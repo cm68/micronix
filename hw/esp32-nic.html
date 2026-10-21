@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ESP32 S-100 Network Card</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Drafting-sheet palette: paper, graphite, one blueprint blue, one warning amber. */
+:root {
+  --bg: #f1f3ef;
+  --panel: #e6ebe6;
+  --panel-2: #dde4de;
+  --ink: #15211f;
+  --muted: #556663;
+  --rule: #c2cdc8;
+  --accent: #1d5f8a;
+  --accent-soft: #d7e5ee;
+  --warn: #8f5410;
+  --warn-soft: #f0e2ce;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --measure: 74ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1416;
+    --panel: #141e20;
+    --panel-2: #1a2628;
+    --ink: #e4ece9;
+    --muted: #93a6a1;
+    --rule: #28383b;
+    --accent: #74b9e0;
+    --accent-soft: #16313f;
+    --warn: #d9a05a;
+    --warn-soft: #33261a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1416;
+  --panel: #141e20;
+  --panel-2: #1a2628;
+  --ink: #e4ece9;
+  --muted: #93a6a1;
+  --rule: #28383b;
+  --accent: #74b9e0;
+  --accent-soft: #16313f;
+  --warn: #d9a05a;
+  --warn-soft: #33261a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.62 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 84px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1060px; margin: 0 auto; }
+.prose { max-width: var(--measure); }
+h1, h2, h3 { text-wrap: balance; letter-spacing: -0.012em; margin: 0; }
+h1 { font-size: clamp(2.05rem, 5vw, 3.1rem); font-weight: 600; line-height: 1.06; }
+h2 { font-size: clamp(1.4rem, 2.6vw, 1.72rem); font-weight: 600; line-height: 1.18; }
+h3 { font-size: 1.06rem; font-weight: 600; line-height: 1.3; }
+p { margin: 0 0 1em; }
+a { color: var(--accent); text-underline-offset: 3px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+code { background: var(--panel); padding: 0.08em 0.32em; border-radius: 3px; }
+strong { font-weight: 600; }
+header.masthead { border-bottom: 1px solid var(--rule); padding-block: 34px 26px; }
+.eyebrow {
+  font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 14px;
+}
+.dek { font-size: 1.1rem; color: var(--muted); max-width: 66ch; margin: 14px 0 0; }
+.specstrip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+  margin-top: 28px;
+}
+.spec { background: var(--bg); padding: 12px 14px; }
+.spec dt {
+  font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--muted); margin: 0 0 3px;
+}
+.spec dd { margin: 0; font-family: var(--mono); font-size: 0.95rem; font-weight: 500; }
+nav.toc { padding: 18px 0 4px; border-bottom: 1px solid var(--rule); }
+nav.toc ol {
+  list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap;
+  gap: 6px 18px; font-family: var(--mono); font-size: 0.78rem;
+}
+nav.toc a { text-decoration: none; color: var(--muted); }
+nav.toc a:hover { color: var(--accent); }
+main { padding-top: 10px; }
+section { padding-block: 38px 6px; border-bottom: 1px solid var(--rule); }
+section:last-of-type { border-bottom: 0; }
+section > .prose { margin-bottom: 18px; }
+.sectionhead { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.sectionhead .tag {
+  font-family: var(--mono); font-size: 0.72rem; color: var(--accent);
+  letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+}
+.lede { font-size: 1.02rem; }
+figure { margin: 22px 0 8px; }
+.figscroll { overflow-x: auto; }
+.figscroll svg { display: block; width: 100%; min-width: 760px; height: auto; }
+figcaption {
+  font-size: 0.8rem; color: var(--muted); margin-top: 8px;
+  max-width: 80ch; line-height: 1.45;
+}
+.scroll { overflow-x: auto; margin: 16px 0 6px; border: 1px solid var(--rule); background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 0.82rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th {
+  font-family: var(--mono); font-weight: 500; font-size: 0.68rem;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  background: var(--panel-2); white-space: nowrap;
+}
+tr:last-child td { border-bottom: 0; }
+td.m, th.m { font-family: var(--mono); font-size: 0.76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.callout {
+  border-left: 3px solid var(--accent); background: var(--accent-soft);
+  padding: 14px 16px; margin: 18px 0; max-width: var(--measure);
+}
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout p:last-child { margin-bottom: 0; }
+.callout .label {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 4px;
+}
+.callout.warn .label { color: var(--warn); }
+ol.steps { max-width: var(--measure); padding-left: 1.25em; margin: 12px 0 0; }
+ol.steps li { margin-bottom: 0.65em; padding-left: 0.2em; }
+ul.plain { max-width: var(--measure); padding-left: 1.1em; margin: 10px 0 0; }
+ul.plain li { margin-bottom: 0.45em; }
+pre {
+  font-family: var(--mono); font-size: 0.78rem; line-height: 1.5;
+  background: var(--panel); border: 1px solid var(--rule); padding: 14px 16px;
+  overflow-x: auto; margin: 16px 0; color: var(--ink);
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+.note { font-size: 0.84rem; color: var(--muted); }
+footer { padding-top: 28px; font-size: 0.8rem; color: var(--muted); }
+footer p { max-width: var(--measure); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { display: inline-block; width: 18px; height: 10px; border: 1.5px solid var(--accent); background: var(--accent-soft); }
+.sw.dash { border-style: dashed; background: none; }
+.sw.hatch { background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 4px); border-color: var(--muted); }
+svg .p { fill: var(--panel); stroke: var(--rule); stroke-width: 1.5; }
+svg .a { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .ad { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 0.7; stroke-dasharray: 2.5 1.5; }
+svg .aw { fill: none; stroke: var(--warn); stroke-width: 0.6; stroke-dasharray: 3 2; }
+svg .txm { fill: var(--muted); }
+svg .txa { fill: var(--accent); }
+svg .txw { fill: var(--warn); }
+svg .ln { stroke: currentColor; fill: none; }
+svg .lna { stroke: var(--accent); fill: none; }
+svg .lnw { stroke: var(--warn); fill: none; }
+svg .lnm { stroke: var(--muted); fill: none; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">NET.md hardware · S-100 prototype card</p>
+  <h1>ESP32 S-100 Network Card</h1>
+  <p class="dek">Logical and physical layout of the card on the s100computers Buffered Prototyping Board, with a DOIT ESP32 DevKit V1. Two I/O ports, one open-collector interrupt, and enough jelly-bean glue to keep the bus buffering on the board.</p>
+  <dl class="specstrip">
+    <div class="spec"><dt>Board</dt><dd>Buffered proto V3.0a</dd></div>
+    <div class="spec"><dt>Module</dt><dd>DOIT DevKit V1, 30-pin</dd></div>
+    <div class="spec"><dt>Ports</dt><dd>0x60 / 0x61</dd></div>
+    <div class="spec"><dt>Interrupt</dt><dd>VI5, pin 9</dd></div>
+    <div class="spec"><dt>Card I/O</dt><dd>21 GPIO</dd></div>
+    <div class="spec"><dt>Board mods</dt><dd>1 trace cut</dd></div>
+  </dl>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <ol>
+    <li><a href="#contract">01 Contract</a></li>
+    <li><a href="#logical">02 Logical</a></li>
+    <li><a href="#levels">03 Levels</a></li>
+    <li><a href="#physical">04 Physical</a></li>
+    <li><a href="#power">05 Power</a></li>
+    <li><a href="#bringup">06 Bring-up</a></li>
+    <li><a href="#timing">07 Timing</a></li>
+    <li><a href="#firmware">08 Firmware map</a></li>
+    <li><a href="#sources">09 References</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="contract">
+  <div class="sectionhead"><span class="tag">01</span><h2>The contract</h2></div>
+  <div class="prose">
+    <p>The guest drives two byte-wide ports and sleeps on one interrupt line. Everything above the byte channel — framing, the eight sockets, JOIN/OPEN/SEND/STATUS — is the ESP32's job and matches <code>sys/NET.md</code> and the simulator's <code>nic.c</code>.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Port</th><th class="m">Address</th><th>Read</th><th>Write</th></tr></thead>
+      <tbody>
+        <tr><td>NETDATA</td><td class="m">0x60</td><td>next RX FIFO byte</td><td>one TX FIFO byte</td></tr>
+        <tr><td>NETSTAT</td><td class="m">0x61</td><td><code>RXRDY 0x01</code> <code>TXRDY 0x02</code> <code>RDY 0x04</code></td><td>ignored</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="prose" style="margin-top:18px">
+    <p><strong>Interrupt.</strong> The card pulls <code>/VI5</code> low while the RX FIFO holds a byte and releases it when the guest drains the FIFO. It is an open-collector, level-asserted line: the 7406 sinks it, a 4.7 kΩ pull-up restores it. VI5 is S-100 edge pin 9, also brought out on the proto board at <code>P23.8</code>.</p>
+    <p><strong>Board versions.</strong> The layout below is checked against the V3.0a KiCad artwork (the 2017 release). The V2 board has the same P40–P48 headers and the same 74LS682, but its 74LS682 Q jumpers are three-pin GND/Q/VCC shunts; the V3 board uses two-pin shunts to GND and relies on the 682's internal Q pull-ups. Strap tables give both.</p>
+  </div>
+</section>
+
+<section id="logical">
+  <div class="sectionhead"><span class="tag">02</span><h2>Logical layout</h2></div>
+  <div class="prose">
+    <p>The proto board already buffers the S-100 address, data and control lines in 74LS245s and decodes the port in a 74LS682. The card adds only what the module needs: a 5 V to 3.3 V receive path, the 3.3 V data-in drive into the board's DI buffer, and the open-collector interrupt driver.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+    <svg viewBox="0 0 960 440" role="img" aria-label="Block diagram: S-100 bus through the proto board buffers and 74LS682 to the level shifters and ESP32, with the DI drive back to the bus and the 7406 interrupt to VI5">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+        </marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="12" fill="currentColor">
+        <!-- bus -->
+        <rect x="24" y="52" width="92" height="330" class="p"></rect>
+        <text x="70" y="72" text-anchor="middle" font-size="13" font-weight="600">S-100 bus</text>
+        <text x="70" y="90" text-anchor="middle" font-size="10" class="txm">J1 edge</text>
+        <text x="70" y="100" text-anchor="middle">A0–A7</text>
+        <text x="70" y="140" text-anchor="middle">DO0–DO7</text>
+        <text x="70" y="180" text-anchor="middle">DI0–DI7</text>
+        <text x="70" y="220" text-anchor="middle">sOUT</text>
+        <text x="70" y="250" text-anchor="middle">sINP</text>
+        <text x="70" y="330" text-anchor="middle" class="txa" font-weight="600">VI5*</text>
+
+        <!-- proto buffers -->
+        <rect x="148" y="52" width="196" height="218" class="p"></rect>
+        <text x="246" y="72" text-anchor="middle" font-size="13" font-weight="600">Proto board buffers</text>
+        <text x="246" y="90" text-anchor="middle" font-size="10" class="txm">74LS245 · existing</text>
+        <text x="246" y="100" text-anchor="middle">A0b</text>
+        <text x="246" y="140" text-anchor="middle">DO0b–DO7b</text>
+        <text x="246" y="180" text-anchor="middle">DI0b–DI7b</text>
+        <text x="246" y="220" text-anchor="middle">sOUTb</text>
+        <text x="246" y="250" text-anchor="middle">sINPb</text>
+        <text x="340" y="136" text-anchor="end" font-size="9" class="txm">U109 A→B</text>
+        <text x="340" y="176" text-anchor="end" font-size="9" class="txm">U107 B→A</text>
+
+        <!-- bus to buffers -->
+        <g class="ln" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="116" y1="100" x2="146" y2="100"></line>
+          <line x1="116" y1="140" x2="146" y2="140"></line>
+          <line x1="116" y1="220" x2="146" y2="220"></line>
+          <line x1="116" y1="250" x2="146" y2="250"></line>
+        </g>
+
+        <!-- 682 -->
+        <rect x="148" y="292" width="196" height="58" class="a"></rect>
+        <text x="246" y="314" text-anchor="middle" font-size="12" font-weight="600">74LS682</text>
+        <text x="246" y="332" text-anchor="middle" font-size="10">0x60 · A0 ignored</text>
+        <path d="M116 100 L140 100 L140 292" class="lnm" stroke-width="1.1" stroke-dasharray="3 3"></path>
+        <text x="126" y="96" font-size="9" class="txm">addr</text>
+
+        <!-- SEL to buffers and to shifter -->
+        <line x1="200" y1="292" x2="200" y2="272" class="lna" stroke-width="1.4" marker-end="url(#ar)"></line>
+        <text x="206" y="284" font-size="9" class="txa">to OE</text>
+        <path d="M280 292 L280 270 L372 270 L372 210 L390 210" class="lna" stroke-width="1.4" marker-end="url(#ar)"></path>
+        <text x="300" y="266" font-size="9" class="txa">SEL*</text>
+
+        <!-- level shift -->
+        <rect x="392" y="76" width="150" height="150" class="a"></rect>
+        <text x="467" y="100" text-anchor="middle" font-size="12" font-weight="600" class="txa">373 + 2× LVC245</text>
+        <text x="467" y="118" text-anchor="middle" font-size="10">5 V → 3.3 V</text>
+        <text x="467" y="142" text-anchor="middle" font-size="10">DO0–7 via U23</text>
+        <text x="467" y="158" text-anchor="middle" font-size="9" class="txm">LE = sOUT &amp; SEL* (U24)</text>
+        <text x="467" y="176" text-anchor="middle" font-size="10">A0 · sOUT · sINP · SEL*</text>
+        <text x="467" y="194" text-anchor="middle" font-size="10" class="txm">VCC = 3.3 V</text>
+        <text x="467" y="210" text-anchor="middle" font-size="9" class="txm">DIR = 3V3 · /OE = GND</text>
+        <g class="ln" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="344" y1="140" x2="390" y2="140"></line>
+          <line x1="344" y1="100" x2="390" y2="112"></line>
+          <line x1="344" y1="220" x2="390" y2="190"></line>
+          <line x1="344" y1="250" x2="390" y2="200"></line>
+        </g>
+
+        <!-- ESP32 -->
+        <rect x="588" y="60" width="196" height="220" fill="var(--panel)" stroke="currentColor" stroke-width="1.6"></rect>
+        <text x="686" y="86" text-anchor="middle" font-size="13" font-weight="600">ESP32</text>
+        <text x="686" y="104" text-anchor="middle" font-size="10" class="txm">DOIT DevKit V1</text>
+        <rect x="608" y="124" width="156" height="58" rx="1" fill="var(--bg)" stroke="var(--rule)"></rect>
+        <text x="686" y="146" text-anchor="middle" font-size="11">core 0 · bus loop</text>
+        <text x="686" y="164" text-anchor="middle" font-size="10" class="txm">poll, capture, IRQ</text>
+        <rect x="608" y="196" width="156" height="58" rx="1" fill="var(--bg)" stroke="var(--rule)"></rect>
+        <text x="686" y="218" text-anchor="middle" font-size="11">core 1 · lwIP</text>
+        <text x="686" y="236" text-anchor="middle" font-size="10" class="txm">wifi + sockets</text>
+        <line x1="542" y1="156" x2="586" y2="156" class="ln" stroke-width="1.4" marker-end="url(#ar)"></line>
+        <text x="564" y="148" text-anchor="middle" font-size="10">12 in</text>
+
+        <!-- wifi -->
+        <rect x="824" y="96" width="118" height="80" class="p"></rect>
+        <text x="883" y="126" text-anchor="middle" font-size="12" font-weight="600">WiFi</text>
+        <text x="883" y="146" text-anchor="middle" font-size="10" class="txm">host · sockets</text>
+        <g class="ln" stroke-width="1.4" marker-end="url(#ar)">
+          <line x1="784" y1="140" x2="822" y2="140"></line>
+          <line x1="822" y1="160" x2="784" y2="160"></line>
+        </g>
+        <text x="803" y="132" text-anchor="middle" font-size="9">frames</text>
+
+        <!-- DI path -->
+        <path d="M588 300 L600 300 L600 390 L360 390 L360 180 L346 180" class="lna" stroke-width="1.5" marker-end="url(#ar)"></path>
+        <text x="470" y="384" text-anchor="middle" font-size="10" class="txa">DI0–DI7 · 3.3 V, no shifter</text>
+
+        <!-- interrupt -->
+        <rect x="824" y="300" width="118" height="58" class="a"></rect>
+        <text x="883" y="322" text-anchor="middle" font-size="12" font-weight="600">7406</text>
+        <text x="883" y="340" text-anchor="middle" font-size="10">open collector</text>
+        <line x1="784" y1="329" x2="822" y2="329" class="ln" stroke-width="1.4" marker-end="url(#ar)"></line>
+        <text x="803" y="321" text-anchor="middle" font-size="9">GPIO12</text>
+        <path d="M883 358 L883 410 L70 410 L70 340" class="lna" stroke-width="1.6" marker-end="url(#ar)"></path>
+        <text x="470" y="424" text-anchor="middle" font-size="10" class="txa">VI5* — held low while RXRDY</text>
+
+        <!-- power note -->
+        <text x="24" y="438" font-size="10" class="txm">+8 V → 7805 → +5 V → DOIT VIN → 3.3 V → LVC245 VCC</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Two paths carry the card: a receive path from the board's buffered pads through the LVC245s into the ESP32, and a transmit path from the ESP32 into the board's DI buffer. The 682's <code>SEL*</code> gates both data buffers and tells the ESP32 the cycle is ours; the 7406 is the only driver on VI5.</figcaption>
+  </figure>
+
+  <h3>Signal schedule</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Signal</th><th class="m">Board pad / header</th><th>Direction</th><th class="m">GPIO</th><th class="m">Module pad</th></tr></thead>
+      <tbody>
+        <tr><td>A0b</td><td class="m">P40.5</td><td>→ card</td><td class="m">39 (VN)</td><td class="m">B1</td></tr>
+        <tr><td>SEL* (682 /P=Q)</td><td class="m">P47.9</td><td>→ card, → U107/U109 OE</td><td class="m">34</td><td class="m">D1</td></tr>
+        <tr><td>sOUTb</td><td class="m">P44.9</td><td>→ card</td><td class="m">35</td><td class="m">E1</td></tr>
+        <tr><td>sINPb</td><td class="m">P44.7</td><td>→ card</td><td class="m">36 (VP)</td><td class="m">C1</td></tr>
+        <tr><td>DO0b–DO7b</td><td class="m">P54.1–P54.8</td><td>→ card</td><td class="m">32 33 25 26 27 14 13 4</td><td class="m">F1 G1 H1 I1 J1 K1 M1 K10</td></tr>
+        <tr><td>DI0b–DI7b</td><td class="m">P50.1–P50.8</td><td>card →</td><td class="m">16 17 5 18 19 21 22 23</td><td class="m">J10 I10 H10 G10 F10 E10 B10 A10</td></tr>
+        <tr><td>VI5*</td><td class="m">P23.8 / J1.9</td><td>card → bus</td><td class="m">12</td><td class="m">L1</td></tr>
+        <tr><td>+5 V</td><td class="m">P57/P59/… VCC rail</td><td>→ card</td><td class="m">VIN</td><td class="m">O1</td></tr>
+        <tr><td>+3.3 V</td><td class="m">module 3V3</td><td>→ LVC245</td><td class="m">3V3</td><td class="m">O10</td></tr>
+        <tr><td>GND</td><td class="m">P56/P58/… rail</td><td>—</td><td class="m">GND</td><td class="m">N1 · N10</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Module pad names are PGA positions in the P7 socket: column 1 is the left header, column 10 the right; rows A to O run from the antenna end toward the USB end. The module's own header order is EN, VN, VP, 34, 35, 32, 33, 25, 26, 27, 14, 12, 13, GND, VIN on the left and 23, 22, TX0, RX0, 21, 19, 18, 5, 17, 16, 4, 2, 15, GND, 3V3 on the right; verify against the silkscreen before soldering.</p>
+
+  <h3>Board straps</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Buffer / net</th><th class="m">Strap</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>U101 DIR / OE</td><td class="m">P40.1→VCC · P40.3→GND</td><td>enable A0b, A→B</td></tr>
+        <tr><td>U105 DIR / OE</td><td class="m">P44.1→VCC · P44.3→GND</td><td>enable sOUTb, sINPb</td></tr>
+        <tr><td>U102, U103, U104</td><td class="m">P41.3 / P42.3 / P43.3 → VCC</td><td>unused, disable outputs</td></tr>
+        <tr><td>U106 (spare 244)</td><td class="m">P45.1, P45.3 → VCC</td><td>unused, disable</td></tr>
+        <tr><td>U107 DI buffer</td><td class="m">P46.1→GND · P46.3→SEL*</td><td>B→A, drive only our port</td></tr>
+        <tr><td>U109 DO buffer</td><td class="m">P48.1→VCC · P48.3→SEL*</td><td>A→B, mirror only our port</td></tr>
+        <tr><td>U108 (spare 245)</td><td class="m">P49.3→VCC</td><td>unused, disable</td></tr>
+        <tr><td>682 Q jumpers</td><td class="m">fit JP11, JP8, JP7, JP6, JP5, JP4; leave JP10, JP9 open</td><td>0x60; fit = Q low, open = internal pull-up high (V3)</td></tr>
+        <tr><td>682 A0 input</td><td class="m">lift U110 pin 17, wire to GND</td><td>ignore A0 so 0x61 matches</td></tr>
+        <tr><td>SEL* pull-up</td><td class="m">4.7 kΩ P47.9 → +5 V</td><td>682 output is open collector</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn">
+    <span class="label">One trace cut</span>
+    <p>The 682 compares A7…A0, with A0 on P7 (pin 17). To make it match both 0x60 and 0x61, lift U110 pin 17 from the A0 net and wire it to ground; fit JP4 (Q7 = 0). Without this, the card answers 0x60 only. If you will not cut a trace, a second 74LS682 or a 74LS688 dead-bugged on the proto area can decode A7…A1 instead; the rest of the layout is unchanged.</p>
+  </div>
+  <p class="note">On a V2 board the Q jumpers are three-pin: shunt pins 1–2 for Q = 0, pins 2–3 for Q = 1. The fit/open table above is the V3 equivalent. The 682 sees only A0–A7, so the upper I/O byte is ignored, as on any 8-bit S-100 card. If your system pages I/O with A8–A15 and another board also answers 0x60 in a different page, add a second comparator on those lines.</p>
+
+  <h3>Write latch and 6 MHz</h3>
+  <div class="prose">
+    <p>At 6 MHz the Z80's I/O write window is only about 250 ns, too tight to trust a firmware poll of DO0b–DO7b. Latch the byte in hardware. U23 is a 74LS373: D0–D7 from P54.1–P54.8, Q0–Q7 to U20 A0–A7, LE from U24, /OE grounded, V<sub>CC</sub> = +5 V. The D inputs get 10 kΩ pull-downs so they are defined when U109 is disabled. U24 is a 74LS00 that makes LE = sOUTb AND SEL*, so only our port is captured.</p>
+    <p>The latch is transparent while sOUT is high and holds the byte when it falls. The ESP32 detects the falling edge of sOUTb with SEL* low and reads the held byte through U20 at its own speed. At 6 MHz the strobe is about 250 ns — 60 cycles at 240 MHz — so core 0 sees it, and the data is stable before and after.</p>
+  </div>
+  <div class="grid2">
+    <div class="scroll">
+      <table>
+        <thead><tr><th class="m">373 pin</th><th>Signal</th><th class="m">373 pin</th><th>Signal</th></tr></thead>
+        <tbody>
+          <tr><td class="m">1</td><td>/OE (GND)</td><td class="m">2</td><td>Q0</td></tr>
+          <tr><td class="m">3</td><td>D0 (P54.1)</td><td class="m">4</td><td>D1 (P54.2)</td></tr>
+          <tr><td class="m">5</td><td>Q1</td><td class="m">6</td><td>Q2</td></tr>
+          <tr><td class="m">7</td><td>D2 (P54.3)</td><td class="m">8</td><td>D3 (P54.4)</td></tr>
+          <tr><td class="m">9</td><td>Q3</td><td class="m">10</td><td>GND</td></tr>
+          <tr><td class="m">11</td><td>LE (U24.8)</td><td class="m">12</td><td>Q4</td></tr>
+          <tr><td class="m">13</td><td>D4 (P54.5)</td><td class="m">14</td><td>D5 (P54.6)</td></tr>
+          <tr><td class="m">15</td><td>Q5</td><td class="m">16</td><td>Q6</td></tr>
+          <tr><td class="m">17</td><td>D6 (P54.7)</td><td class="m">18</td><td>D7 (P54.8)</td></tr>
+          <tr><td class="m">19</td><td>Q7</td><td class="m">20</td><td>V<sub>CC</sub> (+5 V)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th class="m">74LS00 gate</th><th class="m">Pins</th><th>Connection</th></tr></thead>
+        <tbody>
+          <tr><td class="m">1</td><td class="m">1,2 → 3</td><td>SEL* (P47.9) → select (NOT SEL*)</td></tr>
+          <tr><td class="m">2</td><td class="m">4,5 → 6</td><td>sOUTb (P44.9), select → n (NAND)</td></tr>
+          <tr><td class="m">3</td><td class="m">9,10 → 8</td><td>n → LE (U23.11)</td></tr>
+          <tr><td class="m">—</td><td class="m">7,14</td><td>GND, +5 V; unused gate inputs tied</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="levels">
+  <div class="sectionhead"><span class="tag">03</span><h2>Level translation</h2></div>
+  <div class="prose">
+    <p>The board's “buffered” pads are 74LS245 outputs running from a 5 V rail. That matters: an LS high is <strong>2.7 V minimum, about 3.4 V typical</strong>, not 5.0 V. The ESP32's input-high threshold is 0.75 × 3.3 V ≈ 2.48 V, and its absolute maximum on a GPIO is 3.6 V.</p>
+    <p>A 2:1 divider from an LS high lands near 1.7 V, below the ESP32's threshold; the earlier note that a divider gives “about 2.5 V” assumed a 5.0 V source that these pads do not provide. Do not use 10 kΩ/10 kΩ dividers here.</p>
+  </div>
+  <div class="callout">
+    <span class="label">Use a 74LVC245 at 3.3 V</span>
+    <p>Two DIP-20 74LVC245 transceivers, V<sub>CC</sub> = 3.3 V on pin 20 from the module's 3V3, pin 10 to ground. Their inputs are 5 V tolerant to 5.5 V, their input-high threshold is 2.0 V at 3.3 V, and their outputs swing 0–3.3 V into the ESP32 with ±24 mA drive. Use each as a one-way buffer: <strong>DIR (pin 1) to 3.3 V</strong> for A→B, <strong>/OE (pin 19) to ground</strong>. The A side is the latch's Q0–Q7 on U20 and the board's buffered pads on U21; the B side is the ESP32. U20 carries the latched Q0–Q7 on A0–A7; U21 carries sOUTb, sINPb, SEL* and A0b on A0–A3. Tie U21's spare A4–A7 (pins 6–9) to ground and leave its B4–B7 open.</p>
+  </div>
+  <div class="prose">
+    <p>The pinout is the familiar '245: DIR 1, A0–A7 2–9, GND 10, B7–B0 11–18, /OE 19, VCC 20. The B side runs backwards — B0 is pin 18 and B7 is pin 11 — which is the easy wiring mistake.</p>
+    <p><strong>Never put an LVC245 in one of the board's 5 V buffer sockets.</strong> These two are new positions in P14, powered from 3.3 V; U101–U109 stay on the 5 V rail. The 5 V tolerance is specified with V<sub>CC</sub> present; if the board can be powered with the module removed and the 5 V bus live, 1 kΩ series resistors on the twelve A inputs limit the clamp current.</p>
+    <p>If you would rather use the through-hole part, two <strong>CD4050BE</strong> hex buffers at V<sub>DD</sub> = 3.3 V are the alternate: inputs tolerate 18 V, V<sub>IH</sub> is about 0.7 × V<sub>DD</sub> ≈ 2.3 V, outputs are 0–3.3 V, and they are slower. The signals are the same, but the pinout and the P14 sockets differ (DIP-16).</p>
+  </div>
+  <div class="prose">
+    <p>The other direction needs no translator. The ESP32's 3.3 V high is above the 74LS245's 2.0 V V<sub>IH</sub>, so DI0b–DI7b drive U107's B-side inputs directly. The 7406 is also a TTL-threshold part, so GPIO12 drives its input directly.</p>
+    <p>Add 10 kΩ pull-downs on DO0b–DO7b. U109's B side follows the S-100 DO lines, which float when no write is in progress; the pull-downs keep the LVC245 A inputs defined and keep the ESP32 from reading noise. GPIO5 and GPIO15 are strapping pins: GPIO5 is one of the DI outputs, so fit a 10 kΩ pull-up from that module pad (H10) to 3.3 V; GPIO12 is the interrupt output, so fit a 10 kΩ pull-down from L1 to ground. GPIO15 is unused.</p>
+    <p>Do not use an LVC245 for VI5; it is push-pull, and the interrupt line needs the open-collector 7406 (or a 74HCT06).</p>
+  </div>
+</section>
+
+<section id="physical">
+  <div class="sectionhead"><span class="tag">04</span><h2>Physical layout</h2></div>
+  <div class="prose">
+    <p>The board is the standard 254 × 127 mm (10 × 5 in) S-100 card, with the 100-pin edge tongue along the bottom. The top half is twelve 15 × 15 PGA wire-wrap sockets in two rows; the port decode and the bus buffers sit along the bottom. The ESP32 goes in the top row, its antenna toward the card's top edge, and the level shifters go in the bottom row directly above the data headers.</p>
+  </div>
+
+  <figure>
+    <div class="figscroll">
+    <svg viewBox="-10 8 300 176" role="img" aria-label="Scaled floor plan of the 254 by 127 mm board with the ESP32 in socket P7, level shifters in P14, the 7406 in P10, and the port headers along the bottom">
+      <defs>
+        <pattern id="ant" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--muted);stroke-width:0.7"></line>
+        </pattern>
+        <marker id="par" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+        </marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="4" fill="currentColor">
+        <!-- board -->
+        <rect x="12.7" y="22.86" width="254" height="127" class="p"></rect>
+        <rect x="50.8" y="149.86" width="161.925" height="7.62" fill="var(--panel-2)" stroke="currentColor" stroke-width="0.8"></rect>
+        <text x="131.8" y="154.7" text-anchor="middle" font-size="4" class="txm">100-pin edge</text>
+
+        <!-- dimensions -->
+        <line x1="12.7" y1="15" x2="266.7" y2="15" class="lnm" stroke-width="0.4" marker-start="url(#par)" marker-end="url(#par)"></line>
+        <text x="139.7" y="12.8" text-anchor="middle" font-size="4" class="txm">254 mm</text>
+        <line x1="272" y1="22.86" x2="272" y2="149.86" class="lnm" stroke-width="0.4" marker-start="url(#par)" marker-end="url(#par)"></line>
+        <text x="277" y="89" text-anchor="middle" font-size="4" class="txm" transform="rotate(90 277 89)">127 mm</text>
+
+        <!-- sockets -->
+        <g fill="none" stroke="var(--muted)" stroke-width="0.55">
+          <rect x="34.29" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="72.39" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="110.49" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="148.59" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="186.69" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="224.79" y="23.495" width="38.1" height="38.1"></rect>
+          <rect x="34.29" y="61.595" width="38.1" height="38.1"></rect>
+          <rect x="72.39" y="61.595" width="38.1" height="38.1"></rect>
+          <rect x="110.49" y="61.595" width="38.1" height="38.1"></rect>
+          <rect x="186.69" y="61.595" width="38.1" height="38.1"></rect>
+          <rect x="224.79" y="61.595" width="38.1" height="38.1"></rect>
+        </g>
+        <g font-size="3.4" class="txm" text-anchor="middle">
+          <text x="53.3" y="57.5">P4</text><text x="91.4" y="57.5">P5</text><text x="129.5" y="57.5">P6</text>
+          <text x="205.7" y="57.5">P8</text><text x="243.8" y="57.5">P9</text>
+          <text x="53.3" y="95.5">P10</text><text x="91.4" y="95.5">P11</text><text x="129.5" y="95.5">P12</text>
+          <text x="205.7" y="95.5">P14</text><text x="243.8" y="95.5">P19</text>
+        </g>
+
+        <!-- P13 clear -->
+        <rect x="148.59" y="61.595" width="38.1" height="38.1" class="aw"></rect>
+        <text x="167.6" y="95.5" text-anchor="middle" font-size="3.4" class="txw">P13 clear</text>
+
+        <!-- ESP32 in P7 -->
+        <rect x="147.16" y="18.97" width="28.2" height="53" class="a"></rect>
+        <rect x="147.16" y="18.97" width="28.2" height="11" fill="url(#ant)" stroke="var(--accent)" stroke-width="0.5"></rect>
+        <text x="161.3" y="38" text-anchor="middle" font-size="4.2" font-weight="600" class="txa">ESP32</text>
+        <text x="161.3" y="45" text-anchor="middle" font-size="3.2" class="txa">P7</text>
+        <text x="161.3" y="50" text-anchor="middle" font-size="2.8" class="txa">antenna ↑</text>
+        <rect x="158" y="68" width="6" height="3.5" fill="var(--muted)"></rect>
+        <text x="161.3" y="75.5" text-anchor="middle" font-size="3" class="txm">USB</text>
+        <g fill="var(--accent)">
+          <circle cx="149.86" cy="24.77" r="0.8"></circle><circle cx="172.72" cy="24.77" r="0.8"></circle>
+          <circle cx="149.86" cy="60.33" r="0.8"></circle><circle cx="172.72" cy="60.33" r="0.8"></circle>
+        </g>
+        <line x1="149.86" y1="24.77" x2="149.86" y2="60.33" class="lna" stroke-width="0.4"></line>
+        <line x1="172.72" y1="24.77" x2="172.72" y2="60.33" class="lna" stroke-width="0.4"></line>
+
+        <!-- glue P14 -->
+        <rect x="186.69" y="61.595" width="38.1" height="38.1" class="ad"></rect>
+        <text x="205.7" y="78" text-anchor="middle" font-size="3.6" font-weight="600" class="txa">U23 U20 U21</text>
+        <text x="205.7" y="83" text-anchor="middle" font-size="3" class="txa">latch + LVC245</text>
+
+        <!-- 7406 P10 -->
+        <rect x="34.29" y="61.595" width="38.1" height="38.1" class="ad"></rect>
+        <text x="53.3" y="78" text-anchor="middle" font-size="3.6" font-weight="600" class="txa">7406 U24</text>
+        <text x="53.3" y="83" text-anchor="middle" font-size="3" class="txa">VI5 + LE gate</text>
+
+        <!-- power rails -->
+        <rect x="34.29" y="100.3" width="218.0" height="3.4" fill="var(--panel-2)" stroke="var(--muted)" stroke-width="0.3"></rect>
+        <text x="36" y="102.8" font-size="2.8" class="txm">VCC/GND rails · P56–P67</text>
+
+        <!-- headers -->
+        <g fill="var(--panel-2)" stroke="var(--muted)" stroke-width="0.3">
+          <rect x="128.35" y="106.9" width="10" height="4.6"></rect>
+          <rect x="245.19" y="106.9" width="10" height="4.6"></rect>
+          <rect x="67.39" y="106.9" width="10" height="4.6"></rect>
+          <rect x="71.2" y="141.85" width="10" height="4.6"></rect>
+        </g>
+        <g font-size="3.1">
+          <text x="133.35" y="105.6" text-anchor="middle">P40</text>
+          <text x="250.19" y="105.6" text-anchor="middle">P44</text>
+          <text x="72.39" y="105.6" text-anchor="middle">P47</text>
+          <text x="76.2" y="140.5" text-anchor="middle">P23</text>
+        </g>
+        <g fill="var(--panel-2)" stroke="var(--muted)" stroke-width="0.3">
+          <rect x="204.01" y="110.93" width="6" height="4.2"></rect>
+          <rect x="204.01" y="126.17" width="6" height="4.2"></rect>
+        </g>
+        <text x="211" y="114" font-size="3.1">P54 DO</text>
+        <text x="211" y="129.3" font-size="3.1">P50 DI</text>
+
+        <!-- power entry -->
+        <rect x="18" y="130" width="13" height="13" fill="var(--panel)" stroke="var(--muted)" stroke-width="0.4"></rect>
+        <text x="24.5" y="135.5" text-anchor="middle" font-size="3">U1</text>
+        <text x="24.5" y="139.5" text-anchor="middle" font-size="2.8" class="txm">7805</text>
+
+        <!-- bottom ICs -->
+        <g fill="var(--panel)" stroke="var(--muted)" stroke-width="0.3">
+          <rect x="50.8" y="116.2" width="25.4" height="7.6"></rect>
+          <rect x="88.9" y="116.2" width="25.4" height="7.6"></rect>
+          <rect x="127" y="116.2" width="25.4" height="7.6"></rect>
+          <rect x="165.1" y="116.2" width="25.4" height="7.6"></rect>
+          <rect x="228.6" y="116.8" width="25.4" height="7.6"></rect>
+          <rect x="88.8" y="128.7" width="25.4" height="7.6"></rect>
+          <rect x="50.8" y="128.9" width="25.4" height="7.6"></rect>
+          <rect x="127" y="128.9" width="25.4" height="7.6"></rect>
+          <rect x="165.1" y="128.9" width="25.4" height="7.6"></rect>
+          <rect x="228.6" y="129.5" width="25.4" height="7.6"></rect>
+        </g>
+        <g font-size="3.0" text-anchor="middle">
+          <text x="63.5" y="121">U106</text>
+          <text x="101.6" y="121">U103</text>
+          <text x="139.7" y="121">U101</text>
+          <text x="177.8" y="121">U109</text>
+          <text x="241.3" y="121.6">U107</text>
+          <text x="101.5" y="133.5">U104</text>
+          <text x="63.5" y="133.7">U110</text>
+          <text x="139.7" y="133.7">U102</text>
+          <text x="177.8" y="133.7">U108</text>
+          <text x="241.3" y="134.3">U105</text>
+        </g>
+
+        <!-- A0 cut -->
+        <circle cx="70" cy="131" r="2.2" class="lnw" stroke-width="0.7"></circle>
+        <line x1="70" y1="131" x2="70" y2="124" class="lnw" stroke-width="0.5"></line>
+        <line x1="70" y1="124" x2="83" y2="124" class="lnw" stroke-width="0.5"></line>
+        <text x="84" y="127.2" font-size="2.5" class="txw">cut A0 → GND (U110.17)</text>
+
+        <!-- VI5 route -->
+        <path d="M53.3 99.7 L53.3 108 L48 108 L48 137 L76.2 137 L76.2 141.85" class="lna" stroke-width="0.6" stroke-dasharray="3 2" marker-end="url(#par)"></path>
+        <text x="84" y="135" font-size="3" class="txa">VI5</text>
+
+        <!-- power route -->
+        <path d="M205.7 99.9 L205.7 92" class="lnm" stroke-width="0.5" marker-end="url(#par)"></path>
+        <text x="208" y="96" font-size="3" class="txm">3V3 / 5V</text>
+
+        <text x="12.7" y="168" font-size="3.2" class="txm">board-file coordinates, mm · x → · y ↓</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Scaled to the V3.0a board file. The module plugs into P7 with its antenna past the top edge; P13 stays empty because the module body overhangs it. The level shifters sit in P14, between the module and the P50/P54 data headers. The 7406 in P10 is close to the VI5 tap at P23.8. Amber marks the one trace cut; dashed outlines are additions.</figcaption>
+    <div class="legend">
+      <span><i class="sw"></i> added part</span>
+      <span><i class="sw dash"></i> keep clear / dashed</span>
+      <span><i class="sw hatch"></i> antenna keepout</span>
+    </div>
+  </figure>
+
+  <h3>Placement</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Part</th><th>Location</th><th class="m">Center (x, y mm)</th><th>Mounting note</th></tr></thead>
+      <tbody>
+        <tr><td>DOIT ESP32 DevKit V1</td><td>P7, columns 1 and 10, rows A–O</td><td class="m">167.64, 42.55</td><td>two 1×15 female headers; antenna toward y = 22.86</td></tr>
+        <tr><td>U23 74LS373 latch</td><td>P14, rows B–E</td><td class="m">205.74, 69.2</td><td>DIP-20 socket</td></tr>
+        <tr><td>U20 74LVC245 (data)</td><td>P14, rows G–J</td><td class="m">205.74, 81.9</td><td>DIP-20 socket</td></tr>
+        <tr><td>U21 74LVC245 (control)</td><td>P14, rows K–N</td><td class="m">205.74, 92.1</td><td>DIP-20 socket</td></tr>
+        <tr><td>U22 7406</td><td>P10, rows G–J</td><td class="m">53.34, 81.9</td><td>DIP-14 socket</td></tr>
+        <tr><td>U24 74LS00</td><td>P10, rows B–E</td><td class="m">53.34, 69.2</td><td>DIP-14 socket</td></tr>
+        <tr><td>DO pull-downs, 8× 10 kΩ</td><td>P14 / P54</td><td class="m">—</td><td>9-pin bussed SIP or discrete</td></tr>
+        <tr><td>SEL* 4.7 kΩ, VI5 4.7 kΩ</td><td>P10 / P47</td><td class="m">—</td><td>to +5 V</td></tr>
+        <tr><td>GPIO5 pull-up, GPIO12 pull-down</td><td>P7 H10 / L1</td><td class="m">—</td><td>10 kΩ, to 3.3 V / GND</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Mechanical notes</h3>
+  <div class="grid2">
+    <div>
+      <p><strong>Antenna.</strong> The module's PCB antenna sits at its top end. In the P7 socket it overhangs the board edge by only about 4 mm; the rest of the keepout is over the P7 pads. That is enough for bench work and marginal in a metal S-100 chassis. If the card lives in a metal box, either mount the module on standoffs 10–15 mm further toward the top edge and feed it with a short 2×15 ribbon, or use an ESP32-WROOM-32U with an external antenna on a bulkhead connector. Do not put a metal panel or the card guide directly over the antenna.</p>
+      <p><strong>USB.</strong> The connector is at the module's lower end, over the P13 area. Program the module before the final assembly or leave a right-angle cable path; P13 is empty for exactly this reason.</p>
+    </div>
+    <div>
+      <p><strong>Height.</strong> The module sits on 8.5 mm female headers. Its lower end overhangs P13 by about 10 mm, clearing the empty socket. Do not install a wire-wrap socket in P13.</p>
+      <p><strong>Wiring.</strong> Use 30 AWG wire-wrap for the bus signals and keep the DO/DI runs short. The SEL* run from P47/U110 to P14 is the longest at about 130 mm; it is a level, not a strobe, so it is not timing-critical. Twist the VI5 run with a ground return if the chassis is noisy.</p>
+      <p><strong>Mounting.</strong> The module's own holes are 2.8 mm, 43.9 mm apart; nylon standoffs are optional once the headers are soldered.</p>
+    </div>
+  </div>
+
+  <h3>Wiring groups</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Group</th><th>From</th><th>To</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>A · latch</td><td>P54.1–8 (DO0b–DO7b)</td><td>U23 D0–D7 (pins 3,4,7,8,13,14,17,18)</td><td>10 kΩ pull-down at each D input</td></tr>
+        <tr><td></td><td>U23 Q0–Q7 (pins 2,5,6,9,12,15,16,19)</td><td>U20 A0–A7 (pins 2–9)</td><td>LE = sOUTb AND SEL*</td></tr>
+        <tr><td>B · receive</td><td>U20 B0–B7 (pins 18–11)</td><td>P7 F1 G1 H1 I1 J1 K1 M1 K10</td><td>DIR=3V3, /OE=GND; GPIO 32 33 25 26 27 14 13 4</td></tr>
+        <tr><td>C · control</td><td>P44.9, P44.7, P47.9, P40.5</td><td>U21 A0–A3 (pins 2–5)</td><td>DIR=3V3, /OE=GND</td></tr>
+        <tr><td></td><td>U21 B0–B3 (pins 18–15)</td><td>P7 E1 C1 D1 B1</td><td>GPIO 35 36 34 39</td></tr>
+        <tr><td></td><td>U21 A4–A7 (pins 6–9)</td><td>GND</td><td>spare channels; B4–B7 open</td></tr>
+        <tr><td>D · data-in</td><td>P7 J10 I10 H10 G10 F10 E10 B10 A10</td><td>P50.1–8 (DI0b–DI7b)</td><td>direct 3.3 V; GPIO 16 17 5 18 19 21 22 23</td></tr>
+        <tr><td>E · latch gate</td><td>P47.9 (SEL*), P44.9 (sOUTb)</td><td>U24 74LS00: pins 1,2; pin 3 → pin 5; pin 4 = sOUTb; pin 8</td><td>pin 8 → U23 LE (pin 11); pins 7/14 = GND/+5 V</td></tr>
+        <tr><td>F · buffer gates</td><td>P47.9 (SEL*)</td><td>P46.3, P48.3</td><td>4.7 kΩ pull-up to +5 V at P47.9</td></tr>
+        <tr><td>G · interrupt</td><td>P7 L1 (GPIO12)</td><td>U22 pin 1</td><td>10 kΩ pull-down; U22 pin 2 → P23.8; 4.7 kΩ to +5 V</td></tr>
+        <tr><td>H · power</td><td>VCC rail</td><td>P7 O1, U22 VCC, U23/U24 VCC, pull-ups</td><td>+5 V</td></tr>
+        <tr><td></td><td>P7 O10 (3V3)</td><td>U20/U21 pin 20</td><td>+3.3 V; 10 µF + 100 nF</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>LVC245 pin map</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="m">'245 pin</th><th>U20 (data)</th><th>U21 (control)</th></tr></thead>
+      <tbody>
+        <tr><td class="m">1 DIR</td><td class="m">3V3</td><td class="m">3V3</td></tr>
+        <tr><td class="m">2 A0</td><td>U23 Q0 (pin 2)</td><td>P44.9 sOUTb</td></tr>
+        <tr><td class="m">3 A1</td><td>U23 Q1 (pin 5)</td><td>P44.7 sINPb</td></tr>
+        <tr><td class="m">4 A2</td><td>U23 Q2 (pin 6)</td><td>P47.9 SEL*</td></tr>
+        <tr><td class="m">5 A3</td><td>U23 Q3 (pin 9)</td><td>P40.5 A0b</td></tr>
+        <tr><td class="m">6–9 A4–A7</td><td>U23 Q4–Q7 (pins 12,15,16,19)</td><td>GND</td></tr>
+        <tr><td class="m">10 GND</td><td class="m">GND</td><td class="m">GND</td></tr>
+        <tr><td class="m">11 B7</td><td>GPIO4 DO7</td><td>open</td></tr>
+        <tr><td class="m">12 B6</td><td>GPIO13 DO6</td><td>open</td></tr>
+        <tr><td class="m">13 B5</td><td>GPIO14 DO5</td><td>open</td></tr>
+        <tr><td class="m">14 B4</td><td>GPIO27 DO4</td><td>open</td></tr>
+        <tr><td class="m">15 B3</td><td>GPIO26 DO3</td><td>GPIO39 A0</td></tr>
+        <tr><td class="m">16 B2</td><td>GPIO25 DO2</td><td>GPIO34 SEL</td></tr>
+        <tr><td class="m">17 B1</td><td>GPIO33 DO1</td><td>GPIO36 sINP</td></tr>
+        <tr><td class="m">18 B0</td><td>GPIO32 DO0</td><td>GPIO35 sOUT</td></tr>
+        <tr><td class="m">19 /OE</td><td class="m">GND</td><td class="m">GND</td></tr>
+        <tr><td class="m">20 VCC</td><td class="m">3V3</td><td class="m">3V3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>74LS373 latch map</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th class="m">D pin</th><th>From</th><th class="m">Q pin</th><th>To</th></tr></thead>
+      <tbody>
+        <tr><td class="m">D0 (3)</td><td>P54.1</td><td class="m">Q0 (2)</td><td>U20 A0 (2)</td></tr>
+        <tr><td class="m">D1 (4)</td><td>P54.2</td><td class="m">Q1 (5)</td><td>U20 A1 (3)</td></tr>
+        <tr><td class="m">D2 (7)</td><td>P54.3</td><td class="m">Q2 (6)</td><td>U20 A2 (4)</td></tr>
+        <tr><td class="m">D3 (8)</td><td>P54.4</td><td class="m">Q3 (9)</td><td>U20 A3 (5)</td></tr>
+        <tr><td class="m">D4 (13)</td><td>P54.5</td><td class="m">Q4 (12)</td><td>U20 A4 (6)</td></tr>
+        <tr><td class="m">D5 (14)</td><td>P54.6</td><td class="m">Q5 (15)</td><td>U20 A5 (7)</td></tr>
+        <tr><td class="m">D6 (17)</td><td>P54.7</td><td class="m">Q6 (16)</td><td>U20 A6 (8)</td></tr>
+        <tr><td class="m">D7 (18)</td><td>P54.8</td><td class="m">Q7 (19)</td><td>U20 A7 (9)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="power">
+  <div class="sectionhead"><span class="tag">05</span><h2>Power</h2></div>
+  <div class="prose">
+    <p>The board's U1 LM7805 is the only regulator the card needs. Feed it from the S-100 +8 V rail and let the module make its own 3.3 V:</p>
+  </div>
+  <pre><code>S-100 +8 V (pins 1, 51)
+   └─ P70 1–2 ─→ U1 LM7805 ─→ +5 V (VCC rail)
+                                ├─ 74LS buffers, 7406, pull-ups
+                                └─ DOIT VIN (O1) ─→ AMS1117-3.3 ─→ 3.3 V
+                                                                     ├─ ESP32
+                                                                     └─ LVC245 VCC</code></pre>
+  <ul class="plain">
+    <li>Fit U1 and jumper <code>P70 1–2</code>; fit <code>K12 1–2</code> for U1's ground. Leave U2/U3 and their input jumpers unpopulated; the card uses no ±12 V.</li>
+    <li>Budget about 360 mA at 5 V: ~120 mA of LS logic, ~240 mA ESP32 peak during WiFi transmit. The 7805 drops about 3 V at that current, so fit a small TO-220 heatsink; +8 V is unregulated and can sit near 7 V at the low end, which is marginal for a 7805 at full WiFi current. If your +8 V rail is weak, feed the module's VIN from a separate 5 V supply for bench work.</li>
+    <li>Decoupling: 470 µF/10 V at the module VIN, 100 nF at VIN and 3V3, 100 nF at each LVC245, 100 nF at the 74LS373 and 74LS00, and 100 nF at the 7406. The ESP32's transmit bursts are the reason for the bulk capacitor.</li>
+    <li>The '245 pinout: pin 20 V<sub>CC</sub> (3.3 V), pin 10 GND, pin 1 DIR, pin 19 /OE. Do not power them from +5 V. The latch and the gate run from +5 V.</li>
+  </ul>
+
+  <h3>Bill of materials</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Qty</th><th>Part</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td class="m">1×</td><td>DOIT ESP32 DevKit V1, 30-pin</td><td>the coprocessor</td></tr>
+        <tr><td class="m">2×</td><td>74LVC245, DIP-20</td><td>5 V → 3.3 V, U20/U21</td></tr>
+        <tr><td class="m">1×</td><td>74LS373, DIP-20</td><td>DO write latch, U23</td></tr>
+        <tr><td class="m">1×</td><td>74LS00, DIP-14</td><td>latch LE gate, U24</td></tr>
+        <tr><td class="m">1×</td><td>7406, DIP-14</td><td>open-collector VI5 driver, U22</td></tr>
+        <tr><td class="m">2×</td><td>1×15 female header, 2.54 mm</td><td>P7 columns 1 and 10</td></tr>
+        <tr><td class="m">3×</td><td>DIP-20 socket</td><td>U20, U21, U23</td></tr>
+        <tr><td class="m">2×</td><td>DIP-14 socket</td><td>U22, U24</td></tr>
+        <tr><td class="m">8×</td><td>10 kΩ</td><td>DO0b–DO7b pull-downs</td></tr>
+        <tr><td class="m">2×</td><td>10 kΩ</td><td>GPIO5 pull-up, GPIO12 pull-down</td></tr>
+        <tr><td class="m">2×</td><td>4.7 kΩ</td><td>SEL* and VI5 pull-ups</td></tr>
+        <tr><td class="m">1×</td><td>470 µF / 10 V</td><td>module VIN bulk</td></tr>
+        <tr><td class="m">1×</td><td>10 µF</td><td>3V3 at the LVC245s</td></tr>
+        <tr><td class="m">6×</td><td>100 nF</td><td>VIN, 3V3, each LVC245, U23, U24, 7406</td></tr>
+        <tr><td class="m">2×</td><td>CD4050BE, DIP-16 (alternate)</td><td>through-hole level shifter if no LVC245s</td></tr>
+        <tr><td class="m">—</td><td>30 AWG wire-wrap, SIP headers</td><td>straps and signal runs</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="bringup">
+  <div class="sectionhead"><span class="tag">06</span><h2>Bring-up</h2></div>
+  <ol class="steps">
+    <li><strong>Build the board first, module last.</strong> Strap the unused buffers, fit the 682 jumpers, make the A0 cut, and add the pull-ups before the module is plugged in.</li>
+    <li><strong>Bench power.</strong> Use an S-100 extender and feed +8 V and ground only. Check +5 V at the VCC rail and 3.3 V at P7 O10 before fitting the module. The module's USB is the easy way to check that it boots.</li>
+    <li><strong>Static bus test.</strong> With a logic analyzer or a slow Z80, read 0x61 after reset: <code>RDY</code> (0x04) should be set once the firmware has joined, and <code>TXRDY</code> (0x02) always. Check <code>SEL*</code> pulses only at 0x60 and 0x61, and not at 0x62.</li>
+    <li><strong>Keep VI5 low at first.</strong> The current guest driver (<code>sys/net.c</code>) polls RXRDY and does not claim the VI5 line. Leave GPIO12 low so the 7406 holds VI5 deasserted; bring the card up on the polled driver. Enable the interrupt only after the guest driver attaches VI5 (<code>sys/INTR.md</code>); an unclaimed level-asserted line is not something to discover on a live bus.</li>
+    <li><strong>Byte loop.</strong> Write a byte to 0x60 and read it back through the firmware's loopback, then exercise the FIFO status in 0x61. Verify U23: LE pulses only when SEL* is low, the D inputs are pulled down when U109 is disabled, and Q0–Q7 hold the byte after <code>sOUT</code> falls. Check the DI setup before <code>sINP</code>.</li>
+    <li><strong>Interrupt.</strong> Once the driver claims the line, confirm VI5 follows the RX FIFO: low while a frame is waiting, high after the last byte is read.</li>
+    <li><strong>Network.</strong> Join, open a UDP socket, and echo against a host. Then run <code>rcp -r</code> against the tree; that is the same guest binary the simulator runs, so a failure is in the bus interface, not the framing.</li>
+  </ol>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Test point</th><th>Where</th><th>Expected</th></tr></thead>
+      <tbody>
+        <tr><td>TP1 +5 V</td><td>VCC rail / P57.1</td><td class="m">4.75–5.25 V</td></tr>
+        <tr><td>TP2 +3.3 V</td><td>P7 O10</td><td class="m">3.2–3.4 V</td></tr>
+        <tr><td>TP3 SEL*</td><td>P47.9</td><td class="m">low only at 0x60/0x61</td></tr>
+        <tr><td>TP4 VI5</td><td>P23.8</td><td class="m">low while RXRDY</td></tr>
+        <tr><td>TP5 DI0</td><td>P50.1</td><td class="m">3.3 V logic</td></tr>
+        <tr><td>TP6 DO0</td><td>P54.1</td><td class="m">follows bus DO on write</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="timing">
+  <div class="sectionhead"><span class="tag">07</span><h2>Timing</h2></div>
+  <div class="prose">
+    <p>The Z80 gives a peripheral roughly 750 ns at 2 MHz, 375 ns at 4 MHz, and about 250 ns at 6 MHz. The read path is pre-driven: the ESP32 keeps DI0b–DI7b set to <code>A0b ? status : rx_peek()</code>, and U107's <code>/OE = SEL*</code> puts that byte on the S-100 DI lines as soon as the port is addressed. The LS245 enable is about 15 ns and the 682 plus the LVC245 add about 30 ns, well inside the 6 MHz window.</p>
+    <p>The write path no longer races the CPU. U23 latches DO0b–DO7b on <code>sOUTb</code>, gated by <code>SEL*</code>, and holds the byte after <code>sOUT</code> falls; the ESP32 reads it through U20 at its own speed. The only thing the firmware must catch is the <code>sOUT</code> edge: at 6 MHz it is about 250 ns wide, 60 cycles at 240 MHz, so core 0 sees it. The 74LS373's setup time is about 20 ns and the U24 gate adds about 10 ns, both comfortable inside the strobe.</p>
+    <p>The ESP32 must consume one latched byte before the next write to our port. The guest's own flow control and the 240 MHz loop make that easy (one byte per 667 ns at 6 MHz); if a future bus master writes the port back to back faster than that, the latch is overwritten and the byte is lost.</p>
+  </div>
+  <div class="prose">
+    <p><strong>If the CPU needs more time</strong>, the S-100 RDY line (pin 72, on the proto board at <code>P26.3</code>) can be pulled low through a second 7406 until the byte is ready; that is the clean way to add wait states, but it is a second handshake and should be added only if the latch is not enough.</p>
+  </div>
+</section>
+
+<section id="firmware">
+  <div class="sectionhead"><span class="tag">08</span><h2>Firmware map</h2></div>
+  <div class="prose">
+    <p>The pin map below is the logical assignment the board wiring implements. Core 0 owns the bus and never calls into lwIP; core 1 owns the stack. The two exchange bytes through single-producer/single-consumer ring buffers.</p>
+  </div>
+  <pre><code>/* bus side, core 0 */
+#define SEL   34   /* active low, from the 682 */
+#define A0    39
+#define SOUT  35
+#define SINP  36
+#define INT   12   /* drives the 7406; low = VI5 released */
+#define DO(n) do_pin[n]   /* 32 33 25 26 27 14 13 4  */
+#define DI(n) di_pin[n]   /* 16 17 5 18 19 21 22 23  */
+
+static int prev_sout;
+
+for (;;) {
+    int sel = !gpio_get(SEL);
+    int a0  =  gpio_get(A0);
+    int sout = gpio_get(SOUT);
+
+    /* read side: pre-drive the byte the CPU will take */
+    if (sel)
+        gpio_put8(DI, a0 ? netstat() : rx_peek());
+
+    /* write side: U23 has latched DO; take it when sOUT falls */
+    if (sel &amp;&amp; !sout &amp;&amp; prev_sout)
+        tx_put(gpio_get8(DO));   /* U20 B -> U23 Q */
+    prev_sout = sout;
+
+    /* a NETDATA read pops the FIFO */
+    if (sel &amp;&amp; !a0 &amp;&amp; gpio_get(SINP))
+        rx_pop();
+
+    /* level-asserted interrupt, only if the guest has claimed it */
+    gpio_put(INT, rx_count() != 0 &amp;&amp; irq_enabled);
+}</code></pre>
+  <p class="note">The loop is illustrative: read the GPIO registers in one batch where the part allows it, and keep the core free of delays. The simulator's <code>nic.c</code> is the golden reference for the frame codec and socket states; only the byte channel is replaced by this loop.</p>
+</section>
+
+<section id="sources">
+  <div class="sectionhead"><span class="tag">09</span><h2>References</h2></div>
+  <ul class="plain">
+    <li><a href="http://s100computers.com/My%20System%20Pages/Prototype%20Board/Prototype%20Board.htm">S100Computers: Buffered Prototype Board</a> — board description; the V3.0a KiCad/Gerber archives are linked there. The placement table above is taken from that archive's netlist and board file.</li>
+    <li><a href="https://deramp.com/downloads/mfe_archive/010-S100%20Computers%20and%20Boards/03-S100%20Computers%20-%20N8VEM/10-S100%20Computers%20S-100%20Boards/S-100%20Prototype%20Board/PU-74LS682.htm">74LS682 port decoding</a> — comparator inputs, the pin-19 match output, and the “tie P and Q low to drop a bit” method used for A0.</li>
+    <li><a href="https://github.com/wokwi/wokwi-boards/blob/main/boards/esp32-devkit-v1/board.json">DOIT ESP32 DevKit V1 board model</a> and <a href="https://www.schematik.io/parts/board-esp32-devkit-v1">schematik.io</a> — physical pin order (EN top-left, 3V3 bottom-right with the antenna at the top).</li>
+    <li><a href="https://www.ti.com/product/SN74LVC245A">SN74LVC245A datasheet</a> — 2.0 V V<sub>IH</sub> at 3.3 V, 5.5 V-tolerant inputs, ±24 mA drive.</li>
+    <li><a href="https://www.ti.com/lit/ds/symlink/cd4049ub.pdf">CD4049UB/CD4050B datasheet</a> — the through-hole alternate (V<sub>CC</sub> 1, V<sub>SS</sub> 8, 5 V-tolerant inputs).</li>
+    <li><a href="https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32/esp-hardware-design-guidelines-en-master-esp32.pdf">Espressif ESP32 hardware design guidelines</a> — antenna keepout and module placement.</li>
+    <li>Project files: <code>src/micronix/sys/NET.md</code> (the contract), <code>src/hwsim/d1/nic.c</code> (the reference implementation), <code>src/micronix/sys/net.c</code> (the guest driver), <code>src/micronix/sys/INTR.md</code> (the VI-line rules).</li>
+  </ul>
+</section>
+
+<footer>
+  <p>Layout checked against the s100computers Buffered Prototyping Board V3.0a board file: 254 × 127 mm outline, P4–P19 PGA sockets on a 2.54 mm grid, P40–P48 buffered signal headers, P50/P54 data headers, P23 bus taps, U101–U110 at the bottom. Verify pad names against your board revision before cutting anything.</p>
+  <p>The printable placement-and-wiring sheet is <code>esp32-nic-wiring.svg</code> (and <code>.png</code>) beside this file.</p>
+</footer>
+
+</main>
+</div>
+</body>
+</html>
