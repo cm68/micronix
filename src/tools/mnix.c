@@ -838,14 +838,22 @@ fsinfo(int c, char **a)
     printf("free list: \n");
 
     bcopy(fs->s_free, fl, sizeof(fl));
+    if (fs->s_nfree > 100) {
+        printf("bad free list count %d\n", fs->s_nfree);
+        return 1;
+    }
     fi = fs->s_nfree - 1;
 
     /* scan through whole freelist from end */
     k = 0;
-    while ((b = fl[fi]) != 0) {
+    while (fi >= 0 && (b = fl[fi]) != 0) {
         if (!fi) {
             readblk(fs, b, (char *)buf);
-            fi = buf[0] - 1;
+            if (buf[0] > 100) {
+                printf("bad free list block %d count %d\n", b, buf[0]);
+                return 1;
+            }
+            fi = buf[0] - 1;    /* a count of zero ends the list */
             bcopy(&buf[1], fl, sizeof(fl));
             printf(" ...");
         } else {
@@ -859,6 +867,7 @@ fsinfo(int c, char **a)
         }
     }
     if (k) printf("\n");
+    return 0;
 }
 
 /*

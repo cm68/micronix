@@ -135,12 +135,22 @@ check(file)
         /* copy the freelist from superblock to fl */
         memcpy(fl, fs->s_free, sizeof(fl));
         i = fs->s_nfree - 1;
+        if (fs->s_nfree > 100) {
+            printf("bad free list count %d\n", fs->s_nfree);
+            nerror |= 01;
+            i = -1;
+        }
 
         /* scan through whole freelist from end */
-        while ((b = fl[i]) != 0) {
+        while (i >= 0 && (b = fl[i]) != 0) {
             if (!i) {
                 readblk(fs, b, (char *)buf);
-                i = buf[0] - 1;
+                if (buf[0] > 100) {
+                    printf("bad free list block %d count %d\n", b, buf[0]);
+                    nerror |= 01;
+                    break;
+                }
+                i = buf[0] - 1;     /* a count of zero ends the list */
                 memcpy(fl, &buf[1], sizeof(fl));
             } else {
                 i--;
