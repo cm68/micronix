@@ -131,6 +131,16 @@ _tint:
 	pop	af
 	ret
 
+;
+; execv and execl read the environment vector through _environ.  upm's
+; crt is this file, not libunix's crt0, so nothing defines it; CP/M has
+; no environment, and a child upm starts gets an empty one.  It is in
+; text, not data: upm_ccp.o's data must be the first data segment so it
+; lands at 0100, and this word is only ever read.
+;
+	.global _environ
+_environ:	.dw	0
+
 	.text
 __Htext::	.dw	0
 __Ltext::	.dw	0

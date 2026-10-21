@@ -1,10 +1,10 @@
 /*
  * The network disk's module header (sys/ovl.h), in an object of its own.
  *
- * The card is port-mapped and always present in the simulator, so there
- * is no presence probe and no init: init is zero and the driver is
- * registered the moment it is placed.  It has one thing to say on its
- * own - op-done - which arrives as the one interrupt this header names.
+ * The card is port-mapped, so init is zero and the driver is registered
+ * the moment it is placed.  It has one thing to say on its own - op-done
+ * - which arrives as the one interrupt this header names, and the probe
+ * is an ND_READ of block 0: a tickle with no side effect (sys/INTR.md).
  *
  * name is a character list rather than the string it reads as;
  * sys/ovl.h says why.

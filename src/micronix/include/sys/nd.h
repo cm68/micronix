@@ -6,19 +6,20 @@
  * A port-mapped, programmed-I/O block device: three registers, a 4-byte
  * block number and a 512-byte data area, fetched and stored against a
  * backing file on the far side of the card.  sys/nd.c is the driver,
- * hwsim/d1/nic.c the card.
+ * hwsim/d1/nd.c the card.
  */
 
-/* ports (hwsim/d1/nicd1.c) */
-#define ND_STATUS	0x60	/* read: op-done + error */
-#define ND_CMD		0x61	/* write */
-#define ND_DATA		0x63	/* write/read */
+/* ports (hwsim/d1/nd.c) */
+#define ND_STATUS	0x64	/* read: op-done + error */
+#define ND_CMD		0x65	/* write */
+#define ND_DATA		0x67	/* write/read */
 
-/* command register (hwsim/d1/nic.c) */
-#define ND_BLOCK	0x00	/* reset the pointer to the block number */
+/* command register (hwsim/d1/nd.c) */
+#define ND_BLOCK	0x00	/* point at the block number; drops op-done and error */
 #define ND_RAMDATA	0x01	/* reset the pointer to the data */
 #define ND_READ		0x02	/* fetch the block, raise op-done */
 #define ND_WRITE	0x03	/* store the block, raise op-done */
+#define ND_ACK		0x04	/* drop op-done, error and the interrupt line */
 
 /* status register */
 #define ND_OPDONE	0x01

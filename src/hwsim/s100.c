@@ -311,10 +311,15 @@ struct wiring {
 struct wiring wiring;
 
 /*
- * The standard profiles.  A card that shares a line is a second entry on
- * the same vi number; set_vi's card id keeps the open-collector masks
- * apart, so the one-PIC d1 machine and the two-PIC one differ only in
- * whether anything names a second controller's pins.
+ * The standard profiles.  Cards do not share an interrupt line: the
+ * kernel's intr_attach() panics when a probe finds a second card on a
+ * line that is already wired.  profile_ss1 therefore gives every card
+ * its own VI line and leaves the two CompuPro boards that are
+ * alternatives to the HD-DMA unwired (line -1), to be moved onto a
+ * free line with -w ss1,viN=<card> for a run that uses one.  The older
+ * profiles still name alternatives as second entries on the same vi
+ * number, which only works while at most one card of each group is
+ * present.
  */
 static struct wiring profile_d1 = {
     { { "hddma", 0 }, { "hdca", 0 }, { "djdma", 1 }, { "disk1", 1 },
@@ -353,10 +358,10 @@ static struct wiring profile_multio = {
 };
 
 static struct wiring profile_ss1 = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 0 }, { "ncr", 3 },
-      { "ide", 4 }, { "nic", 5 }, { "disk3", 0 }, { "disk1", 1 },
-      { "disk2", 0 } },
-    9,
+    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "ncr", 3 },
+      { "ide", 4 }, { "nic", 5 }, { "nd", 6 }, { "disk1", 7 },
+      { "disk3", -1 }, { "disk2", -1 } },
+    10,
     {
         [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
         [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },

@@ -19,9 +19,9 @@
 ; -------------------------------------------------
 ;
 ; Everything except the read is ideboot1.s: the relocation to RELOC, the
-; stack, the unsigned object header, the bss clear, the entry, and the
-; complaint.  The two files are meant to be read side by side, and the
-; places they agree are the places neither controller has an opinion.
+; stack, the unsigned object header, the entry, and the complaint.  The
+; two files are meant to be read side by side, and the places they agree
+; are the places neither controller has an opinion.
 ;
 ; What differs is the read.  The IDE card's registers are behind an 8255
 ; and every sector there loads a task file; the 5380 is driven one byte
@@ -141,19 +141,17 @@ sector:
 	call	ncrsel+RBIAS
 
 ;
-; The command phase: ten bytes.  hl is the destination, so it is set
-; aside while hl walks the command block.  The block's fourth byte is
-; the LBA, patched per sector like ideboot1's task file byte.
+; The command phase: ten bytes.  hl is the destination and stays it, so
+; the walk is de's.  The block's fourth byte is the LBA, patched per
+; sector like ideboot1's task file byte.
 ;
-	push	hl
-	ld	hl,ncrcdb+RBIAS
+	ld	de,ncrcdb+RBIAS
 	ld	b,CDBLEN
 cdbloop:
-	ld	a,(hl)
+	ld	a,(de)
 	call	ncrout+RBIAS
-	inc	hl
+	inc	de
 	djnz	cdbloop
-	pop	hl
 
 ;
 ; The data phase: SECLEN bytes to hl, one handshake each.  A refused
@@ -202,22 +200,11 @@ dataloop:
 	ldir			; de is left just past it, in memory
 
 ;
-; And clear bss, which the header counts and the file does not contain.
+; No bss to clear here: the linker folds it into the data image as the
+; zeros the file already carries, and the header reports it as zero.  The
+; data ldir above has done the job; see ideboot1.s, where the same
+; eighteen bytes are what keep this sector ahead of the label.
 ;
-	ld	bc,(STAGE+O_BSS)
-	ld	a,b
-	or	c
-	jr	z,enter		; none of it
-	ld	h,d
-	ld	l,e		; hl = de, the usual fill
-	inc	de
-	dec	bc
-	ld	(hl),0
-	ld	a,b
-	or	c
-	jr	z,enter		; only the one byte
-	ldir
-
 enter:
 	ld	hl,(STAGE+O_TOFF)
 	ld	a,(conid+RBIAS)	;the console id, handed on in C
@@ -225,18 +212,22 @@ enter:
 	jp	(hl)
 
 ;
-; What we read is not a program.  Print and stop; puts below does not
-; return, so there is no call and no return address to leave behind.
+; What we read is not a program.  The call leaves the address of the
+; message - the byte behind it - on the stack, which is where puts finds
+; it, and nothing returns here.  That saves the load and the jump, which
+; is the byte this sector has not got.
 ;
 badmag:
-	ld	hl,mmagic+RBIAS
-	jr	puts
+	call	puts
+mmagic:	.db	"mag",0
+hang:	jr	hang
 
 ;
 ; Output only, and no setup.  Wait for the holding register, write a
 ; byte, repeat until the nul, then stop for good.
 ;
 puts:
+	pop	hl		; the call's return address: the message
 	ld	a,(hl)
 	or	a
 	jr	z,hang
@@ -261,8 +252,6 @@ pss1:
 	ld	a,c
 	out	(S1DATA),a
 	jr	puts
-hang:
-	jr	hang
 
 conid:	.db	0		;the console the monitor found: 0 MultIO, 1 SS1
 
@@ -289,12 +278,9 @@ ncrsel:
 	out	(scsiicr),a
 	ld	a,icr_data+icr_sel+icr_bsy
 	out	(scsiicr),a
-	ld	b,0
 ncrwait: in	a,(scsistat)		; wait for the target to answer
 	and	scsi_bsy
-	jr	nz,ncrsel1
-	djnz	ncrwait
-ncrfail: jr	hang			; nobody is home
+	jr	z,ncrwait
 ncrsel1: ld	a,icr_sel+icr_bsy	; the id bits come off
 	out	(scsiicr),a
 	ld	a,icr_bsy		; then SEL
@@ -351,7 +337,5 @@ ncrin1:	in	a,(scsistat)
 ;
 ncrcdb:	.db	28h,0,0
 ncrlba:	.db	1,0,0,0,1,0,0
-
-mmagic:	.db	"mag",0
 
 finish:

@@ -19,9 +19,9 @@
 ; ------------------------------------------------
 ;
 ; Everything except the read is mwboot1.s: the relocation to RELOC, the
-; stack, the unsigned object header, the bss clear, the entry, and the
-; complaints.  The two files are meant to be read side by side, and the
-; places they agree are the places neither controller has an opinion.
+; stack, the unsigned object header, the entry, and the complaints.  The
+; two files are meant to be read side by side, and the places they agree
+; are the places neither controller has an opinion.
 ;
 ; What differs is that this one cannot assume a primed controller.
 ; mwboot1 inherits everything: the rom's nuboot has just read this very
@@ -157,9 +157,7 @@ run:
 ;
 	ld	sp,0		; ie 10000h - first push lands at fffe
 
-	ld	a,GRP1		; the eight ports at 0048 are the uart now
-	out	(GSEL),a
-	ld	hl,msign+RBIAS
+	ld	hl,msign+RBIAS	; puts selects the console's port itself
 	call	puts+RBIAS
 
 ;
@@ -261,25 +259,13 @@ xfer:
 	ldir			; de is left just past it, in memory
 
 ;
-; And clear bss, which the header counts and the file does not contain.
-; de already points at the first byte of it.  The C level 3 is
-; written in expects its globals zeroed and says so, so this is not
-; optional.
+; No bss to clear here.  The linker folds each object's bss into the data
+; image as zeros - mxld writes those zeros into the file and leaves the
+; header's bss field zero - so the data ldir above has already put the
+; zeroed globals where they belong.  mwboot1.s keeps the clear; this
+; sector needs the eighteen bytes it would take to fit ahead of the
+; label.
 ;
-	ld	bc,(STAGE+O_BSS)
-	ld	a,b
-	or	c
-	jr	z,enter		; none of it
-	ld	h,d
-	ld	l,e		; hl = de, the usual fill
-	inc	de
-	dec	bc
-	ld	(hl),0
-	ld	a,b
-	or	c
-	jr	z,enter		; only the one byte
-	ldir
-
 enter:
 	ld	hl,(STAGE+O_TOFF)
 	ld	a,(conid+RBIAS)	;the console id, handed on in C

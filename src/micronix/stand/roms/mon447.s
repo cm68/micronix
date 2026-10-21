@@ -557,6 +557,7 @@ check:	ld	a,(switch)		;test monitor switch
 	jr	z,montor		;jump if monitor desired
 	ld	(mapram + 2),a
 	ld	(map + 2),a		;restore the maps
+	ld	c,0			;the console is the MultIO: level 2's C
 	jr	nutask
 
 montor:	xor	a			;monitor task number

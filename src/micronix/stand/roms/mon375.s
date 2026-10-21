@@ -551,6 +551,7 @@ check:	ld	a,(switch)		;test monitor switch
 	ld	a,1			;normal task number
 	ld	(15h),de		;initialize the t1 pc save area
 	ld	(ctask),a
+	ld	c,0			;the console is the MultIO: level 2's C
 	jr	nz,nutask		;jump if boot desired
 
 montor:	xor	a			;monitor task number

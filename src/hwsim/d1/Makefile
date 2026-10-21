@@ -25,7 +25,7 @@ DRIVERS = djdma$(OBJSUFFIX).o multio$(OBJSUFFIX).o hddma$(OBJSUFFIX).o \
 	disk3$(OBJSUFFIX).o disk2$(OBJSUFFIX).o disk1$(OBJSUFFIX).o \
 	selector$(OBJSUFFIX).o \
 	mpz80$(OBJSUFFIX).o micronix$(OBJSUFFIX).o kdump$(OBJSUFFIX).o \
-	nic$(OBJSUFFIX).o nicd1$(OBJSUFFIX).o ss1$(OBJSUFFIX).o \
+	nic$(OBJSUFFIX).o nicd1$(OBJSUFFIX).o nd$(OBJSUFFIX).o ss1$(OBJSUFFIX).o \
 	pic$(OBJSUFFIX).o
 ROMDIR = ../../micronix/stand/roms
 GENERATED = $(ROMDIR)/mon447.bin $(ROMDIR)/mon447.sym $(ROMDIR)/mon375.bin $(ROMDIR)/mon375.sym \

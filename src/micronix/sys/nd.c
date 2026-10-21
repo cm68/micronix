@@ -21,6 +21,7 @@
 #include <sys/proc.h>
 #include <sys/ioctl.h>
 #include <sys/nd.h>
+#include <sys/ovl.h>
 #include <errno.h>
 
 extern int in(), out(), inton();
@@ -31,6 +32,7 @@ static int ndmutex;		/* the card, 0 = free */
 static int (*ndintr) ();	/* the phase the op-done interrupt resumes */
 static struct nd *ndintarg;
 static UINT8 nddead;		/* seconds the request has been in flight */
+static UINT8 ndstat;		/* the status that raised the interrupt */
 
 static void phase00(), phase04(), phase09(), phase11(), phase12(), release();
 
@@ -182,7 +184,7 @@ phase04(np)
 {
 	char *p;
 
-	if (in(ND_STATUS) & ND_ERROR) {
+	if (ndstat & ND_ERROR) {
 		phase11(np, EIO);
 		return;
 	}
@@ -200,7 +202,7 @@ static void
 phase09(np)
 	struct nd *np;
 {
-	if (in(ND_STATUS) & ND_ERROR)
+	if (ndstat & ND_ERROR)
 		phase11(np, EIO);
 	else {
 		np->n_stat = 0;
@@ -268,14 +270,19 @@ ndtick()
 }
 
 /*
- * The interrupt handler, on the DISK3 spare line.  Op-done resumes the
- * armed phase.
+ * The interrupt handler.  The line is level-asserted, so it is
+ * acknowledged before the armed phase runs: the status is latched in
+ * ndstat for the phase's error check, and ND_ACK drops op-done and the
+ * line.  The ack has to come first because the phase may start the next
+ * queued request, whose own op-done must not be cleared by this one's.
  */
 int
 ndint()
 {
-	if (!(in(ND_STATUS) & ND_OPDONE))
+	ndstat = in(ND_STATUS);
+	if (!(ndstat & ND_OPDONE))
 		return (0);
+	out(ND_CMD, ND_ACK);
 	if (ndintr) {
 		(*ndintr) (ndintarg);
 		ndintr = 0;
@@ -328,12 +335,34 @@ struct biovec ndbvec = { &ndopen, &ndclose, &ndstrat, &ndcioctl };
 
 /*
  * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  STUB - not written;
- * it must issue a command that completes and raises the card's done bit.
+ * (sys/probe_init.c) can discover which line it is on.
+ *
+ * ND_ACK is the clear: it drops op-done, error and the line, so the
+ * CLEAR the attach loop runs before the tickle - and again after its
+ * EOI - leaves the line quiet.  The tickle is an
+ * ND_READ of block 0: the card completes it, raises the line, and the
+ * done bit is left standing for pic_irr() to see.  Nothing consumes the
+ * data; the CLEAR that follows drops the done bit and the line.  The
+ * wait is bounded because the card may not be in the machine at all,
+ * and that is the answer the attach loop wants.
  */
-ndprobe()
+#define PROBEWAIT	10000
+
+ndprobe(mode)
+	int mode;
 {
-    return (0);
+	register int n;
+
+	if (mode == PROBE_CLEAR) {
+		out(ND_CMD, ND_ACK);
+		return (0);
+	}
+	ndblk(0);
+	out(ND_CMD, ND_READ);
+	for (n = 0; n < PROBEWAIT; n++)
+		if (in(ND_STATUS) & ND_OPDONE)
+			break;
+	return (0);
 }
 
 /*

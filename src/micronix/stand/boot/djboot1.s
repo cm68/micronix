@@ -148,9 +148,7 @@ run:
 ;
 	ld	sp,0		; ie 10000h - first push lands at fffe
 
-	ld	a,GRP1		; the eight ports at 0048 are the uart now
-	out	(GSEL),a
-	ld	hl,msign+RBIAS
+	ld	hl,msign+RBIAS	; puts selects the console's port itself
 	call	puts+RBIAS
 
 ;
@@ -234,10 +232,7 @@ is1kb:
 	ld	b,4		; 1024: four sectors, 4K
 
 onesec:
-	ld	a,l
-	ld	(CHAN+1),a	; dma low
-	ld	a,h
-	ld	(CHAN+2),a	; dma high
+	ld	(CHAN+1),hl	; dma low, then high
 	ld	a,c
 	ld	(CHAN+6),a	; sector
 	ld	e,TRIES
