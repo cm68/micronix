@@ -376,8 +376,8 @@ int fd;
 /*
  * Put one command's redirections in place.  This runs in the child,
  * after the fork, so the shell's own descriptors are untouched.  The
- * dance is always the same: open the new file, close the descriptor
- * being replaced, dup the new one into its place, close the spare.
+ * dance is always the same: open the new file, put the new one in the
+ * place of the descriptor being replaced, close the spare.
  */
 redirect(c, pin, pout)
 struct cmd *c;
@@ -387,13 +387,21 @@ int pout;
     int fd;
 
     if (pin >= 0) {
+#ifndef MICRONIX1
+        dup2(pin, 0);
+#else
         close(0);
         dup(pin);
+#endif
         close(pin);
     }
     if (pout >= 0) {
+#ifndef MICRONIX1
+        dup2(pout, 1);
+#else
         close(1);
         dup(pout);
+#endif
         close(pout);
     }
     if (c->in) {
@@ -401,8 +409,12 @@ int pout;
             warn("cannot open %s", c->in);
             exit(1);
         }
+#ifndef MICRONIX1
+        dup2(fd, 0);
+#else
         close(0);
         dup(fd);
+#endif
         close(fd);
     }
     if (c->out) {
@@ -418,8 +430,12 @@ int pout;
             warn("cannot create %s", c->out);
             exit(1);
         }
+#ifndef MICRONIX1
+        dup2(fd, 1);
+#else
         close(1);
         dup(fd);
+#endif
         close(fd);
     }
     /*
@@ -427,10 +443,15 @@ int pout;
      * output now goes.  Done last, so it picks up a redirection or a
      * pipe indifferently.
      */
+#ifndef MICRONIX1
+    if (c->both)
+        dup2(1, 2);
+#else
     if (c->both) {
         close(2);
         dup(1);
     }
+#endif
 }
 
 /*
@@ -869,8 +890,12 @@ int *sv;
             return -1;
         }
         sv[0] = dup(0);
+#ifndef MICRONIX1
+        dup2(fd, 0);
+#else
         close(0);
         dup(fd);
+#endif
         close(fd);
     }
     if (c->out) {
@@ -889,13 +914,21 @@ int *sv;
         }
         fflush(stdout);
         sv[1] = dup(1);
+#ifndef MICRONIX1
+        dup2(fd, 1);
+#else
         close(1);
         dup(fd);
+#endif
         close(fd);
         if (c->both) {
             sv[2] = dup(2);
+#ifndef MICRONIX1
+            dup2(1, 2);
+#else
             close(2);
             dup(1);
+#endif
         }
     }
     return 0;
@@ -908,18 +941,30 @@ int *sv;
     fflush(stdout);
     fflush(stderr);
     if (sv[2] >= 0) {
+#ifndef MICRONIX1
+        dup2(sv[2], 2);
+#else
         close(2);
         dup(sv[2]);
+#endif
         close(sv[2]);
     }
     if (sv[1] >= 0) {
+#ifndef MICRONIX1
+        dup2(sv[1], 1);
+#else
         close(1);
         dup(sv[1]);
+#endif
         close(sv[1]);
     }
     if (sv[0] >= 0) {
+#ifndef MICRONIX1
+        dup2(sv[0], 0);
+#else
         close(0);
         dup(sv[0]);
+#endif
         close(sv[0]);
     }
 }
@@ -1032,8 +1077,12 @@ int n;
     }
     if ((pid = fork()) == 0) {
         close(fds[0]);
+#ifndef MICRONIX1
+        dup2(fds[1], 1);
+#else
         close(1);
         dup(fds[1]);
+#endif
         close(fds[1]);
         runline(cmd);
         exit(status);

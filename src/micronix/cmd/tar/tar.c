@@ -454,20 +454,34 @@ startfilter(compress, rfd)
 	if (pid == 0) {
 		if (compress) {
 			close(pfd[1]);
+#ifndef MICRONIX1
+			dup2(pfd[0], 0);
+			close(pfd[0]);
+			dup2(rfd, 1);
+			close(rfd);
+#else
 			close(0);
 			dup(pfd[0]);
 			close(pfd[0]);
 			close(1);
 			dup(rfd);
 			close(rfd);
+#endif
 		} else {
 			close(pfd[0]);
+#ifndef MICRONIX1
+			dup2(rfd, 0);
+			close(rfd);
+			dup2(pfd[1], 1);
+			close(pfd[1]);
+#else
 			close(0);
 			dup(rfd);
 			close(rfd);
 			close(1);
 			dup(pfd[1]);
 			close(pfd[1]);
+#endif
 		}
 		execv(av[0], av);
 		fprintf(stderr, "tar: ");

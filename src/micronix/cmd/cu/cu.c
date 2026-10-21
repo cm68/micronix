@@ -304,8 +304,12 @@ A:
 		case '$':
 			fk = fork();
 			if (fk == 0) {
+#ifndef MICRONIX1
+				dup2(b[1] == '$'? ln:2, 1);
+#else
 				close(1);
 				dup(b[1] == '$'? ln:2);
+#endif
 				close(ln);
 				mode(0);
 				if (!nhup) signal(SIGINT, SIG_DFL);

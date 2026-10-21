@@ -192,8 +192,12 @@ lsystem(cmd)
 	 * the child gets a duplicate of that.
 	 */
 	inp = dup(0);
+#ifndef MICRONIX1
+	dup2(2, 0);
+#else
 	close(0);
 	dup(2);
+#endif
 
 	/*
 	 * Pass the command to the system to be executed.
@@ -203,8 +207,12 @@ lsystem(cmd)
 	/*
 	 * Restore standard input, reset signals, raw mode, etc.
 	 */
+#ifndef MICRONIX1
+	dup2(inp, 0);
+#else
 	close(0);
 	dup(inp);
+#endif
 	close(inp);
 
 	init_signals();

@@ -456,14 +456,17 @@ execFiltered(char *cmd, char **args, char *nfile)
 
     if (pid == 0) {
         close(pfd[0]);
+#ifndef MICRONIX1
+        dup2(pfd[1], 2);
+#else
         /*
-         * close-then-dup, not dup2: dup returns the lowest free
-         * descriptor, so closing 2 first puts the pipe there.  That
-         * is how it was done before dup2 existed, and Micronix is
-         * from before dup2 existed.
+         * close-then-dup: dup returns the lowest free descriptor, so
+         * closing 2 first puts the pipe there.  That is how it was
+         * done before dup2 existed.
          */
         close(2);
         dup(pfd[1]);
+#endif
         close(pfd[1]);
         execv(cmd, args);
         perror(cmd);

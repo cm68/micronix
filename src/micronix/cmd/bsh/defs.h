@@ -103,7 +103,11 @@ VOID		prs();
 VOID		prc();
 VOID		getenv();
 STRING		*setenv();
+#ifdef	MICRONIX1
 VOID		dup2();
+#else
+INT		dup2();
+#endif
 INT		umask();
 char		*sbrk();
 

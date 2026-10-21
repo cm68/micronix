@@ -43,8 +43,12 @@ char *argv[];
 
 	if(argv[1][0] == '+') {
 		start = 2;
+#ifndef MICRONIX1
+		dup2(1, 2);
+#else
 		close(2);
 		dup(1);
+#endif
 	}
 	else {
 		if(argv[1][0] != '-') {
@@ -70,8 +74,12 @@ char *argv[];
 		if(!app)
 			fd = creat(file,0666);
 		if (fd > 2) {
+#ifndef MICRONIX1
+			if (dup2(fd, 2) != 2) {
+#else
 			close(2);
 			if (dup(fd) != 2) {
+#endif
 				write(open("/dev/tty",1),"bad file descriptor?!?\n",23);
 				exit(1);
 			}

@@ -4,10 +4,13 @@
  */
 
 #include	"defs.h"
+#ifdef	MICRONIX1
 #include	"dup.h"
+#endif
 
 INT		shmask;
 
+#ifdef	MICRONIX1
 /* dup2 semantics: the shell wants dup(fa|DUPFLG, fb) */
 VOID	dup2(fa, fb)
 	REG INT		fa, fb;
@@ -27,6 +30,7 @@ VOID	dup2(fa, fb)
 	   descriptors the shell already owns */
 	WHILE n>0 DO close(held[--n]) OD
 }
+#endif
 
 /* there is no umask syscall; keep the value for creat() */
 INT	umask(m)

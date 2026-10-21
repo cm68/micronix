@@ -177,10 +177,17 @@ keysetup(pw)
 	buf[9] = buf[1];
 	pipe(pf);
 	if (fork() == 0) {
+#ifndef MICRONIX1
+		dup2(pf[0], 0);
+		dup2(pf[1], 1);
+		close(pf[0]);
+		close(pf[1]);
+#else
 		close(0);
 		close(1);
 		dup(pf[0]);
 		dup(pf[1]);
+#endif
 		execv(MAKEKEY, mkargv);
 		execv(ALTKEY, mkargv);
 		exit(1);

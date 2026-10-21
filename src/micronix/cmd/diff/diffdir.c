@@ -340,8 +340,12 @@ calldiff(wantpr)
 			done();
 		}
 		if (pid == 0) {
+#ifndef MICRONIX1
+			dup2(pv[0], 0);
+#else
 			close(0);
 			dup(pv[0]);
+#endif
 			close(pv[0]);
 			close(pv[1]);
 			execv(pr, prargs);
@@ -356,8 +360,12 @@ calldiff(wantpr)
 	}
 	if (pid == 0) {
 		if (wantpr) {
+#ifndef MICRONIX1
+			dup2(pv[1], 1);
+#else
 			close(1);
 			dup(pv[1]);
+#endif
 			close(pv[0]);
 			close(pv[1]);
 		}

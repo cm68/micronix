@@ -1155,7 +1155,12 @@ char **dev;
 		}
 		if (pid == 0) {
 			di();
+#ifndef MICRONIX1
 			dup2(pip[0], 0);
+#else
+			close(0);
+			dup(pip[0]);
+#endif
 			close(pip[0]);
 			close(pip[1]);
 			execl(arg, arg, 0);
