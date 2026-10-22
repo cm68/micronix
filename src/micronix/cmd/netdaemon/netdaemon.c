@@ -24,12 +24,13 @@
  * 0x20 added.  The sender then waits for a Y after F, after the S/R
  * header, and after every D record; the E record is not acknowledged.
  *
- * An R request is store-and-forward: the machine that holds the file
- * copies it into the outbound spool as an S record, and an intermediate
- * machine copies the request, or the S record, into its own spool for
- * the next hop.  network.4's multihop network and netact's strings
- * ("netcp", "/bin/netcp", "cp fails") point this way, but the 1.6
- * daemon's own R handling was not captured; this is an inference.
+ * An R request is store-and-forward, and the recovered daemons were run
+ * through it over two hops: a daemon spools the request and forwards it
+ * unchanged, and the machine that holds the file execs netact, which
+ * runs netcp to copy it into an S record that travels back.  This
+ * reconstruction does the copy itself; the wire is the same.  netact
+ * needs a `network` user in /etc/passwd, and every netmap needs the
+ * return route.
  *
  * The daemon forks one reader per port in the 1.6 binary.  This
  * reconstruction keeps one process and polls each port with a one

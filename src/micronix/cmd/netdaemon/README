@@ -6,6 +6,7 @@ reads /etc/netmap, and moves the files that netcp leaves in
 directory holds the binary that was.
 
 	netdaemon.bin	the recovered executable, 19188 bytes
+	netact.bin	the recovered request agent, 19002 bytes
 	netdaemon.dis	an annotated listing, generated with src/tools/disas
 	netdaemon.ctl	the symbols disas used
 	ANALYSIS.md	the decompiled flow: main, daemon loop, protocol layer
@@ -17,21 +18,33 @@ loop, spool scans, netmap and ttys handling follow the binary, and the
 wire format is the real 1.6 line protocol: three checksum characters
 per line, then `P!`/`A!`, `F`/`Y`, the S or R header and its Y, every D
 record and its Y, and the unacknowledged E.  Two reconstructed daemons
-exchange the same bytes as two recovered ones.  An R request is
-store-and-forward: the machine that holds the file copies it into its
-outbound spool as an S record, and an intermediate machine copies the
-request, or the S record, into its own spool for the next hop.  That
-model comes from network.4's multihop network and from netact's own
-strings ("netcp", "/bin/netcp", "cp fails", "Can't copy"); the 1.6
-daemon's own R handling was not captured, so the relay path is the
-reconstruction's inference, not recovered wire behaviour.  (The 1.6
-daemon was run with netact present; it acknowledged the R request and
-did not produce the return.)
+exchange the same bytes as two recovered ones.  The R path is
+store-and-forward, and the recovered daemons were run through it over
+two hops (a -- b -- c):
 
-The 1.6 daemon forks a reader per port, while this one polls with a one
-second alarm in a single process.  Two end-to-end tests:
-`nettest16.py recon` (push and pull over one link) and
-`nettest16.py relay` (doc -- sales -- admin, two hops).
+- a's netcp queues `R c /etc/motd a /tmp/fetched root`; a's daemon
+  routes it to b, b's daemon forwards the same R to c.
+- c's daemon writes the inbound record to /usr/spool/net/in/ and execs
+  /bin/netact.  netact runs /bin/netcp, which copies /etc/motd into an
+  S record for a; c's daemon forwards that S to b, and b forwards it to
+  a.  a's daemon execs netact, which copies it to /tmp/fetched.
+- A push (`netcp /tmp/hello c%/tmp/hello` on a) runs the same relay in
+  one direction; the file arrives on c.
+
+Two things are required and were the earlier failures:
+/etc/passwd must carry the `network` user (uid 9), which netact looks
+up, and every machine's /etc/netmap must name the return route - c's
+netmap says `b a`, or netcp on c reports "No such network address".
+netact itself is the request agent: it resolves the inbound record and
+runs netcp for a copy (or mail for a message); netact.bin is here for
+the three-machine test.
+
+The reconstruction performs the copy in-process instead of exec'ing
+netact, so it needs neither netact nor the network user; the wire is
+the same.  The 1.6 daemon forks a reader per port, while this one polls
+with a one second alarm in a single process.  The end-to-end tests are
+`nettest16.py recon` (one link), `nettest16.py relay` (three recovered
+machines), and `nettest16.py relayrecon` (the reconstruction).
 
 The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netdaemon),
 extracted with readall.  The 1.61 Vol. 3 catalog container carries the same

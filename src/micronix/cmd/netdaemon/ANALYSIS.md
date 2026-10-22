@@ -193,17 +193,21 @@ Two usersim roots with their /dev/ttyD ptys bridged reproduce this:
 the recovered netcp queues an entry, and after the timeout the two
 daemons exchange the S/D/E record with the three-character checksum
 prefixes and the `A!`/`Y` answers recorded in cmd/netcp/ANALYSIS.md.
-The reconstruction speaks the same lines and checksums, with one
-process and a one second alarm rather than a fork per port.  Its R
-handling is inferred, not captured: network.4 describes a multihop
-network, and netact's strings name netcp and a copy failure, so the
-request is implemented as store-and-forward - the holder copies the
-file into its outbound spool as an S record, and an intermediate
-machine copies the request or the S record into its own spool.  Run
-against the recovered daemon with netact present, the R request was
-acknowledged and no return was produced, so the 1.6 daemon's own
-handling is still unknown.  The `relay` test exercises this inferred
-path over two hops (doc -- sales -- admin).
+The recovered daemons were run through the multihop path (a -- b -- c).
+b forwards the same R record unchanged to c.  c's daemon writes it to
+/usr/spool/net/in/ (the name is derived from the route, e.g. b%#H!)
+and execs /bin/netact; netact runs /bin/netcp, which queues an S record
+for a; that record crosses b back to a, where netact copies it to the
+destination.  The push direction works the same way, ending at netact
+on c.  Two requirements: /etc/passwd must contain the network user with
+uid 9 (netact looks it up; without it netact says "network: No such
+user"), and c's /etc/netmap must name the return route (`b a`), or
+netact's netcp reports "No such network address".
+
+The reconstruction performs the copy itself rather than exec'ing
+netact, and polls each port with a one second alarm instead of forking
+a reader per port.  It matches the captured wire and passes the same
+two-hop push and pull over its own spools.
 
 ## Open points
 
