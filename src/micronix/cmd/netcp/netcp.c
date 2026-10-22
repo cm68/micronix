@@ -227,8 +227,9 @@ ownername(buf)
 
 /*
  * Six bits per printable character, least significant bit first.  A
- * partial group at the end is padded to three bytes, which is why a
- * 20 byte record carries 28 characters.
+ * partial group at the end is padded to three bytes with 0xff, which
+ * is why a 20 byte record carries 28 characters; the length says how
+ * many bytes are real.
  */
 static void
 encode(in, len, out)
@@ -242,10 +243,8 @@ encode(in, len, out)
     o = 0;
     for (i = 0; i < len; i += 3) {
 	bits = in[i];
-	if (i + 1 < len)
-	    bits |= (unsigned long) in[i + 1] << 8;
-	if (i + 2 < len)
-	    bits |= (unsigned long) in[i + 2] << 16;
+	bits |= (unsigned long) (i + 1 < len ? in[i + 1] : 0xff) << 8;
+	bits |= (unsigned long) (i + 2 < len ? in[i + 2] : 0xff) << 16;
 	for (j = 0; j < 4; j++)
 	    out[o++] = ((bits >> (6 * j)) & 0x3f) + 0x20;
     }

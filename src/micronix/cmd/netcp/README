@@ -16,8 +16,10 @@ that was.
 netcp.c is a reconstruction, not the original source.  The command line,
 dispatch, host parsing and local copy follow the binary; the spool record,
 its 45-byte D records and the six-bit encoding are the real 1.6 format.
-Running the recovered netcp under usersim produces byte-identical records
-to the reconstruction for the same command and source.  The queue file
+The last group of a record is padded to three bytes with 0xff, as the
+original does; the length says how many bytes are real.  Running the
+recovered netcp under usersim produces byte-identical records to the
+reconstruction for the same command and source.  The queue file
 is named for the next hop - the netmap route - not the final host; a
 host reached through b gets `b%"..."`, as the 1.6 netcp writes it.
 The end-to-end tests are `nettest16.py recon` and

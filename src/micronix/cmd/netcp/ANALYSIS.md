@@ -188,7 +188,9 @@ So the real record is line based:
 The data encoding is six bits per character with `0x20` added, but the
 bit order is the reverse of the obvious one: the input byte is
 bit-reversed, packed six bits at a time MSB first, and each six-bit
-value is bit-reversed before the `0x20` is added.  That is why the real
+value is bit-reversed before the `0x20` is added.  A final group of one
+or two bytes is padded to three bytes with `0xff`, not with zeros; the
+length character says how many bytes are real.  That is why the real
 body for "hello, network\n" is
 
     H5&;L]&+@X69T=W;RMF"

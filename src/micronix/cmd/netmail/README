@@ -10,6 +10,8 @@ it; at the destination netact runs mail, which files the message.
 	netmail.ctl	the symbols disas used
 	netmail.dis	an annotated listing, generated with src/tools/disas
 	ANALYSIS.md	the decompiled flow and the record it writes
+	netmail.c	the reconstruction; `make` cross builds it
+	GNUmakefile	makefile
 
 The listing is `disas -f netmail.ctl netmail16.bin`.  The binary came
 from the Micronix 1.6 distribution, the same disk as /bin/mail,
@@ -26,9 +28,17 @@ rhost and ruser come from the address; lhost is the first line of
 /etc/netmap and luser is the login name from /etc/passwd.  Data records
 carry at most 45 bytes in the six-bit encoding; the sequence starts at
 one and the header is record zero (its blank second character is the
-code for zero).  The spool file is written under a TEMP name and linked
-to <route>%<codes> when complete, so the daemon never reads a partial
-record.  network(4) describes the format and the wire protocol.
+code for zero).  A partial final group is padded to three bytes with
+0xff, as the original does.  The spool file is written under a TEMP
+name and linked to <route>%<codes> when complete, so the daemon never
+reads a partial record.  network(4) describes the format and the wire
+protocol.
+
+netmail.c is a reconstruction.  For the same address and message it
+writes the same bytes as netmail16.bin, and the record it writes travels
+through the stock daemon, netact and mail to the destination's mailbox.
+The spool name codes (process, time, counter) are not the same between
+two runs; they only make the name unique.
 
 The listing shows main at 0x010e, a worker at 0x01a0, the name builder
 at 0x0468, the M header formatter at 0x0418, the netmap reader at

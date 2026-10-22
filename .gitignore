@@ -378,6 +378,7 @@ src/micronix/cmd/ncheck/ncheck
 src/micronix/cmd/netconf/netconf
 src/micronix/cmd/netcp/netcp
 src/micronix/cmd/netdaemon/netdaemon
+src/micronix/cmd/netmail/netmail
 src/micronix/cmd/newuser/newuser
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm

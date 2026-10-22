@@ -90,9 +90,9 @@ is invisible.  A captured pair is
 
 The record is text.  A D line is `D` + sequence + length + data, both
 numbers six-bit; the data is three bytes to four characters, least
-significant bit first.  The empty message is not special-cased beyond
-the zero data records.  The sequence starts at one and the E carries
-the next number.
+significant bit first, and a final group of one or two bytes is padded
+to three with 0xff.  The sequence starts at one and the E carries the
+next number.
 
 ## Netmap (0x0a73, 0x0b04)
 
@@ -124,3 +124,8 @@ The D line is sequence 1, 26 bytes; the E is 2.  A 152 byte message
 made four records of 45, 45, 45 and 17 bytes, with E 5.  The message
 reached the destination through netdaemon and netact in both the
 two-machine and the three-machine relay tests (`nettestmail.py`).
+
+The reconstruction `netmail.c` writes the same 26 byte record byte for
+byte, and mail running with it in place of the stock netmail delivered
+through the stock daemons.  The only difference is the three unique
+characters in the spool name.

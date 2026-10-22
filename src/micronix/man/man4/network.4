@@ -299,7 +299,8 @@ character = (value & 0x3f) + 0x20
 The values of a group are packed least significant bit first.  Three
 bytes of data become four characters: bits 0-5, 6-11, 12-17, and
 18-23.  A group of one or two bytes at the end of a record is padded
-with zero bits.  A 45 byte record is therefore 60 characters.
+to three bytes with 0xff; the length in the record says how many bytes
+are real.  A 45 byte record is therefore 60 characters.
 .sp 2
 .in -5
 .bd
