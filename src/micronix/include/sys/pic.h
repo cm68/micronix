@@ -15,7 +15,8 @@
  */
 extern int pic_init();          /* bring the PIC(s) up, every line masked */
 extern int inton();             /* inton(line): unmask a line */
-extern int intoff();            /* intoff(line): mask a line */
+extern int intoff();            /* intoff(line): mask a line (init only) */
+extern int pic_mask();          /* pic_mask(line): mask a line, resident */
 extern int pic_irr();           /* which lines are pending, as a bit mask */
 extern int pic_eoi();           /* pic_eoi(line): end of interrupt on a line */
 

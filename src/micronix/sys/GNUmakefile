@@ -147,13 +147,11 @@ pic.o: pic.c
 	$(MXLD) -r -Sdata -o pic.o pic.rel
 	rm -f pic.rel
 
-# net.o is the /dev/net framing (net.c), pure code with no static data,
-# so it folds to the u page the same way.  It is always mapped, so the
-# polled read/write never needs the window page.
+# net.o is not in the kernel: it is the network face of the ND module,
+# linked into nd.mod below.  It is compiled like a module object, not
+# folded.
 net.o: net.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o net.rel $<
-	$(MXLD) -r -Sdata -o net.o net.rel
-	rm -f net.rel
+	$(CCC) $(CCFLAGS) $(INC) -c $<
 
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
@@ -161,7 +159,7 @@ KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
-	picdata.o
+	picdata.o netint.o
 WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
 HIGHMEM_AS_OBJ = inits.o unbcd.o ss1vec.o
@@ -204,7 +202,7 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
 	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
-	 net.c open.c ovl.c probe.c \
+	 net.c netint.c open.c ovl.c probe.c \
 	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
 	 ss1_uart.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
@@ -345,8 +343,8 @@ main_init.o: build.h
 # entry leaves SP, so the kernel stack grows down into ustack.  textpad.o
 # stays last in the main link so _ebss is the end of .bss and binit()'s
 # buffer pool runs up to SCRWIN, below the windows.
-upage.o: $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
-	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) pic.o net.o user.o
+upage.o: $(LEAF_AS) $(LEAF_C) pic.o user.o
+	$(MXLD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) pic.o user.o
 
 # highmem.o is the init-only code - main_init, cus, the MIO/console init
 # in inits.s, bcd2unix (unbcd.s), and the disk drivers' own bring-up
@@ -492,6 +490,11 @@ unix.link: $(OBJS)
 #
 $(MODS:%=%.mod): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
+
+# The ND module carries the network face too: net.o is its second
+# object, linked into the same page (sys/net.c, sys/nd.c).
+nd.mod: ndhdr.o nd.o net.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o net.o
 
 #
 # One module is one page.  What the link produced is a 16 byte object

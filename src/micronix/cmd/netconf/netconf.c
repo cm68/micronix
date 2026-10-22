@@ -4,21 +4,23 @@
  * cmd/netconf/netconf.c
  *
  * The third provisioning path in sys/NET.md section 4: GETCONF and
- * SETCONF are card-level frames, socket 0xff, on the same /dev/net byte
- * channel rcp drives.  The pair lives in the card's non-volatile memory;
- * SETCONF makes it reconnect with the new network at once.
+ * SETCONF are card-level operations, socket 0xff, on /dev/net - the
+ * network face of the ND module, one ioctl command block per operation
+ * (include/sys/ioctl.h and sys/net.h).
  *
  *	netconf			print the stored ssid and password
  *	netconf <ssid> [<pass>]	store a pair (no pass: an open network)
  *
- * The frame types mirror include/sys/net.h, which this program cannot
- * see (it builds against lib/include, not the kernel's include).
+ * The operation numbers and reply types mirror include/sys/net.h, which
+ * this program cannot see (it builds against lib/include, not the
+ * kernel's include).
  */
 
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #define DEV	  "/dev/net"
 #define N_MAXPAY  1024
@@ -31,74 +33,52 @@
 #define N_PASSMAX 63
 
 static int fd;
-static int rtype, rsock;
 
-/* ---- frame io, the same shape as rcp's ---- */
-
-static void
-net_tx(type, sk, p, len)
-    int type, sk, len;
-    char *p;
-{
-    char hdr[4];
-
-    hdr[0] = type;
-    hdr[1] = sk;
-    hdr[2] = len & 0xff;
-    hdr[3] = (len >> 8) & 0xff;
-    write(fd, hdr, 4);
-    if (len)
-	write(fd, p, len);
-}
-
+/* read frames until the card-level ACK, keeping the last one in r */
 static int
-net_rx(typep, sockp, buf, max)
-    int *typep, *sockp, max;
-    char *buf;
-{
-    char r[4 + N_MAXPAY];
-    int n, len, i;
-
-    n = read(fd, r, sizeof r);
-    if (n < 4)
-	return -1;
-    *typep = r[0] & 0xff;
-    *sockp = r[1] & 0xff;
-    len = (r[2] & 0xff) | ((r[3] & 0xff) << 8);
-    if (len > n - 4)
-	len = n - 4;
-    if (len > max)
-	len = max;
-    for (i = 0; i < len; i++)
-	buf[i] = r[4 + i];
-    return len;
-}
-
-/* read frames until the card-level ACK */
-static int
-net_ack(buf, max)
+net_ack(r, buf, max)
+    struct cdb *r;
     char *buf;
     int max;
 {
-    int n;
+    struct cdb q;
 
-    for (;;) {
-	n = net_rx(&rtype, &rsock, buf, max);
-	if (n < 0)
+    while ((r->cmd[0] & 0xff) != N_ACK || (r->cmd[1] & 0xff) != 0xff) {
+	memset((char *) &q, 0, sizeof q);
+	q.cmd[0] = 0;			/* NET_OP_RECV */
+	q.cmd[1] = 0xff;
+	q.len = 4;
+	q.count = max;
+	q.flags = max ? CDB_IN : 0;
+	q.buf = buf;
+	q.hole = -1;
+	if (ioctl(fd, CDBCMD, &q) < 0)
 	    return -1;
-	if (rtype == N_ACK && rsock == 0xff)
-	    return n;
+	memcpy((char *) r, (char *) &q, sizeof q);
     }
+    return 0;
 }
 
 static int
 getconf()
 {
+    struct cdb r;
     char p[N_MAXPAY];
     int n, sl, pl;
 
-    net_tx(N_GETCONF, 0xff, (char *)0, 0);
-    n = net_ack(p, sizeof p);
+    memset((char *) &r, 0, sizeof r);
+    r.cmd[0] = N_GETCONF;
+    r.cmd[1] = 0xff;
+    r.len = 4;
+    r.count = sizeof p;
+    r.flags = CDB_IN;
+    r.buf = p;
+    r.hole = -1;
+    if (ioctl(fd, CDBCMD, &r) < 0)
+	return -1;
+    if (net_ack(&r, p, sizeof p) < 0)
+	return -1;
+    n = r.count;
     if (n < 2)
 	return -1;
 
@@ -124,8 +104,8 @@ static int
 setconf(ssid, pass)
     char *ssid, *pass;
 {
+    struct cdb r;
     char p[1 + N_SSIDMAX + 1 + N_PASSMAX];
-    char a[N_MAXPAY];
     int sl, pl, n, st;
 
     sl = strlen(ssid);
@@ -147,13 +127,19 @@ setconf(ssid, pass)
     memcpy(p + n, pass, pl);
     n += pl;
 
-    net_tx(N_SETCONF, 0xff, p, n);
-    n = net_ack(a, sizeof a);
-    if (n < 1) {
+    memset((char *) &r, 0, sizeof r);
+    r.cmd[0] = N_SETCONF;
+    r.cmd[1] = 0xff;
+    r.len = 4;
+    r.count = n;
+    r.flags = 0;
+    r.buf = p;
+    r.hole = -1;
+    if (ioctl(fd, CDBCMD, &r) < 0 || net_ack(&r, (char *)0, 0) < 0) {
 	fprintf(stderr, "netconf: no answer from the card\n");
 	return 1;
     }
-    st = a[0] & 0xff;
+    st = r.cmd[2] & 0xff;
     if (st != 0) {
 	fprintf(stderr, "netconf: the card refused, status %d\n", st);
 	return 1;

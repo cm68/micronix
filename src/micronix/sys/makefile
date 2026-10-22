@@ -115,12 +115,12 @@ KERNEL_C_SRC  = mount.c balloc.c cio.c create.c exec.c fio.c fork.c \
 	ialloc.c iget.c imap.c malloc.c name.c queue.c \
 	reg.c sig.c sleep.c subc.c swap.c sys1.c system.c time.c \
 	trap.c tty.c uio.c multio.c ss1_uart.c dlabel.c ovl.c main.c \
-	upd1990.c ss1_clock.c picdata.c
+	upd1990.c ss1_clock.c picdata.c netint.c
 KERNEL_C_OBJ  = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o \
-	upd1990.o ss1_clock.o picdata.o
+	upd1990.o ss1_clock.o picdata.o netint.o
 
 #
 # The window-page cluster, folded to .data at 0xe000 (BUFWIN) by win.o's
@@ -148,11 +148,9 @@ USER_C_SRC = user.c
 USER_C_OBJ = user.o
 
 # The code that is folded to .data and rides the u page: pic.c's resident
-# half (pic_eoi, inton) and net.c's /dev/net framing.
+# half (pic_eoi, inton).
 PIC_C_SRC = pic.c
 PIC_C_OBJ = pic.o
-NET_C_SRC = net.c
-NET_C_OBJ = net.o
 
 #
 # The disk drivers, each a module of its own: a driver .c and a header
@@ -221,11 +219,11 @@ $(KERNEL_C_OBJ) probe.o $(WIN_C_OBJ) $(HIGHMEM_C_OBJ) $(USER_C_OBJ) \
 # user.o (the u struct) whose data is ustack (512 bytes, the system
 # stack) below the u struct, all as .data placed at 0xf000.  The code
 # must be .data, not .text - the loader reads text and then data, so text
-# parked here would be overwritten.  pic.o and net.o are folded to data
-# by their own rules below for the same reason.
-upage.o: $(LEAF_AS) $(LEAF_C) $(PIC_C_OBJ) $(NET_C_OBJ) $(USER_C_OBJ)
+# parked here would be overwritten.  pic.o is folded to data by its own
+# rule below for the same reason.
+upage.o: $(LEAF_AS) $(LEAF_C) $(PIC_C_OBJ) $(USER_C_OBJ)
 	$(LD) -r -Tdata=0xf000 -o upage.o $(LEAF_AS) $(LEAF_C) \
-		$(PIC_C_OBJ) $(NET_C_OBJ) $(USER_C_OBJ)
+		$(PIC_C_OBJ) $(USER_C_OBJ)
 
 # highmem.o is the init-only code - main_init, cus, the drivers' bring-up
 # (djinit, ncrinit), the PIC discovery, the probe and attach, the clock
@@ -261,10 +259,10 @@ pic.o: pic.c
 	$(LD) -r -Sdata -o pic.o pic.rel
 	rm -f pic.rel
 
+# net.o is not in the kernel: it is the network face of the ND module
+# and is linked into nd.mod below.
 net.o: net.c
-	$(CC) $(CFLAGS) -c -o net.rel net.c
-	$(LD) -r -Sdata -o net.o net.rel
-	rm -f net.rel
+	$(CC) $(CFLAGS) -c net.c
 
 # uhdr.o must stay at 0x1000 (the firmware's entry point).  The asm
 # follows the C objects: mem.s remaps segment 1 (0x1000-0x1fff) through
@@ -356,6 +354,11 @@ dj.mod mw.mod ide.mod ncr.mod hdca.mod nd.mod disk1.mod disk2.mod \
 	disk3.mod: $*hdr.o $*.o unix.link
 	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 
+# The ND module carries the network face too: net.o is its second
+# object, linked into the same page (sys/net.c, sys/nd.c).
+nd.mod: ndhdr.o nd.o net.o unix.link
+	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o net.o
+
 # One module is one page.  What the link produced is a 16 byte object
 # header followed by the page's bytes - all of them, because -Sdata puts
 # every section there and -s leaves nothing after - so the page is what
@@ -434,7 +437,7 @@ clean:
 	rm -f iget.o imap.o malloc.o name.o queue.o reg.o sig.o sleep.o
 	rm -f subc.o swap.o sys1.o system.o time.o trap.o tty.o uio.o
 	rm -f multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o
-	rm -f ss1_clock.o picdata.o open.o sys2.o rdwri.o memdev.o link.o
+	rm -f ss1_clock.o picdata.o netint.o open.o sys2.o rdwri.o memdev.o link.o
 	rm -f access.o $(HIGHMEM)
 	rm -f $(MOD_OBJ) $(MOD_HDR)
 	rm -f dj.mod mw.mod ide.mod ncr.mod hdca.mod

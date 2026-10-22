@@ -21,6 +21,7 @@
 #include <sys/proc.h>
 #include <sys/ioctl.h>
 #include <sys/nd.h>
+#include <sys/net.h>
 #include <sys/ovl.h>
 #include <errno.h>
 
@@ -136,6 +137,12 @@ ndstrat(b)
 {
 	struct nd *np;
 
+	if (minor(b->dev) == NET_MINOR) {	/* ioctl only */
+		b->flags |= BERROR;
+		b->error = ENXIO;
+		iodone(b);
+		return (0);
+	}
 	np = &ndinfo[0];		/* one drive */
 	np->n_buf = b;
 	np->n_cur = b;
@@ -319,7 +326,8 @@ ndclose(dev)
 /*
  * The ND has no command block: it is a flat block device, and every
  * control operation a disk needs - format, seek, geometry - is
- * meaningless here.
+ * meaningless here.  The minor does have one: NET_MINOR is the network
+ * functions, the same card's other face, and its ioctl is sys/net.c's.
  */
 int
 ndcioctl(dev, cmd, r, b)
@@ -327,6 +335,8 @@ ndcioctl(dev, cmd, r, b)
 	struct cdb *r;
 	struct buf *b;
 {
+	if (minor(dev) == NET_MINOR)
+		return (netioctl(dev, cmd, r, b));
 	u.error = ENOTTY;
 	return (-1);
 }

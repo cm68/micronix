@@ -28,9 +28,10 @@ An ESP32 + a bus-interface CPLD.  The Z80 sees two 8-bit S-100 ports:
 
 Interrupt-driven.  The card asserts a vectored-interrupt line (VI5, the
 spare DISK3 line) whenever `RXRDY` is set and holds it until the RX FIFO
-drains; the guest sleeps on the line and the handler reads the FIFO.  The
-line is open-collector, so the card pulls it through an open-collector
-driver (7406), not a push-pull pin.
+drains.  The guest handler masks the line and wakes the waiting ioctl,
+which drains the FIFO and opens the line again for its next wait; the
+handler never reads data.  The line is open-collector, so the card pulls it
+through an open-collector driver (7406), not a push-pull pin.
 
 ## 2. Framing
 
@@ -153,10 +154,27 @@ whole disk i/o is this.
 stream of `DATA`/`SEND` frames, plumbed through a pty (separate work) to
 a shell.
 
-## 8. The three implementations
+## 8. The guest interface
+
+The card is one face of the ND module: `/dev/net` is block major 6,
+minor 1 (`dev/devlist`), and every operation is one ioctl command block
+(`include/sys/ioctl.h`):
+
+    ioctl(fd, CDBCMD, &cdb)
+
+`cdb.cmd[0]` is the operation (`N_OPEN` … `N_SETCONF`, or `NET_OP_RECV`
+to take the next frame), `cdb.cmd[1]` the socket, and the operation's
+own fields follow at `cdb.cmd[2..]`; `cdb.buf`/`cdb.count` are its data
+phase.  The driver builds the frame from those fields, sends it, and
+reads the reply before returning: `cdb.cmd[0..2]` carry the reply type,
+socket and first payload byte, and `cdb.count` the payload copied back.
+The operation list and field layout are in `include/sys/net.h`; a reply
+payload needs `CDB_IN` and `count` set to the buffer's size.
+
+## 9. The three implementations
 
 One contract, three bodies, the same guest binary:
 
-    guest driver     parses/writes these frames over NETDATA/NETSTAT
+    guest driver     builds the frames from the ioctl's typed fields
     sim nic.c        models the two ports, translates frames to host sockets
     esp32 firmware   lwIP + this framing over the bus channel

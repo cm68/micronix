@@ -33,7 +33,8 @@ extern struct ovlintr ovlint[MAXNOVLINE];  /* sys/probe.c */
  * what lets it run twice - see the note on it below.
  */
 #define NPINTR  12              /* the module pages all carry a probe: nine
-                                 * of them, and a stamped root driver too */
+                                 * of them, a stamped root driver, and the
+                                 * net probe the nd module adds */
 static int (*intrprobe[NPINTR]) ();
 static int (*intrfn[NPINTR]) ();
 static UINT intrseg[NPINTR];

@@ -21,11 +21,12 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 #define DEV      "/dev/net"
 #define N_MAXPAY 1024
 
-/* frame types (include/sys/net.h) */
+/* frame types and the local receive op (include/sys/net.h) */
 #define N_OPEN    0x01
 #define N_CLOSE   0x02
 #define N_CONNECT 0x04
@@ -35,16 +36,19 @@
 #define N_DATA    0x81
 #define N_EVENT   0x82
 #define N_EV_CONNECTED 1
+#define NET_OP_RECV 0
 
 #define RSH_PORT  514
 #define RSH_USER  "curt"        /* the host user the rshd's .rhosts names */
 
 extern long lseek();            /* the kernel's seek, which returns the offset */
 
-static int fd;                  /* /dev/net, the frame channel */
+static int fd;                  /* /dev/net, the command channel */
 static int sock;                /* the one rsh socket */
 static char rbuf[N_MAXPAY];     /* a frame payload scratch */
 static int rtype, rsock;        /* the last frame net_rx read */
+static char stash[N_MAXPAY];    /* a command's reply frame */
+static int stype = -1, ssock, slen, shave;
 
 static int port = RSH_PORT;
 static int recursive;           /* -r: walk directories */
@@ -52,20 +56,54 @@ static int stream_closed;       /* the remote closed; net_wait saw the event */
 
 /* ---- frame io ---- */
 
+/*
+ * One command: the typed fields are laid into the command block and the
+ * driver answers with the card's reply.  That reply is held for net_rx,
+ * so a caller that sends and then waits sees the ACK in order.
+ */
 static void
 net_tx(type, sk, p, len)
     int type, sk, len;
     char *p;
 {
-    char hdr[4];
+    struct cdb r;
+    int cap;
 
-    hdr[0] = type;
-    hdr[1] = sk;
-    hdr[2] = len & 0xff;
-    hdr[3] = (len >> 8) & 0xff;
-    write(fd, hdr, 4);
-    if (len)
-        write(fd, p, len);
+    memset((char *) &r, 0, sizeof r);
+    r.cmd[0] = type;
+    r.cmd[1] = sk;
+    r.len = 4;
+    r.hole = -1;
+    cap = 1;
+    switch (type) {
+    case N_OPEN:
+        r.cmd[2] = p[0];
+        break;
+    case N_CONNECT:
+        memcpy((char *) &r.cmd[2], p, 6);
+        break;
+    case N_SEND:
+        r.count = len;
+        r.flags = 0;
+        r.buf = p;
+        cap = 0;
+        break;
+    }
+    if (cap) {
+        r.count = cap;
+        r.flags = CDB_IN;
+        r.buf = stash;
+    }
+    if (ioctl(fd, CDBCMD, &r) < 0) {
+        stype = -1;
+        slen = 0;
+        shave = 1;
+        return;
+    }
+    stype = r.cmd[0] & 0xff;
+    ssock = r.cmd[1] & 0xff;
+    slen = r.count;
+    shave = 1;
 }
 
 /* read one pushed frame into buf; return its payload length, or -1 */
@@ -74,22 +112,33 @@ net_rx(typep, sockp, buf, max)
     int *typep, *sockp, max;
     char *buf;
 {
-    char r[4 + N_MAXPAY];
-    int n, len, i;
+    struct cdb r;
+    int n;
 
-    n = read(fd, r, sizeof r);
-    if (n < 4)
+    if (shave) {
+        shave = 0;
+        if (stype < 0)
+            return -1;
+        *typep = stype;
+        *sockp = ssock;
+        n = slen < max ? slen : max;
+        if (n)
+            memcpy(buf, stash, n);
+        return n;
+    }
+    memset((char *) &r, 0, sizeof r);
+    r.cmd[0] = NET_OP_RECV;
+    r.cmd[1] = 0xff;
+    r.len = 4;
+    r.count = max;
+    r.flags = max ? CDB_IN : 0;
+    r.buf = buf;
+    r.hole = -1;
+    if (ioctl(fd, CDBCMD, &r) < 0)
         return -1;
-    *typep = r[0] & 0xff;
-    *sockp = r[1] & 0xff;
-    len = (r[2] & 0xff) | ((r[3] & 0xff) << 8);
-    if (len > n - 4)
-        len = n - 4;
-    if (len > max)
-        len = max;
-    for (i = 0; i < len; i++)
-        buf[i] = r[4 + i];
-    return len;
+    *typep = r.cmd[0] & 0xff;
+    *sockp = r.cmd[1] & 0xff;
+    return r.count;
 }
 
 /* read frames until one of `want` on `sk`; return its payload length */

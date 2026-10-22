@@ -183,12 +183,49 @@ The line is level-asserted, so the guest releases it by draining
 `NETDATA`, not by acknowledging an edge.  That is why the producer does
 not need to know whether the guest is in its handler.
 
-The current guest driver (`sys/net.c`) polls `RXRDY` and does not claim
-VI5.  The firmware implements the contract anyway; until the guest
-driver attaches the line (`sys/INTR.md`), a hardware bring-up should
-keep VI5 masked or released, because an unclaimed level-asserted line
-stays low for as long as data is waiting.  The simulator's card model
-asserts the same line, so the guest-side change is the remaining piece.
+The guest side is the network face of the ND module: `sys/net.c` is
+linked into `nd.mod`, and `ndstart()` registers its probe and handler
+with the attach loop when the module is placed.  `intr_attach()` tickles
+it with a `STATUS` for socket 0, finds the line from the PIC's pending
+register and writes `netint` into `ovlint[]`.  The line is never named
+in the driver: `intrline(netint, seg)` finds it again from the handler's
+own address and the module's segment.
+
+`/dev/net` is block major 6, minor 1, and every operation is one
+`ioctl(CDBCMD)` command block: the driver builds the frame from the
+block's typed fields, sends it, and reads the reply before returning.
+A wait (`netwait()`) unmasks the line, looks at `RXRDY`, and sleeps on
+`netchan`, the one resident piece (module data addresses are shared
+between modules); the handler masks the line and wakes the caller.  The
+mask is the piece the level-asserted line needs:
+the card holds VI5 low until the FIFO drains, and the thing that drains
+it is the reader, not the handler.  Without the mask a frame arriving
+with nobody reading would interrupt forever.  The next read opens the
+line again, and because the line is still low the interrupt is
+immediate.  A wake that is not the card (a signal aborts the sleep)
+leaves the line open with no reader; the next frame's handler closes it,
+which is what the mask is for.
+
+The probe doubles as the presence test.  A card that is not in the
+machine reads open bus: all eight status bits set, where the card leaves
+the upper five zero.  `0xf8` is the absent signature, and the probe
+returns without draining or raising a line; `intr_attach()` leaves the
+driver unattached and an ioctl returns `ENXIO` rather than sleeping
+forever.  A card whose firmware is still booting when the guest reaches
+the attach is the one case the signature cannot tell from absent: the
+probe's bounded wait (about 0.2 s at 6 MHz) gives up, and that boot has
+no network.  The ESP32's tasks start in `setup()` after the network
+bring-up, so a cold power-up can lose this race.
+
+A Z80 reset does not reset the ESP32.  The probe's CLEAR therefore
+drains the card's whole receive ring, not one frame: a warm reset can
+leave the previous session's frames queued and VI5 already low, and the
+attach's baseline would otherwise read that as a line that was pending
+before the tickle.  Sockets the old session left open are still open on
+the card; the firmware has no reset line to close them.
+
+The simulator's card model asserts the same line, so the guest binary
+is unchanged between the two.
 
 ## 4. Implementation
 

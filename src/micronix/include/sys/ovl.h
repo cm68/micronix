@@ -189,4 +189,5 @@ extern int ovlattach();         /* ovlattach(seg): place a module, run its init 
 extern int ovlstart();          /* place the driver stamped into the slot */
 extern int ovlntr();            /* ovlntr(line): call the handler on a line */
 extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
+extern int intrline();          /* intrline(fn, seg): the line a handler was wired to */
 extern int intr_attach();       /* intr_attach(): tickle each card, wire ovlint */

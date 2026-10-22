@@ -107,6 +107,37 @@ only ever called because its card asserted it.  The EOI the handler owes
 is `pic_eoi(line)`, which the resident dispatch supplies; the driver does
 not touch the PIC.
 
+## Level-asserted lines and the idle mask
+
+A card that releases its line only when the driver consumes data — the
+net card holds VI5 low while its receive FIFO is non-empty — cannot be
+served by the attach's single `inton(line)` alone.  The handler cannot
+drain the card (the frame belongs to the reader), so a frame arriving
+with nobody in `read()` would re-assert the line forever.
+
+The pattern that driver uses, and the one to copy:
+
+    handler:   pic_mask(line); wakeup(&chan);
+    reader:    inton(line); look; sleep(&chan);     /* loop */
+
+The line is closed whenever no reader waits; the reader opens it for
+each look, and because the card still holds it low the interrupt is
+immediate.  A sleep aborted by a signal leaves the line open with no
+reader, which is safe — the next frame's handler closes it.
+
+The handler still does not name its line.  `intrline(handler, seg)`
+scans `ovlint[]` for the handler's own address and segment, which the
+attach wrote; the segment is part of the match because every module's
+functions are at OVLBASE-relative addresses and two modules can share
+one.  A module that carries a second face — the ND module's network
+face (`sys/net.c`) — claims it from the module's init, which
+`ovlplaceall()` runs before `intr_attach()`:
+
+    intrset(netprobe, netint, seg);
+
+`pic_mask(line)` (sys/probe.c) is the resident counterpart of
+`inton()`; `intoff()` is init-only.
+
 ## What went away
 
 - `ints.h`'s `INT_*` line names and its `#if N8259` table — a driver
