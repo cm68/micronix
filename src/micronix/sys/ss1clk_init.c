@@ -1,7 +1,7 @@
 /*
  * The CompuPro System Support 1 clock, init half.
  *
- * sys/ss1_clock_init.c
+ * sys/ss1clk_init.c
  *
  * ss1_clockinit() programs the 8253's counter 0 - the heartbeat.  It runs
  * once at boot, so this file folds into highmem.o and is reclaimed as
