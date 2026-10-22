@@ -34,35 +34,35 @@
 #include <stdio.h>
 #include "peep.h"
 
-long n_incsp = 0;
-long n_pushpop = 0;
-long n_pushswap = 0;
-long n_pushsave = 0;
-long n_bytestore = 0;
-long n_astore = 0;
-long n_bounce = 0;
-long n_and0 = 0;
-long n_frame = 0;
-long n_invjp = 0;
-long n_outi = 0;
-long n_exx = 0;
-long n_constdup = 0;
-long n_orclr = 0;
-long n_reuse = 0;
-long n_pushsrc = 0;
-long n_ptrload = 0;
-long n_ixcopy = 0;
-long n_autozero = 0;
-long n_xordup = 0;
-long n_exde = 0;
-long n_ldazero = 0;
-long n_bitset = 0;
-long n_m1cmp = 0;
-long n_ccall = 0;
-long n_cret = 0;
-long n_jpnext = 0;
-long n_hlarg = 0;
-long n_noframe = 0;
+int n_incsp = 0;
+int n_pushpop = 0;
+int n_pushswap = 0;
+int n_pushsave = 0;
+int n_bytestore = 0;
+int n_astore = 0;
+int n_bounce = 0;
+int n_and0 = 0;
+int n_frame = 0;
+int n_invjp = 0;
+int n_outi = 0;
+int n_exx = 0;
+int n_constdup = 0;
+int n_orclr = 0;
+int n_reuse = 0;
+int n_pushsrc = 0;
+int n_ptrload = 0;
+int n_ixcopy = 0;
+int n_autozero = 0;
+int n_xordup = 0;
+int n_exde = 0;
+int n_ldazero = 0;
+int n_bitset = 0;
+int n_m1cmp = 0;
+int n_ccall = 0;
+int n_cret = 0;
+int n_jpnext = 0;
+int n_hlarg = 0;
+int n_noframe = 0;
 long saved = 0;
 
 /* does the key at window line i match s exactly */
@@ -81,6 +81,82 @@ starts(int i, char *s)
 	if (i >= nwin || win[i].kind != L_INSN)
 		return 0;
 	return strncmp(win[i].key, s, strlen(s)) == 0;
+}
+
+/*
+ * The register a push or pop names, or 0.  Every rule that looks at one
+ * wants the mask, not the spelling - "is this the same register" is a
+ * comparison of two of these - and there are enough of them to be worth
+ * one copy.
+ */
+static int
+pushreg(int i)
+{
+	if (!starts(i, "push "))
+		return 0;
+	return regat(win[i].key + 5);
+}
+
+static int
+popreg(int i)
+{
+	if (!starts(i, "pop "))
+		return 0;
+	return regat(win[i].key + 4);
+}
+
+/*
+ * The one-character operand of "ld r,c", or 0.  A key is normalised, so
+ * a single-character operand is the whole operand and the line ends.
+ */
+static int
+ldchar(int i, int r)
+{
+	char *k;
+
+	if (i >= nwin || win[i].kind != L_INSN)
+		return 0;
+	k = win[i].key;
+	if (k[0] != 'l' || k[1] != 'd' || k[2] != ' ' || k[3] != r ||
+	    k[4] != ',' || k[5] == '\0' || k[6] != '\0')
+		return 0;
+	return k[5];
+}
+
+/*
+ * The next instruction after line i, skipping comments and blanks, or
+ * -1 when a label, a data line or the end of the window comes first.
+ */
+static
+int
+nextinsn(i)
+	int i;
+{
+	for (i++; i < nwin; i++) {
+		if (win[i].kind == L_BLANK)
+			continue;
+		if (win[i].kind == L_INSN)
+			return i;
+		return -1;
+	}
+	return -1;
+}
+
+/* delete n lines at the head of the window and put s there */
+static
+replace(int n, char *s)
+{
+	delline(0, n);
+	insline(0, s);
+}
+
+/* delete line j and the head line, then put s at the head */
+static
+replace2(int j, char *s)
+{
+	delline(j, 1);
+	delline(0, 1);
+	insline(0, s);
 }
 
 /*
@@ -103,7 +179,7 @@ r_incsp(void)
 		n++;
 	if (n < 2)
 		return 0;
-	if (!starts(n, "pop "))
+	if (!popreg(n))
 		return 0;
 
 	k = n / 2;
@@ -132,15 +208,13 @@ r_incsp(void)
 int
 r_pushpop(void)
 {
-	char x[KLEN], y[KLEN];
+	int rx, ry;
 
-	if (!starts(0, "push ") || !starts(1, "pop ") || !starts(2, "push "))
+	rx = pushreg(0);
+	ry = popreg(1);
+	if (rx == 0 || ry == 0 || pushreg(2) != ry)
 		return 0;
-	strcpy(x, win[0].key + 5);
-	strcpy(y, win[1].key + 4);
-	if (strcmp(y, win[2].key + 5) != 0)
-		return 0;
-	if (strcmp(x, y) == 0)
+	if (rx == ry)
 		return 0;				/* push hl/pop hl/push hl: not ours */
 
 	/* is Y wanted after the third line */
@@ -165,24 +239,14 @@ r_pushpop(void)
 int
 r_pushswap(void)
 {
-	char x[KLEN], y[KLEN];
 	int rx, ry;
 
-	if (!starts(0, "push ") || !starts(1, "pop ") ||
-	    !starts(2, "push ") || !starts(3, "pop "))
-		return 0;
-	strcpy(x, win[0].key + 5);
-	strcpy(y, win[1].key + 4);
-	if (strcmp(x, y) == 0)
-		return 0;
-	if (strcmp(y, win[2].key + 5) != 0)
-		return 0;
-	if (strcmp(x, win[3].key + 4) != 0)
-		return 0;
-	rx = regat(x);
-	ry = regat(y);
-	if (rx == 0 || ry == 0 || (rx & R_F) || (ry & R_F))
+	rx = pushreg(0);
+	ry = popreg(1);
+	if (rx == 0 || ry == 0 || rx == ry || (rx & R_F) || (ry & R_F))
 		return 0;				/* af: the pop moves the flags */
+	if (pushreg(2) != ry || popreg(3) != rx)
+		return 0;
 
 	delline(2, 2);
 	n_pushswap++;
@@ -207,24 +271,16 @@ r_pushswap(void)
 int
 r_pushsave(void)
 {
-	char x[KLEN];
 	int j, rm;
 	int w;
 
-	if (!starts(0, "push "))
-		return 0;
-	strcpy(x, win[0].key + 5);
-	rm = regat(x);
+	rm = pushreg(0);
 	if (rm == 0 || (rm & R_F))
 		return 0;
 
-	for (j = 1; j < nwin; j++) {
-		if (win[j].kind == L_BLANK)
-			continue;
-		if (win[j].kind != L_INSN)
-			return 0;			/* label or data ends the run */
+	for (j = nextinsn(0); j >= 0; j = nextinsn(j)) {
 		if (starts(j, "pop ")) {
-			if (strcmp(win[j].key + 4, x) == 0) {
+			if (popreg(j) == rm) {
 				delline(j, 1);
 				delline(0, 1);
 				n_pushsave++;
@@ -284,25 +340,6 @@ adead(from)
 }
 
 /*
- * The next instruction after line i, skipping comments and blanks, or
- * -1 when a label, a data line or the end of the window comes first.
- */
-static
-int
-nextinsn(i)
-	int i;
-{
-	for (i++; i < nwin; i++) {
-		if (win[i].kind == L_BLANK)
-			continue;
-		if (win[i].kind == L_INSN)
-			return i;
-		return -1;
-	}
-	return -1;
-}
-
-/*
  * push hl / ld l,X / ld h,0 / ld a,l / pop hl / ld (hl),a - a byte
  * value X is zero-extended through hl only to be put back into a and
  * stored through the pointer the push saved.  The store can name X
@@ -318,7 +355,7 @@ int
 r_bytestore(void)
 {
 	char buf[KLEN];
-	char x;
+	int x;
 	int i1, i2, i3, i4, i5;
 
 	if (!is(0, "push hl"))
@@ -330,11 +367,8 @@ r_bytestore(void)
 	i5 = i4 < 0 ? -1 : nextinsn(i4);
 	if (i5 < 0)
 		return 0;
-	if (strlen(win[i1].key) != 6 ||
-	    strncmp(win[i1].key, "ld l,", 5) != 0)
-		return 0;
-	x = win[i1].key[5];
-	if (!strchr("bcde", x))
+	x = ldchar(i1, 'l');
+	if (x < 'b' || x > 'e')
 		return 0;
 	if (!is(i2, "ld h,0") || !is(i3, "ld a,l") ||
 	    !is(i4, "pop hl") || !is(i5, "ld (hl),a"))
@@ -343,8 +377,7 @@ r_bytestore(void)
 		return 0;
 
 	sprintf(buf, "\tld (hl),%c\n", x);
-	delline(0, i5 + 1);
-	insline(0, buf);
+	replace(i5 + 1, buf);
 	n_bytestore++;
 	saved += 6;				/* seven bytes become one */
 	return 1;
@@ -362,25 +395,19 @@ int
 r_astore(void)
 {
 	char buf[KLEN];
-	char x;
-	int j;
+	int x, j;
 
-	if (!starts(0, "ld a,") || strlen(win[0].key) != 6)
+	x = ldchar(0, 'a');
+	if (x < 'b' || x > 'e')
 		return 0;
-	x = win[0].key[5];
-	if (!strchr("bcde", x))
-		return 0;
-	for (j = 1; j < nwin; j++)
-		if (win[j].kind != L_BLANK)
-			break;
-	if (!is(j, "ld (hl),a"))
+	j = nextinsn(0);
+	if (j < 0 || !is(j, "ld (hl),a"))
 		return 0;
 	if (!adead(j + 1))
 		return 0;
 
 	sprintf(buf, "\tld (hl),%c\n", x);
-	delline(0, j + 1);
-	insline(0, buf);
+	replace(j + 1, buf);
 	n_astore++;
 	saved += 1;
 	return 1;
@@ -394,7 +421,7 @@ r_astore(void)
 int
 r_bounce(void)
 {
-	char src[KLEN], dst;
+	char *src, dst;
 	char buf[KLEN + 8];
 
 	if (!starts(0, "ld a,") || !starts(1, "ld "))
@@ -407,7 +434,7 @@ r_bounce(void)
 	if (!strchr("bcdehl", dst))
 		return 0;
 
-	strcpy(src, win[0].key + 5);
+	src = win[0].key + 5;
 	/* (nn) loads only into a; (hl) and (ix+d) load into any register */
 	if (src[0] == '(' && !memok(src))
 		return 0;
@@ -416,8 +443,7 @@ r_bounce(void)
 		return 0;
 
 	sprintf(buf, "\tld %c,%s\n", dst, src);
-	delline(0, 2);
-	insline(0, buf);
+	replace(2, buf);
 	n_bounce++;
 	saved += 1;
 	return 1;
@@ -438,8 +464,7 @@ r_and0(void)
 	if (!starts(0, "ld a,") || !is(1, "and 0"))
 		return 0;
 	/* the load is only there to feed the and, whose answer ignores it */
-	delline(0, 2);
-	insline(0, "\txor a\n");
+	replace(2, "\txor a\n");
 	n_and0++;
 	saved += 2;
 	return 1;
@@ -475,8 +500,7 @@ r_fenter(void)
 	if (!isdead(R_HL, 3))
 		return 0;
 
-	delline(0, 3);
-	insline(0, "\tcall\tfenter\n");
+	replace(3, "\tcall\tfenter\n");
 	n_frame++;
 	saved += 5;
 	return 1;
@@ -488,8 +512,7 @@ r_fexit(void)
 	if (!is(0, "ld sp,iy") || !is(1, "pop iy") || !is(2, "ret"))
 		return 0;
 
-	delline(0, 3);
-	insline(0, "\tjp\tfexit\n");
+	replace(3, "\tjp\tfexit\n");
 	n_frame++;
 	saved += 2;
 	return 1;
@@ -525,13 +548,69 @@ nextsig(int i)
 	return -1;
 }
 
+/*
+ * Find s in a table of pairs - condition and its inverse, or condition
+ * and the flag it tests.  Returns the index of the pair, or -1.
+ */
+static int
+cclookup(char *s, char **tab)
+{
+	int i;
+
+	for (i = 0; tab[i]; i += 2)
+		if (strcmp(s, tab[i]) == 0)
+			return i;
+	return -1;
+}
+
+/*
+ * Does the label on line j name the identifier at p?  p is the target
+ * of a jump, so its length is the whole name; the label carries the
+ * colon.
+ */
+static int
+labmatch(int j, char *p)
+{
+	int n = strlen(p);
+
+	if (j < 0 || j >= nwin || win[j].kind != L_LABEL)
+		return 0;
+	return strncmp(win[j].key, p, n) == 0 &&
+		win[j].key[n] == ':' && win[j].key[n + 1] == '\0';
+}
+
+/*
+ * The shared tail of the three hop rules: the window head is a
+ * conditional jump to the label on line j2.  Return the index of the
+ * inverse condition in ccinv, or -1 when the jump is unconditional or
+ * the label is not the one it names.
+ */
+static int
+hopcc(int j2)
+{
+	char cc[4];
+	char *comma;
+	int n;
+
+	comma = strchr(win[0].key + 3, ',');
+	if (!comma)
+		return -1;
+	n = comma - (win[0].key + 3);
+	if (n < 1 || n > 2)
+		return -1;
+	memcpy(cc, win[0].key + 3, n);
+	cc[n] = 0;
+
+	if (!labmatch(j2, comma + 1))
+		return -1;
+	return cclookup(cc, ccinv);
+}
+
 int
 r_invjp(void)
 {
-	char cc[4];
 	char buf[KLEN + 8];
-	char *comma;
-	int i, n, j1, j2;
+	int i, j1, j2;
 
 	if (!starts(0, "jp "))
 		return 0;
@@ -542,33 +621,14 @@ r_invjp(void)
 	j2 = nextsig(j1);
 	if (j2 < 0 || win[j2].kind != L_LABEL)
 		return 0;
-	comma = strchr(win[0].key + 3, ',');
-	if (!comma)
-		return 0;
 	if (strchr(win[j1].key + 3, ','))
 		return 0;			/* second jump conditional: not ours */
-	n = comma - (win[0].key + 3);
-	if (n < 1 || n > 2)
-		return 0;
-	memcpy(cc, win[0].key + 3, n);
-	cc[n] = 0;
-
-	/* the label the hop targets must be the next one down */
-	n = strlen(comma + 1);
-	if (strncmp(win[j2].key, comma + 1, n) != 0 ||
-	    win[j2].key[n] != ':' || win[j2].key[n + 1] != '\0')
-		return 0;
-
-	for (i = 0; ccinv[i]; i += 2)
-		if (strcmp(cc, ccinv[i]) == 0)
-			break;
-	if (!ccinv[i])
+	i = hopcc(j2);
+	if (i < 0)
 		return 0;
 
 	sprintf(buf, "\tjp %s,%s\n", ccinv[i + 1], win[j1].key + 3);
-	delline(j1, 1);
-	delline(0, 1);
-	insline(0, buf);
+	replace2(j1, buf);
 	n_invjp++;
 	saved += 3;
 	return 1;
@@ -616,10 +676,8 @@ r_invjp(void)
 int
 r_ccall(void)
 {
-	char cc[4];
 	char buf[KLEN + 8];
-	char *comma;
-	int i, n, j1, j2;
+	int i, j1, j2;
 
 	if (!starts(0, "jp "))
 		return 0;
@@ -631,31 +689,12 @@ r_ccall(void)
 	j2 = nextsig(j1);
 	if (j2 < 0 || win[j2].kind != L_LABEL)
 		return 0;
-	comma = strchr(win[0].key + 3, ',');
-	if (!comma)
+	i = hopcc(j2);
+	if (i < 0)
 		return 0;			/* unconditional hop: not ours */
-	n = comma - (win[0].key + 3);
-	if (n < 1 || n > 2)
-		return 0;
-	memcpy(cc, win[0].key + 3, n);
-	cc[n] = 0;
-
-	/* the label hopped to must be the one right after the call */
-	n = strlen(comma + 1);
-	if (strncmp(win[j2].key, comma + 1, n) != 0 ||
-	    win[j2].key[n] != ':' || win[j2].key[n + 1] != '\0')
-		return 0;
-
-	for (i = 0; ccinv[i]; i += 2)
-		if (strcmp(cc, ccinv[i]) == 0)
-			break;
-	if (!ccinv[i])
-		return 0;
 
 	sprintf(buf, "\tcall %s,%s\n", ccinv[i + 1], win[j1].key + 5);
-	delline(j1, 1);
-	delline(0, 1);
-	insline(0, buf);
+	replace2(j1, buf);
 	n_ccall++;
 	saved += 3;
 	return 1;
@@ -677,10 +716,8 @@ r_ccall(void)
 int
 r_cret(void)
 {
-	char cc[4];
 	char buf[KLEN + 8];
-	char *comma;
-	int i, n, j1, j2;
+	int i, j1, j2;
 
 	if (!starts(0, "jp "))
 		return 0;
@@ -690,30 +727,12 @@ r_cret(void)
 	j2 = nextsig(j1);
 	if (j2 < 0 || win[j2].kind != L_LABEL)
 		return 0;
-	comma = strchr(win[0].key + 3, ',');
-	if (!comma)
-		return 0;
-	n = comma - (win[0].key + 3);
-	if (n < 1 || n > 2)
-		return 0;
-	memcpy(cc, win[0].key + 3, n);
-	cc[n] = 0;
-
-	n = strlen(comma + 1);
-	if (strncmp(win[j2].key, comma + 1, n) != 0 ||
-	    win[j2].key[n] != ':' || win[j2].key[n + 1] != '\0')
-		return 0;
-
-	for (i = 0; ccinv[i]; i += 2)
-		if (strcmp(cc, ccinv[i]) == 0)
-			break;
-	if (!ccinv[i])
+	i = hopcc(j2);
+	if (i < 0)
 		return 0;
 
 	sprintf(buf, "\tret %s\n", ccinv[i + 1]);
-	delline(j1, 1);
-	delline(0, 1);
-	insline(0, buf);
+	replace2(j1, buf);
 	n_cret++;
 	saved += 3;
 	return 1;
@@ -737,16 +756,12 @@ r_cret(void)
 int
 r_jpnext(void)
 {
-	int j1, n;
+	int j1;
 
 	if (!starts(0, "jp ") || strchr(win[0].key + 3, ','))
 		return 0;			/* conditional: it may fall through */
 	j1 = nextsig(0);
-	if (j1 < 0 || win[j1].kind != L_LABEL)
-		return 0;
-	n = strlen(win[0].key + 3);
-	if (strncmp(win[j1].key, win[0].key + 3, n) != 0 ||
-	    win[j1].key[n] != ':' || win[j1].key[n + 1] != '\0')
+	if (!labmatch(j1, win[0].key + 3))
 		return 0;
 	delline(0, 1);
 	n_jpnext++;
@@ -809,10 +824,26 @@ r_outi(void)
  * stays below it), no branches, no calls, nothing that writes H, L
  * or IY.  A label ends it: someone may arrive there another way.
  */
+/* "ld X,tail" -> X, or 0.  tail names the rest of the operand:
+ * ",(iy+4)" and ",(iy+5)" for the two halves of a stack argument. */
+static int
+iyarg(int i, char *tail)
+{
+	char *k;
+
+	if (i >= nwin || win[i].kind != L_INSN)
+		return 0;
+	k = win[i].key;
+	if (strncmp(k, "ld ", 3) != 0 || strcmp(k + 4, tail) != 0)
+		return 0;
+	return k[3];
+}
+
 int
 r_hlarg(void)
 {
-	int j, k;
+	char buf[10];
+	int j, k, lo, hi;
 
 	if (!is(0, "call fentbw") && !is(0, "call fentxw") &&
 	    !is(0, "call fentbxw") && !is(0, "call fentnw") &&
@@ -825,9 +856,10 @@ r_hlarg(void)
 		if (win[j].kind != L_INSN)
 			return 0;
 
-		if (is(j, "ld l,(iy+4)")) {
+		lo = iyarg(j, ",(iy+4)");
+		if (lo == 'l') {
 			k = nextsig(j);
-			if (k < 0 || !is(k, "ld h,(iy+5)"))
+			if (k < 0 || iyarg(k, ",(iy+5)") != 'h')
 				return 0;	/* half a load: leave it */
 			delline(k, 1);
 			delline(j, 1);
@@ -835,48 +867,27 @@ r_hlarg(void)
 			saved += 6;
 			return 1;
 		}
-		if (is(j, "ld c,(iy+4)")) {
+		if (lo == 'c' || lo == 'e') {
+			hi = lo - 1;			/* b, d */
 			k = nextsig(j);
-			if (k > 0 && is(k, "ld b,(iy+5)")) {
+			if (k >= 0 && iyarg(k, ",(iy+5)") == hi) {
+				sprintf(buf, "\tld %c,h\n", hi);
 				delline(k, 1);
-				insline(k, "\tld b,h\n");
-				delline(j, 1);
-				insline(j, "\tld c,l\n");
+				insline(k, buf);
 				saved += 4;
 			} else {
-				delline(j, 1);
-				insline(j, "\tld c,l\n");
 				saved += 2;
 			}
-			n_hlarg++;
-			return 1;
-		}
-		if (is(j, "ld e,(iy+4)")) {
-			k = nextsig(j);
-			if (k > 0 && is(k, "ld d,(iy+5)")) {
-				delline(k, 1);
-				insline(k, "\tld d,h\n");
-				delline(j, 1);
-				insline(j, "\tld e,l\n");
-				saved += 4;
-			} else {
-				delline(j, 1);
-				insline(j, "\tld e,l\n");
-				saved += 2;
-			}
-			n_hlarg++;
-			return 1;
-		}
-		if (is(j, "ld b,(iy+4)")) {
+			sprintf(buf, "\tld %c,l\n", lo);
 			delline(j, 1);
-			insline(j, "\tld b,l\n");
+			insline(j, buf);
 			n_hlarg++;
-			saved += 2;
 			return 1;
 		}
-		if (is(j, "ld a,(iy+4)")) {
+		if (lo == 'b' || lo == 'a') {
+			sprintf(buf, "\tld %c,l\n", lo);
 			delline(j, 1);
-			insline(j, "\tld a,l\n");
+			insline(j, buf);
 			n_hlarg++;
 			saved += 2;
 			return 1;
@@ -988,10 +999,8 @@ r_m1cmp(void)
 		return 0;
 	memcpy(cc, win[j3].key + 3, n);
 	cc[n] = 0;
-	for (i = 0; ccm1[i]; i += 2)
-		if (strcmp(cc, ccm1[i]) == 0)
-			break;
-	if (!ccm1[i])
+	i = cclookup(cc, ccm1);
+	if (i < 0)
 		return 0;			/* branches on a flag the add does not set */
 
 	/* %.2s keeps the mnemonic: jr c and jr nc are both encodable */
@@ -1107,9 +1116,7 @@ r_reuse(void)
 		return 0;
 
 	sprintf(buf, "\tadd hl,%s\n", (hi == VD) ? "bc" : "de");
-	delline(j, 1);
-	delline(0, 1);
-	insline(0, buf);
+	replace2(j, buf);
 	n_reuse++;
 	saved += 3;
 	return 1;
@@ -1139,8 +1146,7 @@ r_pushsrc(void)
 
 	delline(k, 1);
 	delline(j, 1);
-	delline(0, 1);
-	insline(0, "\tpush bc\n");
+	replace(1, "\tpush bc\n");
 	n_pushsrc++;
 	saved += 2;
 	return 1;
@@ -1171,8 +1177,7 @@ r_ptrload(void)
 
 	delline(k, 1);
 	delline(j, 1);
-	delline(0, 1);
-	insline(0, "\tld a,(bc)\n");
+	replace(1, "\tld a,(bc)\n");
 	n_ptrload++;
 	saved += 2;
 	return 1;
@@ -1197,8 +1202,7 @@ r_ixcopy(void)
 		return 0;
 
 	sprintf(buf, "\tpush %s\n\tpop %s\n", src, dst);
-	delline(0, 2);
-	insline(0, buf);
+	replace(2, buf);
 	n_ixcopy++;
 	saved += 1;
 	return 1;
@@ -1315,8 +1319,7 @@ r_ldazero(void)
 	if (!isdead(R_F, 1))
 		return 0;
 
-	delline(0, 1);
-	insline(0, "\txor a\n");
+	replace(1, "\txor a\n");
 	n_ldazero++;
 	saved += 1;
 	return 1;
@@ -1413,8 +1416,7 @@ r_bitset(void)
 		return 0;
 
 	sprintf(buf, "\t%s %d,%s\n", set ? "set" : "res", k, op0);
-	delline(0, 3);
-	insline(0, buf);
+	replace(3, buf);
 	n_bitset++;
 	saved += (strncmp(op0, "(hl", 3) == 0) ? 2 : 4;
 	return 1;
@@ -1541,22 +1543,22 @@ report(void)
 	 * "unknown error" - and the one line this used to be was 125,
 	 * so the counters added since would have run it off the end.
 	 */
-	fprintf(stderr, "peep: frame %ld  incsp %ld  pushpop %ld"
-		"  bounce %ld  and0 %ld  invjp %ld  oarg %ld\n",
+	fprintf(stderr, "peep: frame %d  incsp %d  pushpop %d"
+		"  bounce %d  and0 %d  invjp %d  oarg %d\n",
 		n_frame, n_incsp, n_pushpop, n_bounce, n_and0, n_invjp,
 		n_outi);
-	fprintf(stderr, "peep: exx %ld  m1cmp %ld  ccall %ld  cret %ld"
-		"  jpnext %ld  hlarg %ld  noframe %ld  pool %ld = %ld bytes\n",
+	fprintf(stderr, "peep: exx %d  m1cmp %d  ccall %d  cret %d"
+		"  jpnext %d  hlarg %d  noframe %d  pool %ld = %ld bytes\n",
 		n_exx, n_m1cmp, n_ccall, n_cret, n_jpnext, n_hlarg,
 		n_noframe, poolmerged, saved);
-	fprintf(stderr, "peep: constdup %ld  orclr %ld  reuse %ld  pushsrc %ld"
-		"  ptrload %ld  ixcopy %ld  autozero %ld  xordup %ld\n",
+	fprintf(stderr, "peep: constdup %d  orclr %d  reuse %d  pushsrc %d"
+		"  ptrload %d  ixcopy %d  autozero %d  xordup %d\n",
 		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
 		n_autozero, n_xordup);
-	fprintf(stderr, "peep: exde %ld  ldazero %ld  bitset %ld\n",
-		n_exde, n_ldazero, n_bitset);
-	fprintf(stderr, "peep: pushswap %ld  pushsave %ld  bytestore %ld  astore %ld\n",
-		n_pushswap, n_pushsave, n_bytestore, n_astore);
+	fprintf(stderr, "peep: exde %d  ldazero %d  bitset %d  pushswap %d"
+		"  pushsave %d  bytestore %d  astore %d\n",
+		n_exde, n_ldazero, n_bitset, n_pushswap, n_pushsave,
+		n_bytestore, n_astore);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

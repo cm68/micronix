@@ -340,7 +340,7 @@ insline(int i, char *s)
  * pass2 already emits rely on - and the q entries are left alone: a
  * long first argument spills two words and earns its frame.
  */
-extern long n_noframe;		/* the counter lives with the others */
+extern int n_noframe;		/* the counter lives with the others */
 extern long saved;
 
 /*
