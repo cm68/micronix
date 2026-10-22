@@ -209,6 +209,21 @@ netact, and polls each port with a one second alarm instead of forking
 a reader per port.  It matches the captured wire and passes the same
 two-hop push and pull over its own spools.
 
+## Errors
+
+The stock daemon's bad-checksum path was captured: it printed
+`lrec - checksum` and sent a line whose payload is `N`, the stock
+sender retransmitted the corrupted D record, and the file still
+arrived.  The reconstruction does the same.  A D record's sequence is
+checked, and the E record's character is the next sequence number, so
+a dropped record is caught at E: the receiver NAKs, discards its
+temporary, and the sender retries the whole transfer.
+
+`nettesterr.py` exercises four of these: a corrupted record checksum, a
+corrupted proposal, a wrong sequence with a valid checksum, and a
+dropped record.  Each recovers; the captures show `N` and the
+retransmission, or the second transfer for the dropped record.
+
 ## Open points
 
 - 0x0162 is the transfer worker; it calls lrec/ngets/nputchar indirectly

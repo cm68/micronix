@@ -18,9 +18,14 @@ loop, spool scans, netmap and ttys handling follow the binary, and the
 wire format is the real 1.6 line protocol: three checksum characters
 per line, then `P!`/`A!`, `F`/`Y`, the S or R header and its Y, every D
 record and its Y, and the unacknowledged E.  Two reconstructed daemons
-exchange the same bytes as two recovered ones.  The R path is
-store-and-forward, and the recovered daemons were run through it over
-two hops (a -- b -- c):
+exchange the same bytes as two recovered ones.  The sender does not
+stop for a Y between lines: the 1.6 receiver reads the next record
+before it answers the previous one, so F, the header, every D and the
+E go as one burst, and the Y answers are drained afterward.  A P! that
+arrives during that drain is the R reply and is handled there.
+
+The R path is store-and-forward, and the recovered daemons were run
+through it over two hops (a -- b -- c):
 
 - a's netcp queues `R c /etc/motd a /tmp/fetched root`; a's daemon
   routes it to b, b's daemon forwards the same R to c.
@@ -42,9 +47,25 @@ the three-machine test.
 The reconstruction performs the copy in-process instead of exec'ing
 netact, so it needs neither netact nor the network user; the wire is
 the same.  The 1.6 daemon forks a reader per port, while this one polls
-with a one second alarm in a single process.  The end-to-end tests are
-`nettest16.py recon` (one link), `nettest16.py relay` (three recovered
-machines), and `nettest16.py relayrecon` (the reconstruction).
+with a one second alarm in a single process.  The end-to-end tests are `nettest16.py recon` (one link),
+`nettest16.py relay` (three recovered machines),
+`nettest16.py relayrecon` (the reconstruction), and the mixed tests
+`nettestmix.py ours-netcp` and `nettestmix.py ours-daemon`, which put
+one of our programs at a and the stock chain at b and c.
+
+## Errors
+
+A line whose checksum fails gets a NAK (`N`); the sender resends that
+line.  Each D record's sequence is checked, and the E record carries
+the next sequence number, so a dropped record is caught at E: the
+receiver NAKs, discards its temporary file, and the sender retries the
+whole transfer.  The destination is written to `<path>.net` and renamed
+only on success, so a failed transfer leaves no half file.
+
+`nettesterr.py` injects a bad checksum on a record, a bad proposal, a
+wrong sequence, and a dropped record.  All four recover; the captured
+traffic shows the NAK and the retransmission (or the second whole
+transfer for the dropped record).
 
 The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netdaemon),
 extracted with readall.  The 1.61 Vol. 3 catalog container carries the same

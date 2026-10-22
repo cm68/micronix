@@ -17,8 +17,11 @@ netcp.c is a reconstruction, not the original source.  The command line,
 dispatch, host parsing and local copy follow the binary; the spool record,
 its 45-byte D records and the six-bit encoding are the real 1.6 format.
 Running the recovered netcp under usersim produces byte-identical records
-to the reconstruction for the same command and source.  The end-to-end
-test is `python3 -I src/usersim/nettest16.py recon`.
+to the reconstruction for the same command and source.  The queue file
+is named for the next hop - the netmap route - not the final host; a
+host reached through b gets `b%"..."`, as the 1.6 netcp writes it.
+The end-to-end tests are `nettest16.py recon` and
+`nettestmix.py ours-netcp`.
 
 The binary came from Micronix 1.6 Distribution Vol. 3 (/bin/netcp),
 extracted with readall.  Header: Whitesmiths object, text 0x4454 at 0x100,

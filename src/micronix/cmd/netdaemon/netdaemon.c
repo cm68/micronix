@@ -21,8 +21,15 @@
  * then a newline.  The checksum is over the line and its newline: for
  * each byte, add it and rotate the 16-bit sum left one place.  The
  * three characters are bits 0-5, 6-11 and 12-17 of that sum, each with
- * 0x20 added.  The sender then waits for a Y after F, after the S/R
- * header, and after every D record; the E record is not acknowledged.
+ * 0x20 added.  The receiver reads the next record before answering the
+ * previous one, so the sender sends its lines as a burst and drains the
+ * Y answers; the E record is not acknowledged.
+ *
+ * A line that fails its checksum is answered with a NAK (payload N) and
+ * the sender resends it.  The E record's character is the next sequence
+ * number, so a dropped record is caught there: the receiver NAKs and
+ * discards its temporary, and the sender retries the whole transfer.
+ * The destination is written to <path>.net and renamed on success.
  *
  * An R request is store-and-forward, and the recovered daemons were run
  * through it over two hops: a daemon spools the request and forwards it
@@ -58,12 +65,14 @@
 #define TTYS	 "/etc/ttys"
 #define MAXPORTS 16
 #define LINEMAX	 512
+#define HANDSHAKE 90
 
 extern DIR *opendir();
 extern struct direct *readdir();
 extern int closedir();
 extern int (*signal())();
 extern int fread();
+extern int rename(char *, char *);
 
 struct port {
     char dev[32];
@@ -440,7 +449,7 @@ wire_read(p, buf, size, secs)
     hdr[1] = ((sum >> 6) & 0x3f) + 0x20;
     hdr[2] = ((sum >> 12) & 0x3f) + 0x20;
     if (buf[0] != hdr[0] || buf[1] != hdr[1] || buf[2] != hdr[2])
-	return 0;
+	return -1;			/* a line, but not a valid one */
     for (i = 3; buf[i]; i++)
 	buf[i - 3] = buf[i];
     buf[i - 3] = 0;
@@ -548,9 +557,13 @@ receive_s(p, header)
     char host[64];
     char ourhost[64];
     char path[256];
+    char tmp[300];
     char mode[32];
     FILE *out;
     int len;
+    int r;
+    int seq;
+    int naks;
 
     /*
      * The first field is the destination machine.  If it is not this
@@ -568,26 +581,80 @@ receive_s(p, header)
      */
     if (!field(header, 2, path, sizeof path))
 	return 0;
-    out = fopen(path, "w");
+    /*
+     * Write a temporary and rename it at the end, so a transfer that
+     * fails its last record does not leave a half file in place.
+     */
+    sprintf(tmp, "%s.net", path);
+    out = fopen(tmp, "w");
     if (out == 0) {
-	perror(path);
+	perror(tmp);
 	return 0;
     }
+    seq = 1;
+    naks = 0;
     for (;;) {
-	if (!wire_read(p, line, sizeof line, 5)) {
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 0) {
 	    fclose(out);
+	    unlink(tmp);
 	    return 0;
 	}
+	if (r < 0) {			/* lrec - checksum */
+	    wire_write(p, "N");
+	    if (++naks > 8) {
+		fclose(out);
+		unlink(tmp);
+		return 0;
+	    }
+	    continue;
+	}
 	if (line[0] == 'D') {
+	    int ds;
+
+	    ds = ((unsigned char) line[1] - 0x20) & 0x3f;
+	    if (ds != seq) {		/* a lost or out-of-order record */
+		wire_write(p, "N");
+		if (++naks > 8) {
+		    fclose(out);
+		    unlink(tmp);
+		    return 0;
+		}
+		continue;
+	    }
 	    len = ((unsigned char) line[2] - 0x20) & 0x3f;
 	    decode(line + 3, len, out);
 	    wire_write(p, "Y");
+	    seq++;
+	    naks = 0;
 	    continue;
 	}
-	if (line[0] == 'E')
+	if (line[0] == 'E') {
+	    int es;
+
+	    /*
+	     * The end record carries the next sequence number.  If it
+	     * does not match what arrived, a record was lost; NAK and
+	     * leave the spool entry for a fresh transfer.
+	     */
+	    es = ((unsigned char) line[1] - 0x20) & 0x3f;
+	    if (es != seq) {
+		wire_write(p, "N");
+		fclose(out);
+		unlink(tmp);
+		return 0;
+	    }
 	    break;
+	}
+	wire_write(p, "N");
+	if (++naks > 8) {
+	    fclose(out);
+	    unlink(tmp);
+	    return 0;
+	}
     }
     fclose(out);
+    rename(tmp, path);
     if (field(header, 6, mode, sizeof mode))
 	chmod(path, octal(mode));
     if (debug)
@@ -610,6 +677,22 @@ queuename(h, out)
     now = time((long *) 0);
     c = (now & 0x3f) + 0x20;
     sprintf(out, "%s%s%%\"%c\"", SPOOLOUT, h, c);
+}
+
+/*
+ * The 1.6 spool names the next hop, not the final host.
+ */
+static void
+queue_for(host, out)
+    char *host;
+    char *out;
+{
+    char route[64];
+
+    if (netlookup(host, route))
+	queuename(route, out);
+    else
+	queuename(host, out);
 }
 
 /*
@@ -650,7 +733,7 @@ copy_r_to_s(header)
     localname(ourhost);
     ownername(owner);
     mode = st.st_mode & 0777;
-    queuename(desthost, q);
+    queue_for(desthost, q);
     out = fopen(q, "w");
     if (out == 0) {
 	fclose(in);
@@ -686,7 +769,7 @@ relay_r(header)
 
     if (!field(header, 1, host, sizeof host))
 	return 0;
-    queuename(host, q);
+    queue_for(host, q);
     out = fopen(q, "w");
     if (out == 0)
 	return 0;
@@ -708,27 +791,44 @@ relay_s(p, header)
     char q[256];
     char line[LINEMAX];
     FILE *out;
+    int r, naks;
 
     if (!field(header, 1, host, sizeof host))
 	return 0;
-    queuename(host, q);
+    queue_for(host, q);
     out = fopen(q, "w");
     if (out == 0)
 	return 0;
     fprintf(out, "%s\n", header);
+    naks = 0;
     for (;;) {
-	if (!wire_read(p, line, sizeof line, 5)) {
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 0) {
 	    fclose(out);
 	    return 0;
+	}
+	if (r < 0) {
+	    wire_write(p, "N");
+	    if (++naks > 8) {
+		fclose(out);
+		return 0;
+	    }
+	    continue;
 	}
 	if (line[0] == 'D') {
 	    fprintf(out, "%s\n", line);
 	    wire_write(p, "Y");
+	    naks = 0;
 	    continue;
 	}
 	if (line[0] == 'E') {
 	    fprintf(out, "%s\n", line);
 	    break;
+	}
+	wire_write(p, "N");
+	if (++naks > 8) {
+	    fclose(out);
+	    return 0;
 	}
     }
     fclose(out);
@@ -736,25 +836,38 @@ relay_s(p, header)
 }
 
 /*
- * Accept a transfer: P! then F then the S or R header.  The sender waits
- * for Y after F and after the header, and after each D record.
+ * The body of an acceptance, after the P! has been read: A!, F and its
+ * Y, the S or R header and its Y, then the transfer.
  */
 static int
-accept_link(p)
+proposal(p)
     struct port *p;
 {
     char line[LINEMAX];
     char rheader[LINEMAX];
+    int r, tries;
 
-    if (!wire_read(p, line, sizeof line, 1))
-	return 0;
-    if (strcmp(line, "P!"))
-	return 0;
     wire_write(p, "A!");
-    if (!expect(p, "F", 5))
+    for (tries = 0; tries < 6; tries++) {
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 0)
+	    return 0;
+	if (r > 0 && strcmp(line, "F") == 0)
+	    break;
+	wire_write(p, "N");
+    }
+    if (tries == 6)
 	return 0;
     wire_write(p, "Y");
-    if (!wire_read(p, line, sizeof line, 5))
+    for (tries = 0; tries < 6; tries++) {
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 0)
+	    return 0;
+	if (r > 0 && (line[0] == 'S' || line[0] == 'R'))
+	    break;
+	wire_write(p, "N");
+    }
+    if (tries == 6)
 	return 0;
     wire_write(p, "Y");
     if (line[0] == 'S')
@@ -769,7 +882,16 @@ accept_link(p)
 	 * else, copy the request into the spool and forward it.
 	 */
 	strcpy(rheader, line);
-	wire_read(p, line, sizeof line, 5);	/* E, no ack */
+	for (tries = 0; tries < 6; tries++) {
+	    r = wire_read(p, line, sizeof line, HANDSHAKE);
+	    if (r == 0)
+		return 0;
+	    if (r > 0 && line[0] == 'E')
+		break;
+	    wire_write(p, "N");
+	}
+	if (tries == 6)
+	    return 0;
 	localname(ourhost);
 	if (field(rheader, 1, reqhost, sizeof reqhost) &&
 	    strcmp(reqhost, ourhost) == 0)
@@ -780,8 +902,73 @@ accept_link(p)
 }
 
 /*
- * Send one spool entry: P!, A!, F, Y, then the S or R header, its Y,
- * every D with a Y, and the E alone.
+ * Accept a transfer: a P! proposal, then the body.
+ */
+static int
+accept_link(p)
+    struct port *p;
+{
+    char line[LINEMAX];
+    int r;
+
+    r = wire_read(p, line, sizeof line, 1);
+    if (r == 0)
+	return 0;
+    if (r < 0) {
+	wire_write(p, "N");		/* lrec - checksum: send a NAK */
+	return 0;
+    }
+    if (strcmp(line, "P!"))
+	return 0;
+    return proposal(p);
+}
+
+/*
+ * Send one line and watch for a NAK.  The 1.6 receiver defers its Y
+ * until it has read the next line, so a timeout is not a failure; a NAK
+ * means resend this line.
+ */
+static int
+send_line(p, line)
+    struct port *p;
+    char *line;
+{
+    char buf[LINEMAX];
+    int tries, r, naked;
+
+    naked = 0;
+    for (tries = 0; tries < 6; tries++) {
+	if (!wire_write(p, line))
+	    return 0;
+	r = wire_read(p, buf, sizeof buf, 1);
+	if (r == 0) {
+	    /* No answer: a receiver that reads ahead, or one that has
+	     * given up after a NAK.  The latter is a failure. */
+	    if (naked)
+		return 0;
+	    return 1;
+	}
+	if (r < 0) {			/* a bad line from the peer */
+	    naked = 1;
+	    continue;
+	}
+	if (buf[0] == 'N') {		/* NAK: send this line again */
+	    naked = 1;
+	    continue;
+	}
+	if (strcmp(buf, "P!") == 0) {	/* the R reply arrived */
+	    proposal(p);
+	    return 1;
+	}
+	return 1;			/* Y, or another acknowledgement */
+    }
+    return 0;
+}
+
+/*
+ * Send one spool entry: P! and its A!, then F, the S or R header, every
+ * D record and the E.  Between lines the sender watches for a NAK; it
+ * does not wait for a Y, because the receiver reads ahead.
  */
 static int
 send_spool(p, path)
@@ -790,15 +977,29 @@ send_spool(p, path)
 {
     FILE *f;
     char line[LINEMAX];
+    int ok;
+    int tries, r, got;
 
     f = fopen(path, "r");
     if (f == 0)
 	return 0;
-    if (!wire_write(p, "P!") || !expect(p, "A!", 5)) {
+    got = 0;
+    for (tries = 0; tries < 6; tries++) {
+	if (!wire_write(p, "P!"))
+	    break;
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 1 && strcmp(line, "A!") == 0) {
+	    got = 1;
+	    break;
+	}
+	if (r == 0)
+	    break;
+    }
+    if (!got) {
 	fclose(f);
 	return 0;
     }
-    if (!wire_write(p, "F") || !expect(p, "Y", 5)) {
+    if (!send_line(p, "F")) {
 	fclose(f);
 	return 0;
     }
@@ -806,17 +1007,31 @@ send_spool(p, path)
 	strip(line);
 	if (line[0] == 0)
 	    continue;
-	if (line[0] == 'E') {
-	    wire_write(p, line);
-	    break;
-	}
-	if (!wire_write(p, line) || !expect(p, "Y", 5)) {
+	if (!send_line(p, line)) {
 	    fclose(f);
 	    return 0;
 	}
+	if (line[0] == 'E')
+	    break;
     }
     fclose(f);
-    return 1;
+    ok = 1;
+    while (wire_read(p, line, sizeof line, 2)) {
+	if (line[0] == 'N') {		/* a NAK that arrived late */
+	    ok = 0;
+	    break;
+	}
+	if (strcmp(line, "P!") == 0) {
+	    /*
+	     * The peer turned the transfer around - an R reply, or a
+	     * fresh proposal - while the acknowledgements were being
+	     * drained.  Handle it here, or it is lost.
+	     */
+	    proposal(p);
+	    break;
+	}
+    }
+    return ok;
 }
 
 static int

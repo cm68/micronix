@@ -301,7 +301,11 @@ send_file(dest, src)
     localname(lname);
     ownername(owner);
     mode = st.st_mode & 0777;
-    queuename(host, qname);
+    /*
+     * The queue name is the next hop, not the final host: the 1.6
+     * netcp names it with the route out of /etc/netmap.
+     */
+    queuename(route, qname);
     out = fopen(qname, "w");
     if (out == 0) {
 	perror(qname);
@@ -345,7 +349,7 @@ receive_file(dest, src)
     strcpy(rpath, skip_host(src));
     localname(lname);
     ownername(owner);
-    queuename(host, qname);
+    queuename(route, qname);
     out = fopen(qname, "w");
     if (out == 0) {
 	perror(qname);
