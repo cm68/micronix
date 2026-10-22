@@ -279,9 +279,11 @@ c2 = ((sum >> 12) & 0x3f) + 0x20
 .in -5
 .fi
 .sp
-Every character on the wire is therefore in the range 0x20 to 0x5f.
-A receiver recomputes the sum over the text and compares all three
-characters; any difference is an error.
+The checksum characters, and every value sent in the six-bit code, are
+therefore in the range 0x20 to 0x5f.  The text of a header is ordinary
+ASCII, so paths and names keep their case.  A receiver recomputes the
+sum over the text and compares all three characters; any difference is
+an error.
 .sp 2
 .in -5
 .bd
@@ -433,8 +435,8 @@ Every read has a twenty second timeout.  The receiver answers a line
 whose checksum does not verify, or a read that times out, with N; the
 sender sends the same line again.  The sender makes ten attempts per
 line, each with its own twenty second timeout, before it gives up on
-the transfer.  On a read timeout the receiving side also sends a bare
-newline, which is not a protocol line.
+the transfer.  A side whose read times out also sends a bare newline,
+which is not a protocol line.
 .sp
 The receiver acknowledges a line as soon as its checksum verifies,
 before it looks at the sequence number.  A line whose number is not
