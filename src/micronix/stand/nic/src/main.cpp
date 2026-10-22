@@ -6,8 +6,10 @@
  * runs them against lwIP sockets, and pushes ACK/DATA/EVENT frames back.
  * The contract is src/micronix/sys/NET.md; the simulator's card model,
  * src/hwsim/d1/nic.c, is the golden reference and this file follows it
- * command for command.  The board and pinout are the card document in
- * src/hwsim/d1 commit 13bd5d78, docs/hw/esp32-nic.md.
+ * command for command.  The board, pinout and timing are hw/esp32-nic.md.
+ * The write is latched (74LS373) so the 6 MHz I/O cycle never races this
+ * loop; the latch holds the byte and the loop reads it on the falling
+ * edge of sOUT.
  *
  * Two tasks, two cores.  busTask owns one core at the highest priority
  * and never yields: it polls the buffered board's select/sOUT/sINP and
@@ -66,27 +68,28 @@
 /* ------------------------------------------------------------------ */
 
 /*
- * The card document's pinout.  DO and the three control lines are 5V
- * bus signals through 2:1 dividers, so they are inputs; DI drives the
- * board's data buffer.  GPIO 34-39 are input-only, which the four
- * control lines use.  The interrupt is GPIO4 through a 7406: the
- * inverter makes it an open-collector pull-down of VI5 (active low on
- * the bus), so GPIO4 HIGH asserts the line.
+ * The card's pinout (hw/esp32-nic.md).  DO comes from the 74LS373
+ * write latch through U20, a 74LVC245 at 3.3 V; the four control lines
+ * and the latch outputs are 5V bus signals, so they are inputs.  DI
+ * drives the board's data buffer directly at 3.3 V.  GPIO 34-39 are
+ * input-only, which the four control lines use.  The interrupt is
+ * GPIO12 through a 7406: the inverter makes it an open-collector
+ * pull-down of VI5 (active low on the bus), so GPIO12 HIGH asserts the
+ * line.
  *
- * The board presents select/sOUT/sINP/A0 as the card document's poll
- * loop reads them.  A board that buffers an inverted line needs the
- * matching ACTIVE constant flipped; A0 high is NETSTAT (0x61).
+ * SEL* is the 74LS682's /P=Q and is active low.  sOUT and sINP are
+ * active high on the S-100 bus; A0 high selects NETSTAT (0x61).
  */
-static const uint8_t DO_PIN[8] = {32, 33, 25, 26, 27, 14, 12, 13};
-static const uint8_t DI_PIN[8] = {21, 22, 23, 18, 19, 5, 16, 17};
+static const uint8_t DO_PIN[8] = {32, 33, 25, 26, 27, 14, 13, 4};
+static const uint8_t DI_PIN[8] = {16, 17, 5, 18, 19, 21, 22, 23};
 
 #define PIN_SEL   34
 #define PIN_SOUT  35
 #define PIN_SINP  36
 #define PIN_A0    39
-#define PIN_IRQ    4
+#define PIN_IRQ   12
 
-static const bool SEL_ACTIVE  = true;
+static const bool SEL_ACTIVE  = false;  /* SEL* = 682 /P=Q */
 static const bool SOUT_ACTIVE = true;
 static const bool SINP_ACTIVE = true;
 static const bool A0_STAT_HIGH = true;   /* A0 high selects NETSTAT */
@@ -196,23 +199,24 @@ static inline IRAM_ATTR uint8_t do_byte(uint32_t in0, uint32_t in1)
 
     if (in1 & (1UL << 0))  v |= 0x01;   /* DO0 = GPIO32 */
     if (in1 & (1UL << 1))  v |= 0x02;   /* DO1 = GPIO33 */
-    if (in0 & (1UL << 25)) v |= 0x04;
-    if (in0 & (1UL << 26)) v |= 0x08;
-    if (in0 & (1UL << 27)) v |= 0x10;
-    if (in0 & (1UL << 14)) v |= 0x20;
-    if (in0 & (1UL << 12)) v |= 0x40;
-    if (in0 & (1UL << 13)) v |= 0x80;
+    if (in0 & (1UL << 25)) v |= 0x04;   /* DO2 = GPIO25 */
+    if (in0 & (1UL << 26)) v |= 0x08;   /* DO3 = GPIO26 */
+    if (in0 & (1UL << 27)) v |= 0x10;   /* DO4 = GPIO27 */
+    if (in0 & (1UL << 14)) v |= 0x20;   /* DO5 = GPIO14 */
+    if (in0 & (1UL << 13)) v |= 0x40;   /* DO6 = GPIO13 */
+    if (in0 & (1UL << 4))  v |= 0x80;   /* DO7 = GPIO4 */
     return v;
 }
 
 /*
- * The bus loop.  It is a poll loop because the card document chose a
- * buffered board over a latch: the Z80's I/O cycle is the timing budget,
- * so the loop must never block or take a fault.  Read cycles drive DI
+ * The bus loop.  The write is latched (U23, 74LS373) with
+ * LE = sOUTb AND SEL*, so the 6 MHz cycle never races this loop: the
+ * latch is transparent while sOUT is high and holds the byte when it
+ * falls.  The loop reads the held byte on the falling edge, through
+ * U20.  It must never block or take a fault.  Read cycles drive DI
  * continuously with the byte the guest would read (rx head for NETDATA,
  * the status byte for NETSTAT); a read strobe only consumes the byte,
- * which buys the setup time the Z80 needs.  Writes are sampled on the
- * strobe's leading edge, so one bus cycle is one byte.
+ * which buys the setup time the Z80 needs.
  *
  * The interrupt follows the rx FIFO's emptiness.  Assertion happens in
  * the network task under irqMux after a frame is queued; release happens
@@ -224,6 +228,7 @@ static void IRAM_ATTR busTask(void *arg)
 {
     bool prev_rd = false;
     bool prev_wr = false;
+    bool wr_stat = false;       /* A0 sampled at the write's leading edge */
     uint8_t driven = 0xff;
 
     (void)arg;
@@ -246,8 +251,10 @@ static void IRAM_ATTR busTask(void *arg)
                 portEXIT_CRITICAL(&irqMux);
             }
         }
-        if (wr && !a0 && !prev_wr)
-            tx_put(do_byte(in0, in1));
+        if (wr && !prev_wr)
+            wr_stat = a0;           /* the address is valid for the cycle */
+        if (prev_wr && !wr && !wr_stat)
+            tx_put(do_byte(in0, in1));  /* U23 held it; read on the fall */
         prev_rd = rd;
         prev_wr = wr;
 

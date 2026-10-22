@@ -5,31 +5,37 @@ The guest driver is `sys/net.c`, the golden reference for this side is
 the simulator's card model, `src/hwsim/d1/nic.c`, and this firmware is
 the one that runs on the ESP32.
 
-The board is the one in the card document added with the driver
-(`git show 13bd5d78:docs/hw/esp32-nic.md`): an ESP32-DOIT DEVKIT V1 on
-an S-100 buffered prototype board, 2:1 dividers on every 5V input, a
-7406 pulling VI5, and nothing else.
+The design — intent, wire protocol, VI5 interrupt architecture, and
+implementation — is in `DESIGN.md`.  This file is the operator's side:
+pins, build, provisioning, and limits.
+
+The board is the one in `hw/esp32-nic.md`: a DOIT ESP32 DevKit V1 on the
+s100computers buffered prototype board, two 74LVC245 level shifters at
+3.3 V, a 74LS373 write latch with a 74LS00 LE gate, and a 7406 pulling
+VI5.  The board's own 74LS245s and 74LS682 do the bus buffering and the
+port decode.
 
 ## Pins
 
 | S-100 | ESP32 | direction |
 |---|---|---|
-| DO0–DO7 | GPIO 32 33 25 26 27 14 12 13 | in, through dividers |
-| DI0–DI7 | GPIO 21 22 23 18 19 5 16 17 | out, to the bus buffer |
-| select | GPIO 34 | in, input-only |
-| sOUT | GPIO 35 | in, input-only |
-| sINP | GPIO 36 | in, input-only |
+| DO0–DO7 | GPIO 32 33 25 26 27 14 13 4 | in, latch Q through U20 |
+| DI0–DI7 | GPIO 16 17 5 18 19 21 22 23 | out, direct to the DI buffer |
+| SEL* | GPIO 34 | in, input-only, active low |
+| sOUT | GPIO 35 | in, input-only, active high |
+| sINP | GPIO 36 | in, input-only, active high |
 | A0 | GPIO 39 | in, input-only (high = NETSTAT, 0x61) |
-| VI5 | GPIO 4 | out, 7406 open collector (high asserts) |
+| VI5 | GPIO 12 | out, 7406 open collector (high asserts) |
 
-`select`, `sOUT` and `sINP` are treated as active high, as the card
-document's poll loop reads them (`SEL_ACTIVE`, `SOUT_ACTIVE`,
-`SINP_ACTIVE`, `A0_STAT_HIGH` in `src/main.cpp`).  A board that buffers
-an inverted line needs the matching constant flipped.
+SEL* is the 74LS682's `/P=Q` and is active low; sOUT and sINP are active
+high; A0 high selects NETSTAT.  The polarity constants are `SEL_ACTIVE`,
+`SOUT_ACTIVE`, `SINP_ACTIVE` and `A0_STAT_HIGH` in `src/main.cpp`.
 
-GPIO 5, 12–15 are strapping pins at reset.  DI5 is GPIO 5 and DI6 is
-GPIO 12; the bus buffer must not drive them at reset.  The rest of the
-DI pins are ordinary outputs.
+GPIO 5, 12–15 are strapping pins at reset.  DI2 is GPIO 5 and needs its
+10 kΩ pull-up; the interrupt is GPIO12 and needs its 10 kΩ pull-down so
+VI5 is released at reset.  The rest of the DI pins are ordinary
+outputs.  At 6 MHz the write is captured by U23 and read on the falling
+edge of sOUT.
 
 ## Build and flash
 
@@ -123,9 +129,11 @@ with data waiting.
   per-socket receive buffer.
 - A frame whose length exceeds 1024 is discarded with `ACK bad-state`
   rather than overrunning the assembly buffer (`nic.c` trusts it).
-- The bus loop costs one byte per strobe; there is no latch.  If the
-  timing ever bites, the card document's decision list already names
-  the 74LS374 answer.
+- The write is latched by a 74LS373 (LE = sOUTb AND SEL*), so the bus
+  loop reads the held byte on the falling edge of sOUT.  At 6 MHz the
+  strobe is about 250 ns; the latch, not the loop, is the timing
+  guarantee.  Reads stay pre-driven: the ESP32 keeps DI set to the byte
+  the CPU would take.
 
 The guest side can be brought up under the simulator first: `d1` models
 this same register face with `nic.c`, and `usersim` mounts it on
