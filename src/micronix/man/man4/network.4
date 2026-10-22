@@ -310,16 +310,16 @@ The lines of the protocol are:
 .sp
 .nf
 .in +5
-P n	proposal; n is the proposal number
-A n	acceptance of proposal n
+Pn	proposal; n is the proposal number, no blank after P
+An	acceptance of proposal n, no blank after A
 F	file start
 Y	line acknowledged
 N	line not acknowledged
-S ...	a file is offered
+S ...	a file is offered; one blank, then the fields
 R ...	a file is requested
 M ...	a message is offered
-D s l d	a data record, sequence s, l bytes, d encoded
-E n	end of record
+Dsld	a data record: sequence s, length l, data d
+En	end of record; the sequence follows E with no blank
 .in -5
 .fi
 .sp
@@ -380,10 +380,10 @@ record would have.  A file of three data records is numbered
 .nf
 .in +5
 S ...	0	the character after S is a blank
-D ! ...	1
-D " ...	2
-D # ...	3
-E $	4
+D!...	1
+D"...	2
+D#...	3
+E$	4
 .in -5
 .fi
 .sp
@@ -401,13 +401,13 @@ is idle waits for a proposal.  A transfer runs:
 .nf
 .in +5
 sender                  receiver
-P !                     A !	(accept; the P becomes an A)
+P!                      A!	(accept; the P becomes an A)
 F                       (waited for, not answered)
 S ...                   Y
-D ! ...                 Y
-D " ...                 Y
+D!...                   Y
+D"...                   Y
 ...
-E n                     Y
+En                      Y
 .in -5
 .fi
 .sp
