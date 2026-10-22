@@ -1,0 +1,38 @@
+netmail - the recovered network mail sender
+
+netmail is not called by a user.  mail(1) finds a recipient of the form
+machine%user, and execs /bin/netmail with that address; the message is
+on standard input.  netmail looks the machine up in /etc/netmap, writes
+an M record into /usr/spool/net/out, and exits.  netdaemon transports
+it; at the destination netact runs mail, which files the message.
+
+	netmail16.bin	the recovered executable, 16754 bytes
+	netmail.ctl	the symbols disas used
+	netmail.dis	an annotated listing, generated with src/tools/disas
+	ANALYSIS.md	the decompiled flow and the record it writes
+
+The listing is `disas -f netmail.ctl netmail16.bin`.  The binary came
+from the Micronix 1.6 distribution, the same disk as /bin/mail,
+/bin/netact and /bin/netdaemon.
+
+The record is a text file in the spool directory:
+
+	M <rhost> <ruser> <lhost> <luser>
+	D<seq><len><data>
+	...
+	E<next>
+
+rhost and ruser come from the address; lhost is the first line of
+/etc/netmap and luser is the login name from /etc/passwd.  Data records
+carry at most 45 bytes in the six-bit encoding; the sequence starts at
+one and the header is record zero (its blank second character is the
+code for zero).  The spool file is written under a TEMP name and linked
+to <route>%<codes> when complete, so the daemon never reads a partial
+record.  network(4) describes the format and the wire protocol.
+
+The listing shows main at 0x010e, a worker at 0x01a0, the name builder
+at 0x0468, the M header formatter at 0x0418, the netmap reader at
+0x0a73, the route lookup at 0x0b04, and the passwd owner lookup at
+0x0b94.  cent is 0x3c06 and cret 0x3c0d; arguments are at DE+4 upward
+and the return value is in BC.  The literal pools are inside the text
+and are marked DB in the listing.

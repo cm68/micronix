@@ -33,8 +33,8 @@ STOCK_NC = os.path.join(CMD, 'netcp/netcp.bin')
 STOCK_ND = os.path.join(CMD, 'netdaemon/netdaemon.bin')
 OUR_ND = os.path.join(CMD, 'netdaemon/netdaemon')
 NETACT = os.path.join(CMD, 'netdaemon/netact.bin')
-MAIL = os.path.join(CMD, 'netdaemon/mail16.bin')
-NETMAIL = os.path.join(CMD, 'netdaemon/netmail16.bin')
+MAIL = os.path.join(CMD, 'mail/mail16.bin')
+NETMAIL = os.path.join(CMD, 'netmail/netmail16.bin')
 
 PASSWD = ('root::0:0:Super user:/:/bin/sh\n'
           'network::9:7::/a/network:/bin/sh\n')

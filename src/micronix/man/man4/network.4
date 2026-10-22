@@ -240,6 +240,346 @@ Dipper   doc      admin --- support         doc
 .sp 2
 .in -5
 .bd
+PROTOCOL
+.in +5
+.br
+This section describes the protocol as the recovered 1.6 programs
+implement it: netcp, netdaemon, netact, mail and netmail.  The
+decompilation is in the source tree, under cmd/netdaemon and
+cmd/netcp; the line formats below were also captured from the
+distributed binaries running under the simulator.
+.sp 2
+.in -5
+.bd
+The line
+.in +5
+.br
+A link is one asynchronous serial line, 1200 baud, one conversation at
+a time.  Everything is sent in lines.  A line is three printable
+characters of checksum, the text of the line, and a newline.  The
+checksum is a 16-bit sum that starts at zero; for each character of
+the text, including the newline but not the three checksum
+characters,
+.sp
+.nf
+.in +5
+sum = sum + character
+sum = (sum << 1) | (sum >> 15)
+.in -5
+.fi
+.sp
+The sum is sent as three six-bit groups, lowest group first, each
+group plus 0x20:
+.sp
+.nf
+.in +5
+c0 = (sum & 0x3f) + 0x20
+c1 = ((sum >> 6) & 0x3f) + 0x20
+c2 = ((sum >> 12) & 0x3f) + 0x20
+.in -5
+.fi
+.sp
+Every character on the wire is therefore in the range 0x20 to 0x5f.
+A receiver recomputes the sum over the text and compares all three
+characters; any difference is an error.
+.sp 2
+.in -5
+.bd
+The six-bit code
+.in +5
+.br
+Data bytes, sequence numbers and lengths are sent six bits at a time:
+.sp
+.nf
+.in +5
+character = (value & 0x3f) + 0x20
+.in -5
+.fi
+.sp
+The values of a group are packed least significant bit first.  Three
+bytes of data become four characters: bits 0-5, 6-11, 12-17, and
+18-23.  A group of one or two bytes at the end of a record is padded
+with zero bits.  A 45 byte record is therefore 60 characters.
+.sp 2
+.in -5
+.bd
+The records
+.in +5
+.br
+The lines of the protocol are:
+.sp
+.nf
+.in +5
+P n	proposal; n is the proposal number
+A n	acceptance of proposal n
+F	file start
+Y	line acknowledged
+N	line not acknowledged
+S ...	a file is offered
+R ...	a file is requested
+M ...	a message is offered
+D s l d	a data record, sequence s, l bytes, d encoded
+E n	end of record
+.in -5
+.fi
+.sp
+The proposal number n is one six-bit character.  It is a counter in
+the sending daemon, incremented for each proposal and wrapped at 64.
+The acceptance carries the same number: the receiver changes the P of
+the proposal to A and recomputes the checksum.
+.sp
+The S record offers a file.  Its fields are separated by single
+blanks:
+.sp
+.nf
+.in +5
+S rhost rpath lhost lpath owner mode
+.in -5
+.fi
+.sp
+rhost is the machine the file is going to, rpath the name it will have
+there; lhost is the machine the file comes from, lpath the name it has
+there; owner is the login name from /etc/passwd; mode is the octal
+permission bits.
+.sp
+The R record asks a machine for a file and carries no data:
+.sp
+.nf
+.in +5
+R rhost rpath lhost lpath owner
+.in -5
+.fi
+.sp
+rhost and rpath name the file to be fetched, lhost and lpath name the
+copy to be made, and owner is the requester.
+.sp
+The M record is a message:
+.sp
+.nf
+.in +5
+M rhost ruser lhost luser
+.in -5
+.fi
+.sp
+rhost is the machine the message is going to and ruser the user there;
+lhost is the sending machine and luser the user sending it.
+.sp
+A D record carries one piece of data.  The character after D is the
+sequence number, one six-bit character; the next is the length, the
+number of data bytes, one six-bit character; the rest is the data in
+the six-bit code.  A data record holds at most 45 bytes, which is 60
+characters.
+.sp
+The header line is record zero, and the sequence number of every
+following line is in the character after the record letter.  For the
+header this character is the blank that separates the letter from the
+first field, which is the six-bit code of zero.  Data records are
+numbered from one.  The E record carries the number that the next data
+record would have.  A file of three data records is numbered
+.sp
+.nf
+.in +5
+S ...	0	the character after S is a blank
+D ! ...	1
+D " ...	2
+D # ...	3
+E $	4
+.in -5
+.fi
+.sp
+The sequence numbers are six bits and wrap at 64.  A receiver uses
+them to notice a lost, repeated or misplaced record.
+.sp 2
+.in -5
+.bd
+The exchange
+.in +5
+.br
+The daemon that has a spool entry to send proposes.  The daemon that
+is idle waits for a proposal.  A transfer runs:
+.sp
+.nf
+.in +5
+sender                  receiver
+P !                     A !	(accept; the P becomes an A)
+F                       (waited for, not answered)
+S ...                   Y
+D ! ...                 Y
+D " ...                 Y
+...
+E n                     Y
+.in -5
+.fi
+.sp
+The proposer waits for an A with its own number.  An A with another
+number is ignored.  A received P instead of an A means both ends
+proposed at once; this is a collision (see ERROR RECOVERY).  After the
+A, the sender sends F and then the records of the spool file one at a
+time; each is acknowledged with Y before the next is sent.  A N
+instead of a Y causes the same line to be sent again.
+.sp
+The spool file holds the header, D and E lines as text, without the
+checksum characters.  The daemon adds the checksum when it sends a
+line, and the receiver removes it before writing the line to its own
+spool file.
+.sp 2
+.in -5
+.bd
+ERROR RECOVERY
+.in +5
+.br
+Every read has a twenty second timeout.  The receiver answers a line
+whose checksum does not verify, or a read that times out, with N; the
+sender sends the same line again.  The sender makes ten attempts per
+line, each with its own twenty second timeout, before it gives up on
+the transfer.  On a read timeout the receiving side also sends a bare
+newline, which is not a protocol line.
+.sp
+The receiver acknowledges a line as soon as its checksum verifies,
+before it looks at the sequence number.  A line whose number is not
+the expected one is reported as a sequence error and is not stored; it
+does not advance the receiver's count.  The E record still ends the
+transfer, so the sequence check reports a fault but does not repair
+one.  A line lost on the wire is repaired by the timeout and the N,
+not by numbering.
+.sp
+A proposal that gets no A is abandoned after the twenty second read
+timeout.  The spool entry is kept and is proposed again on a later
+pass.  Likewise, after the A, if F or a record cannot be delivered,
+the entry stays in the spool directory and the whole transfer is tried
+again later; the receiver removes the partial file it made.
+.sp
+When a proposal arrives while this end is waiting for its own A, this
+end records a collision, sleeps for a pseudo-random interval of up to
+twenty seconds, and gives up this attempt without consuming the spool
+entry.  The proposal it received is left unanswered, so the other end
+times out and tries again later as well.  When both ends are idle
+neither sends a protocol line; a transfer starts only when one has an
+entry to send.
+.sp
+The receiver names its incoming file after the machine at the other
+end of the port, so a receiver that restarts leaves a partial file
+behind.  The daemon does not sweep
+the incoming directory at startup; stale files there are not
+delivered.  A sender that crashes after the receiver has taken the
+file but before the sender removes its spool entry will offer the file
+again, and the file will be delivered twice: the protocol has no
+transaction identifier and no duplicate suppression.
+.sp 2
+.in -5
+.bd
+NAMING
+.in +5
+.br
+Each machine has a name, one short word.  The first line of /etc/netmap
+is the local machine's name.  Every later line begins with the name of
+a machine directly connected by a cable; any further names on the line
+are machines reachable through that connection.  The first word of the
+line is the route, the next hop, for every name on the line.
+.sp
+A port is named in /etc/ttys by a token net-name, where name is the
+machine at the other end of the cable, for example
+.sp
+.nf
+.in +5
+ttyD 1200 net-sales
+.in -5
+.fi
+.sp
+The daemon opens /dev/ttyD and treats the name sales as the identity of
+that port.  The 1200 is the line speed.
+.sp
+A network file name is host%path, and a network mail address is
+host%user; host is one or more lower case letters and is looked up in
+/etc/netmap to find the route.  A name without a percent sign is local.
+.sp
+The spool directories are /usr/spool/net/out for work to be sent and
+/usr/spool/net/in for work being received.  Every file in them is named
+.sp
+.nf
+.in +5
+base % c0 c1 c2
+.in -5
+.fi
+.sp
+where base is the route for an outbound entry, or the name of the
+machine at the other end of the port for an inbound one.  The three
+characters are six-bit codes of values that make the name unique:
+the process id, the time, and a counter that the program increments
+for each name it makes.  A slash produced by a code is changed to the
+character 0 so that the name cannot leave the directory.  For example
+.sp
+.nf
+.in +5
+/usr/spool/net/out/sales%"S!
+.in -5
+.fi
+.sp
+is an entry for the machine sales.
+.sp
+An entry is not written in place.  netcp and netmail create a file
+whose base is TEMP, write the whole record, and then make the real
+name with a link and remove the temporary name.  The daemon scans for
+names beginning with its own route, so a half written TEMP file is
+never sent.  A relayed record is moved from the incoming to the
+outgoing directory the same way, by link and unlink, under the name of
+the next hop.
+.sp
+An R record travels to the machine that holds the file.  That machine
+runs netcp, which sends an S record back to the requester, and the
+requester makes the copy.  For this to work every machine's /etc/netmap
+must name the route back to the machines that will answer it; a
+machine with only its own name in netmap can receive but cannot answer.
+.sp 2
+.in -5
+.bd
+CONCURRENCY
+.in +5
+.br
+The daemon reads /etc/ttys at startup and forks one process for each
+network port.  The parent goes on to the next line of the file and
+exits at the end; each child owns one port and runs the daemon loop:
+.sp
+.nf
+.in +5
+for (;;) {
+	scan_in();	accept a transfer if one is proposed
+	scan_out();	send one spool entry if there is one
+}
+.in -5
+.fi
+.sp
+scan_in waits in accept for up to twenty seconds, so a port that has
+nothing to do wakes at least that often and looks at the outgoing
+spool.  There is no select and no interrupt: the daemon is a poller.
+.sp
+All the port processes share the two spool directories.  An outgoing
+entry is named with its route, and each port process only takes
+entries whose name begins with the machine at the other end of its
+port, so an entry is offered on the one port that leads toward its
+destination.  There is
+no lock on the spool directories.  Two entries from two users are two
+files and are sent one after the other.  If the same machine is
+connected twice, or a netmap is written with two routes to the same
+name, one entry can be found by both processes and sent twice.
+.sp
+One transfer at a time runs on a link.  Two ends that propose together
+collide; the random backoff keeps them from colliding again in step.
+While a transfer is in progress the receiving port process is busy
+with it and cannot start an outgoing transfer on that port; the
+sending process likewise.  Work for other ports is unaffected.
+.sp
+At the destination the incoming file is handed to netact, which is
+started by fork and waited for.  The port process does nothing else
+until the local copy, fetch or mail delivery finishes, so a slow
+destination device delays that port but not the others.  The incoming
+file is removed after netact returns.  netact is run only for a record
+addressed to this machine; one addressed elsewhere is moved straight
+into the outgoing spool, and the port process for the next hop then
+sends it onward.
+.sp 2
+.in -5
+.bd
 SEE ALSO
 .in +5
 .br

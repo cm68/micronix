@@ -7,8 +7,6 @@ directory holds the binary that was.
 
 	netdaemon.bin	the recovered executable, 19188 bytes
 	netact.bin	the recovered request agent, 19002 bytes
-	mail16.bin	the recovered mail program, 19169 bytes
-	netmail16.bin	the recovered network mail sender, 16754 bytes
 	netdaemon.dis	an annotated listing, generated with src/tools/disas
 	netdaemon.ctl	the symbols disas used
 	ANALYSIS.md	the decompiled flow: main, daemon loop, protocol layer
@@ -107,8 +105,8 @@ the record to /usr/spool/net/in/ and execs /bin/netact; netact runs
 
 mail(1) and netmail are not reconstructed.  mail detects a network name
 (machine%user) and execs /bin/netmail; netmail writes the M record into
-the outbound spool.  mail16.bin and netmail16.bin are here so the tests
-can drive the stock front end.
+the outbound spool.  The recovered binaries are in cmd/mail and
+cmd/netmail, so the tests can drive the stock front end.
 
 The reconstruction routes and relays an M record by the same rules as
 S, and at the destination writes it to the inbound spool and execs
