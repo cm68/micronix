@@ -36,6 +36,10 @@
 
 long n_incsp = 0;
 long n_pushpop = 0;
+long n_pushswap = 0;
+long n_pushsave = 0;
+long n_bytestore = 0;
+long n_astore = 0;
 long n_bounce = 0;
 long n_and0 = 0;
 long n_frame = 0;
@@ -146,6 +150,239 @@ r_pushpop(void)
 	delline(1, 2);
 	n_pushpop++;
 	saved += 2;
+	return 1;
+}
+
+/*
+ * push X / pop Y / push Y / pop X - the first pair copies X into Y and
+ * leaves X alone; the second pair copies Y back into X, which still
+ * holds it.  The second pair is a no-op and goes.
+ *
+ * This is the shape c1 emits for a pointer it keeps in both hl and ix
+ * while it walks it, one store per byte: push hl / pop ix / push ix /
+ * pop hl / inc ix / ld (hl),n / push ix.
+ */
+int
+r_pushswap(void)
+{
+	char x[KLEN], y[KLEN];
+	int rx, ry;
+
+	if (!starts(0, "push ") || !starts(1, "pop ") ||
+	    !starts(2, "push ") || !starts(3, "pop "))
+		return 0;
+	strcpy(x, win[0].key + 5);
+	strcpy(y, win[1].key + 4);
+	if (strcmp(x, y) == 0)
+		return 0;
+	if (strcmp(y, win[2].key + 5) != 0)
+		return 0;
+	if (strcmp(x, win[3].key + 4) != 0)
+		return 0;
+	rx = regat(x);
+	ry = regat(y);
+	if (rx == 0 || ry == 0 || (rx & R_F) || (ry & R_F))
+		return 0;				/* af: the pop moves the flags */
+
+	delline(2, 2);
+	n_pushswap++;
+	saved += ((rx & (R_IX | R_IY)) ? 2 : 1) +
+		 ((ry & (R_IX | R_IY)) ? 2 : 1);
+	return 1;
+}
+
+/*
+ * push X ... pop X - a save and restore with nothing between that can
+ * change X or the stack.  The pop puts back the value the push put
+ * there, so both go.  What is left is the code between them.
+ *
+ * The scan stops at anything that can move the stack (another push or
+ * pop, a call or a return, a sp adjustment, ex (sp)), at a label or a
+ * data line (a branch could enter the range), and at anything that
+ * writes X.  A read of X is harmless: its value has not changed.
+ *
+ * AF is left alone: the pop would restore the flags, and an instruction
+ * in between may have changed them.
+ */
+int
+r_pushsave(void)
+{
+	char x[KLEN];
+	int j, rm;
+	int w;
+
+	if (!starts(0, "push "))
+		return 0;
+	strcpy(x, win[0].key + 5);
+	rm = regat(x);
+	if (rm == 0 || (rm & R_F))
+		return 0;
+
+	for (j = 1; j < nwin; j++) {
+		if (win[j].kind == L_BLANK)
+			continue;
+		if (win[j].kind != L_INSN)
+			return 0;			/* label or data ends the run */
+		if (starts(j, "pop ")) {
+			if (strcmp(win[j].key + 4, x) == 0) {
+				delline(j, 1);
+				delline(0, 1);
+				n_pushsave++;
+				saved += (rm & (R_IX | R_IY)) ? 4 : 2;
+				return 1;
+			}
+			return 0;			/* another pop eats our value */
+		}
+		if (starts(j, "push ") || starts(j, "call ") ||
+		    isbranch(win[j].key) || starts(j, "ld sp,") ||
+		    starts(j, "inc sp") || starts(j, "dec sp") ||
+		    starts(j, "ex (sp)"))
+			return 0;
+		w = writes(win[j].key);
+		if (w & rm)
+			return 0;
+	}
+	return 0;
+}
+
+/*
+ * Is A dead from line from, with a frame-exit call counted as not
+ * reading it?  The fex* helpers unwind a frame off the stack; their
+ * inputs are there, not in A.  The fent* helpers do read A - they pop
+ * the caller's return address through AF - so they are not exempt.
+ */
+static
+int
+adead(from)
+	int from;
+{
+	int i;
+
+	for (i = from; i < nwin; i++) {
+		if (win[i].kind == L_LABEL) {
+			/*
+			 * X<name> is ccc's end-of-function alias, not an
+			 * entry: A is caller-saved and is not live past
+			 * the function's last instruction.
+			 */
+			if (win[i].key[0] == 'X')
+				return 1;
+			return 0;
+		}
+		if (win[i].kind != L_INSN)
+			continue;
+		if (reads(win[i].key) & R_A) {
+			if (!starts(i, "call fex") && !starts(i, "call _fex"))
+				return 0;
+		}
+		if (writes(win[i].key) & R_A)
+			return 1;
+		if (isbranch(win[i].key))
+			return 0;
+	}
+	return 0;
+}
+
+/*
+ * The next instruction after line i, skipping comments and blanks, or
+ * -1 when a label, a data line or the end of the window comes first.
+ */
+static
+int
+nextinsn(i)
+	int i;
+{
+	for (i++; i < nwin; i++) {
+		if (win[i].kind == L_BLANK)
+			continue;
+		if (win[i].kind == L_INSN)
+			return i;
+		return -1;
+	}
+	return -1;
+}
+
+/*
+ * push hl / ld l,X / ld h,0 / ld a,l / pop hl / ld (hl),a - a byte
+ * value X is zero-extended through hl only to be put back into a and
+ * stored through the pointer the push saved.  The store can name X
+ * directly: ld (hl),X.  The push and pop go with the zero extension.
+ *
+ * A is left alone by the rewrite and was set to X by the original, so
+ * it has to be dead afterwards.
+ *
+ * c1 puts an expression dump between the statements, so the six lines
+ * are found past the comments; the whole range goes, comments and all.
+ */
+int
+r_bytestore(void)
+{
+	char buf[KLEN];
+	char x;
+	int i1, i2, i3, i4, i5;
+
+	if (!is(0, "push hl"))
+		return 0;
+	i1 = nextinsn(0);
+	i2 = i1 < 0 ? -1 : nextinsn(i1);
+	i3 = i2 < 0 ? -1 : nextinsn(i2);
+	i4 = i3 < 0 ? -1 : nextinsn(i3);
+	i5 = i4 < 0 ? -1 : nextinsn(i4);
+	if (i5 < 0)
+		return 0;
+	if (strlen(win[i1].key) != 6 ||
+	    strncmp(win[i1].key, "ld l,", 5) != 0)
+		return 0;
+	x = win[i1].key[5];
+	if (!strchr("bcde", x))
+		return 0;
+	if (!is(i2, "ld h,0") || !is(i3, "ld a,l") ||
+	    !is(i4, "pop hl") || !is(i5, "ld (hl),a"))
+		return 0;
+	if (!adead(i5 + 1))
+		return 0;
+
+	sprintf(buf, "\tld (hl),%c\n", x);
+	delline(0, i5 + 1);
+	insline(0, buf);
+	n_bytestore++;
+	saved += 6;				/* seven bytes become one */
+	return 1;
+}
+
+/*
+ * ld a,X / ld (hl),a - X can be stored directly, and a is not needed
+ * afterwards.  The store through a is the shape the byte-value code
+ * uses before it knows the value came from a register.
+ *
+ * Comments are skipped between the pair: c1 puts its expression dumps
+ * there, and they are not instructions.
+ */
+int
+r_astore(void)
+{
+	char buf[KLEN];
+	char x;
+	int j;
+
+	if (!starts(0, "ld a,") || strlen(win[0].key) != 6)
+		return 0;
+	x = win[0].key[5];
+	if (!strchr("bcde", x))
+		return 0;
+	for (j = 1; j < nwin; j++)
+		if (win[j].kind != L_BLANK)
+			break;
+	if (!is(j, "ld (hl),a"))
+		return 0;
+	if (!adead(j + 1))
+		return 0;
+
+	sprintf(buf, "\tld (hl),%c\n", x);
+	delline(0, j + 1);
+	insline(0, buf);
+	n_astore++;
+	saved += 1;
 	return 1;
 }
 
@@ -1244,6 +1481,12 @@ applyrules(void)
 	case 'p':
 		if (r_fenter())
 			return 1;
+		if (r_pushswap())
+			return 1;
+		if (r_bytestore())
+			return 1;
+		if (r_pushsave())
+			return 1;
 		return r_pushpop();
 	case 'j':
 		if (r_invjp())
@@ -1263,6 +1506,8 @@ applyrules(void)
 		if (k[3] == 'd' && r_m1cmp())	/* ld de,-1 */
 			return 1;
 		if (k[3] == 'a') {
+			if (r_astore())		/* ld a,x ; ld (hl),a */
+				return 1;
 			if (r_bounce())		/* ld a,x then ld r,a */
 				return 1;
 			if (r_and0())		/* ld a,x then and 0 */
@@ -1310,6 +1555,8 @@ report(void)
 		n_autozero, n_xordup);
 	fprintf(stderr, "peep: exde %ld  ldazero %ld  bitset %ld\n",
 		n_exde, n_ldazero, n_bitset);
+	fprintf(stderr, "peep: pushswap %ld  pushsave %ld  bytestore %ld  astore %ld\n",
+		n_pushswap, n_pushsave, n_bytestore, n_astore);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */
