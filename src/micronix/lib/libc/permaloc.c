@@ -54,7 +54,16 @@ permalloc(unsigned int n)
 	char *p;
 	unsigned int pad;
 
+#ifdef CCC
+	/*
+	 * The Z80 addresses any byte - a word load or store is two
+	 * accesses and neither cares about the address.  Pad only for
+	 * the host, whose pointers want the alignment.
+	 */
+	pad = 0;
+#else
 	pad = (unsigned int)(sizeof(char *) - 1) & -(unsigned int)pnext;
+#endif
 	if (n + pad > pleft) {
 		pgrab(n);
 		pad = 0;

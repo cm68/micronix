@@ -404,10 +404,12 @@ unsigned n;
     char *p;
 
     /*
-     * Even, so the shorts and pointers in what comes back are laid
-     * out the way the compiler expects them.
+     * Even only for the host: its pointers want the alignment.  The
+     * Z80 addresses any byte, so the native build takes n as asked.
      */
+#ifndef CCC
     n = (n + 1) & ~1;
+#endif
 
     if (n > permleft) {
         /*

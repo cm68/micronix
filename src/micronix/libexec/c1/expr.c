@@ -69,8 +69,17 @@ arena_alloc(unsigned int n)
 {
 	char *p;
 
+#ifndef CCC
 	n += 3;
 	n -= n & 3;			/* round up to 4: host pointers want it */
+#endif
+	/*
+	 * The Z80 has no alignment requirement, so the native build takes
+	 * the size as asked.  Rounding 14-byte nodes to 16 was two bytes
+	 * per node - 12% of the arena high-water, which is exactly what a
+	 * tight file like c0/declare.c cannot spare (measure: 3072 bytes
+	 * of arena, gap 110 under usersim).
+	 */
 	if (arena_base == 0 || arena_cur + n > arena_top) {
 		if (arena_base == 0) {
 			unsigned int need = n > ARENA_CHUNK ? n : ARENA_CHUNK;
