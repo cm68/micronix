@@ -1151,21 +1151,29 @@ ideastat()
 }
 
 /*
- * The probe: make the card raise its interrupt so the attach loop
- * (sys/probe.c) can discover which line it is on.  IDENTIFY DEVICE is
- * the command that touches no sector - it asks the drive to describe
- * itself, which it does out of its own registers - and it completes
- * with a status the card turns into INTRQ like any other command.  The
- * drive's interrupt enable is the one the reset leaves: on, which is
- * what the attach loop needs to see the line go high.
+ * The probe, in two halves (sys/ovl.h).  PROBE_TICKLE makes the card
+ * raise its interrupt so the attach loop (sys/probe.c) can discover which
+ * line it is on: IDENTIFY DEVICE is the command that touches no sector -
+ * it asks the drive to describe itself, which it does out of its own
+ * registers - and it completes with a status the card turns into INTRQ
+ * like any other command.  The drive's interrupt enable is the one the
+ * reset leaves: on, which is what the attach loop needs to see the line
+ * go high.
  *
- * The status is polled rather than slept on because the attach runs
- * with every line masked, so no handler would ever be called for this
- * one.  A card with no drive in the bay still takes the command and
- * still raises the line; it is the board the probe is testing for, not
- * the medium.
+ * PROBE_CLEAR takes INTRQ down before that, by reading the status
+ * register, which is the same acknowledgement ideint() uses.  The loader
+ * leaves INTRQ up on the sector that held the kernel, and a line that is
+ * already high produces no edge for the attach loop to see; without this
+ * the loop finds no line, never unmasks it, and the first label read
+ * sleeps forever waiting for an interrupt that cannot arrive.
+ *
+ * The status is polled rather than slept on because the attach runs with
+ * every line masked, so no handler would ever be called for this one.  A
+ * card with no drive in the bay still takes the command and still raises
+ * the line; it is the board the probe is testing for, not the medium.
  */
-ideprobe()
+ideprobe(mode)
+	int mode;
 {
 	register struct ideif *ip;
 	register UINT32 n;
@@ -1174,6 +1182,10 @@ ideprobe()
 	ip = &boards[0];
 	(*ip->sel) (0);
 	(*ip->intr) (1);
+	if (mode == PROBE_CLEAR) {
+		(void) (*ip->rd) (STAT);	/* the acknowledgement */
+		return (0);
+	}
 	(*ip->wr) (DRVHD, DLBA);
 	(*ip->wr) (ERRST, 0);
 	(*ip->wr) (SCOUNT, 1);

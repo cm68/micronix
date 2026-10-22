@@ -910,10 +910,23 @@ struct biovec djbvec = { &djopen, &djclose, &djstrat, &djioctl };
  */
 #define PROBEWAIT 10000
 
-djprobe()
+djprobe(mode)
+	int mode;
 {
 	register int n;
 	int before;
+
+	/*
+	 * The clear half: acknowledge whatever the board is holding, so the
+	 * attach loop's sample sees a quiet line before the tickle.  Without
+	 * this the clear itself raises the line, the tickle produces no new
+	 * edge, the attach finds no line and never unmasks it, and the first
+	 * read dies on the deadman as EIO.
+	 */
+	if (mode == PROBE_CLEAR) {
+		djack();
+		return (0);
+	}
 
 	D[0] = SETINT;
 	D[1] = NOSTAT;

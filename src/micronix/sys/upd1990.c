@@ -26,6 +26,7 @@
 #include <sys/sys.h>
 
 #define CLOCKPORT   0x4a            /* MBASE + 2 */
+#define SELPORT     0x4f            /* MBASE + 7, the group select */
 
 #define CLK_DATA    0x01
 #define CLK_SHIFT   0x02            /* DSTROBE */
@@ -65,6 +66,17 @@ rtcget(UINT8 *r)
 {
     UINT8 b;
 
+    /*
+     * The MultIO's group latch is shared with the console's ACE and is
+     * left wherever the last access put it: the monitor's condrv selects
+     * its uart group and the tty interrupt does the same.  Reading the
+     * clock without selecting group 0 bit-bangs whichever register is in
+     * the window instead, and a corrupt calendar sends upd_rtcinit()
+     * round its year loop forever.  Select the clock's group and keep
+     * the bit-bang atomic.
+     */
+    di();
+    out(SELPORT, 0);
     clkcmd(CC_ENSR);
     clkcmd(CC_GET);
     for (b = 0; b < 5; b++)
@@ -74,6 +86,7 @@ rtcget(UINT8 *r)
             r[b / 8] |= 1 << (b % 8);
         clkshift();
     }
+    ei();
 }
 
 /* write the 40-bit rtc from r[5] */
@@ -82,6 +95,8 @@ rtcset(UINT8 *r)
 {
     UINT8 b;
 
+    di();
+    out(SELPORT, 0);            /* the clock's group; see rtcget */
     clkcmd(CC_ENSR);
     for (b = 0; b < 40; b++) {
         UINT8 bit = (r[b / 8] >> (b % 8)) & 1;
@@ -90,6 +105,7 @@ rtcset(UINT8 *r)
         out(CLOCKPORT, (bit ? CLK_DATA : 0));
     }
     clkcmd(CC_SET);
+    ei();
 }
 
 /*
