@@ -209,6 +209,17 @@ netact, and polls each port with a one second alarm instead of forking
 a reader per port.  It matches the captured wire and passes the same
 two-hop push and pull over its own spools.
 
+## Mail
+
+An M record is mail: `M remote-host remote-user local-host local-user`,
+then D and E records in the same framing.  It routes by the first field
+like S.  The destination writes it to /usr/spool/net/in/ and execs
+netact, which runs mail; the message lands in
+/usr/spool/mail/<user>.  mail(1) uses netmail for a `machine%user` name;
+netmail writes the M record into the outbound spool.  The
+reconstruction relays M by the same rules and execs netact at the
+destination.
+
 ## Errors
 
 The stock daemon's bad-checksum path was captured: it printed

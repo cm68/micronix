@@ -73,6 +73,7 @@ extern int closedir();
 extern int (*signal())();
 extern int fread();
 extern int rename(char *, char *);
+extern int execl();
 
 struct port {
     char dev[32];
@@ -836,6 +837,114 @@ relay_s(p, header)
 }
 
 /*
+ * An M record: mail.  If this machine is the destination, write it to
+ * the inbound spool and hand it to /bin/netact, which runs mail; if
+ * not, copy the record into the outbound spool for the next hop.  The
+ * header is "M remote-host remote-user local-host local-user".
+ */
+static int
+receive_m(p, header)
+    struct port *p;
+    char *header;
+{
+    char host[64];
+    char ourhost[64];
+    char path[300];
+    char line[LINEMAX];
+    FILE *out;
+    int r, seq, naks;
+    int now, c, pid, status;
+
+    localname(ourhost);
+    if (!field(header, 1, host, sizeof host))
+	return 0;
+    if (strcmp(host, ourhost) != 0)
+	return relay_s(p, header);
+
+    now = time((long *) 0);
+    c = (now & 0x3f) + 0x20;
+    sprintf(path, "%s%s%%#%c", SPOOLIN, host, c);
+    out = fopen(path, "w");
+    if (out == 0) {
+	perror(path);
+	return 0;
+    }
+    fprintf(out, "%s\n", header);
+    seq = 1;
+    naks = 0;
+    for (;;) {
+	r = wire_read(p, line, sizeof line, HANDSHAKE);
+	if (r == 0) {
+	    fclose(out);
+	    unlink(path);
+	    return 0;
+	}
+	if (r < 0) {
+	    wire_write(p, "N");
+	    if (++naks > 8) {
+		fclose(out);
+		unlink(path);
+		return 0;
+	    }
+	    continue;
+	}
+	if (line[0] == 'D') {
+	    int ds;
+
+	    ds = ((unsigned char) line[1] - 0x20) & 0x3f;
+	    if (ds != seq) {
+		wire_write(p, "N");
+		if (++naks > 8) {
+		    fclose(out);
+		    unlink(path);
+		    return 0;
+		}
+		continue;
+	    }
+	    fprintf(out, "%s\n", line);
+	    wire_write(p, "Y");
+	    seq++;
+	    naks = 0;
+	    continue;
+	}
+	if (line[0] == 'E') {
+	    int es;
+
+	    es = ((unsigned char) line[1] - 0x20) & 0x3f;
+	    if (es != seq) {
+		wire_write(p, "N");
+		fclose(out);
+		unlink(path);
+		return 0;
+	    }
+	    fprintf(out, "%s\n", line);
+	    break;
+	}
+	wire_write(p, "N");
+	if (++naks > 8) {
+	    fclose(out);
+	    unlink(path);
+	    return 0;
+	}
+    }
+    fclose(out);
+    /*
+     * The 1.6 daemon forks netact and waits for it; netact runs mail
+     * for an M record.  The file name is the route and a code, as the
+     * recovered daemon names it.
+     */
+    pid = fork();
+    if (pid == 0) {
+	execl("/bin/netact", "netact", path, (char *) 0);
+	exit(1);
+    }
+    if (pid > 0)
+	wait(&status);
+    unlink(path);
+    return 1;
+}
+
+/*
  * The body of an acceptance, after the P! has been read: A!, F and its
  * Y, the S or R header and its Y, then the transfer.
  */
@@ -863,7 +972,8 @@ proposal(p)
 	r = wire_read(p, line, sizeof line, HANDSHAKE);
 	if (r == 0)
 	    return 0;
-	if (r > 0 && (line[0] == 'S' || line[0] == 'R'))
+	if (r > 0 && (line[0] == 'S' || line[0] == 'R' ||
+		line[0] == 'M'))
 	    break;
 	wire_write(p, "N");
     }
@@ -872,6 +982,8 @@ proposal(p)
     wire_write(p, "Y");
     if (line[0] == 'S')
 	return receive_s(p, line);
+    if (line[0] == 'M')
+	return receive_m(p, line);
     if (line[0] == 'R') {
 	char reqhost[64];
 	char ourhost[64];
