@@ -191,11 +191,22 @@ disks/bootdisks/*.img
 dist/*.IMD
 dist/*.img
 
+#
+# The local media staging tree, disks/new: the 1.6, 1.61 and 1.67
+# diskettes and the 1.67 patch, assembled beside the tools that make
+# them and used as input to the boot tests.  Regenerable, and never a
+# source the tree builds.
+#
+disks/new/
+
 # Run leftovers, never a source: an empty drive image dropped at the
-# root by the drive emulator, and the selector test image beside the d1
-# drivers.
+# root by the drive emulator, the selector test image beside the d1
+# drivers, and the empty unit files the disk2/disk3 profiles leave when
+# a run asks for a drive it never writes.
 /DRIVE_A.IMD
 src/hwsim/d1/selector
+src/hwsim/d1/disk2-*
+src/hwsim/d1/disk3-*
 
 #
 # A convenience symlink in that directory, to the kernel's own sys
