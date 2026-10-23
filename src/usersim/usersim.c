@@ -161,7 +161,7 @@ z80_run()
 #define	STACKTOP	0xffff
 #define MAXIMUM_STRING_LENGTH   100
 
-static int do_exec(char *name, char *guest, char **argv, char **envp);
+static int do_exec(char *name, char *guest, char **argv, char **envp, int report);
 static void emulate();
 void SystemCall();
 void int_handler();
@@ -1673,7 +1673,7 @@ main(int argc, char **argv)
      * one only when its parent passes it through execve; nothing from
      * the host's environment is handed over.
      */
-    if (do_exec(fname(argvec[0]), argvec[0], argvec, 0)) {
+    if (do_exec(fname(argvec[0]), argvec[0], argvec, 0, 1)) {
         return (EXIT_FAILURE);
     }
     procsetcmd(selfgpid(), base_name(argvec[0]));
@@ -1976,7 +1976,7 @@ lookup_sym(char *name)
  * this is the exec function - slightly different from the standard unix
  */
 static int
-do_exec(char *name, char *guest, char **argv, char **envp)
+do_exec(char *name, char *guest, char **argv, char **envp, int report)
 {
     FILE *file;
     struct obj header;
@@ -2015,7 +2015,14 @@ do_exec(char *name, char *guest, char **argv, char **envp)
     }
 
     if ((file = fopen(name, "rb")) == NULL) {
-        message("Can't open file %s!\n", name);
+        /*
+         * A failed execve is an ordinary, silent answer: the shell
+         * walks PATH and expects ENOENT from the entries that miss.
+         * Only the program the simulator was started with is worth
+         * reporting, since nothing else will explain the exit.
+         */
+        if (report || (verbose & V_ERROR))
+            message("Can't open file %s!\n", name);
         return (errno);
     }
     fseek(file, 0, SEEK_SET);
@@ -4808,7 +4815,7 @@ SystemCall()
             argvec[i] = strdup(name2);
         }
         argvec[i] = 0;
-        ret = do_exec(fname(fn), fn, argvec, 0);
+        ret = do_exec(fname(fn), fn, argvec, 0, 0);
         if (ret) {
             ret = errno;
             carry_set();
@@ -4845,7 +4852,7 @@ SystemCall()
                 envvec[i] = strdup(name2);
             }
         envvec[i] = 0;
-        ret = do_exec(fname(fn), fn, argvec, envvec);
+        ret = do_exec(fname(fn), fn, argvec, envvec, 0);
         if (ret) {
             ret = errno;
             carry_set();
