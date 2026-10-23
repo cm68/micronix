@@ -542,7 +542,12 @@ assign(Expr *e, unsigned char tgt)
  */
 
 /*
- * Check if n is power of 2, return exponent or -1
+ * Is n a power of two?  Return its exponent plus one, or 0 if n is not
+ * one.  The bias is the point: the exponent of 1 is 0, and the callers
+ * read the answer as a boolean, so a plain exponent says no to the mask
+ * 1 - which is bit 0, a perfectly good bit to test.  Everything that
+ * wants the bit number subtracts the one (the RF_POW2 transform and the
+ * SET/RES emitters in lower.c).
  */
 int
 ispow2(unsigned long n)
@@ -556,10 +561,10 @@ ispow2(unsigned long n)
 	 * can be trusted.  Right shift by constant 1 is the dullest
 	 * long operation there is.
 	 */
-	if (n == 0) return -1;
-	for (i = 0; n != 1; i++) {
+	if (n == 0) return 0;
+	for (i = 1; n != 1; i++) {
 		if (n & 1)
-			return -1;
+			return 0;
 		n >>= 1;
 	}
 	return i;
@@ -1297,11 +1302,11 @@ tryrule(struct rule *rp, Expr *e)
 		e->right = rc;
 	}
 
-	/* Transform POW2 to shift amount */
+	/* Transform POW2 to shift amount: ispow2 is biased by one */
 	if ((rp->flags & RF_POW2) && e->right->op == NUMBER) {
 		shift = ispow2(e->right->u.val);
 		if (shift > 0) {
-			e->right->u.val = shift;
+			e->right->u.val = shift - 1;
 			changed = 1;
 		}
 	}

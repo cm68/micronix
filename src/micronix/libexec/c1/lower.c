@@ -788,17 +788,17 @@ docompound(Expr *e)
 		long m = e->right->u.val;
 		int bit;
 
-		if (op == OR && (bit = ispow2(m & 0xff)) >= 0) {
+		if (op == OR && (bit = ispow2(m & 0xff)) > 0) {
 			out("\tset ");
-			outc('0' + bit);
+			outc('0' + bit - 1);
 			out(",(hl)\n");
-		} else if (op == AND && (bit = ispow2((~m) & 0xff)) >= 0) {
+		} else if (op == AND && (bit = ispow2((~m) & 0xff)) > 0) {
 			out("\tres ");
-			outc('0' + bit);
+			outc('0' + bit - 1);
 			out(",(hl)\n");
 		} else
-			bit = -1;
-		if (bit >= 0) {
+			bit = 0;
+		if (bit > 0) {
 			if (e->dest == DEST_VALUE || e->dest == DEST_STACK)
 				out("\tld a,(hl)\n");
 			else if (e->dest == DEST_FLAGS)
@@ -912,9 +912,9 @@ trybitset(Expr *e)
 	if (!op || !ISBYTE(w) || !e->right || e->right->op != NUMBER)
 		return 0;
 	m = e->right->u.val;
-	if (op == OR && (bit = ispow2(m & 0xff)) >= 0)
+	if (op == OR && (bit = ispow2(m & 0xff)) > 0)
 		isres = 0;
-	else if (op == AND && (bit = ispow2((~m) & 0xff)) >= 0)
+	else if (op == AND && (bit = ispow2((~m) & 0xff)) > 0)
 		isres = 1;
 	else
 		return 0;
@@ -971,7 +971,7 @@ trybitset(Expr *e)
 		return 0;
 
 	out(isres ? "\tres " : "\tset ");
-	outc('0' + bit);
+	outc('0' + bit - 1);
 	if (hl) {
 		out(",(hl)\n");
 	} else {

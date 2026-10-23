@@ -269,6 +269,31 @@ foldNode(struct expr *e)
     if (left->op == STRING || right->op == STRING)
         return e;
 
+    /*
+     * A short-circuit whose left operand already settles the answer.
+     * C does not evaluate the right operand then, and pass2 cannot
+     * express that: it compiles both sides and branches around the
+     * test afterwards, so "0 && f()" still called f().  The result is
+     * an int whatever was tested.  Dropping the right subtree is the
+     * semantics, not an optimisation - nothing in it may run.
+     */
+    if ((op == LAND || op == LOR) && (left->flags & E_CONST) &&
+        (op == LAND ? left->v == 0 : left->v != 0)) {
+        left->op = CONST;
+        left->v = (op == LOR);
+        left->type = inttype;
+        left->flags = E_CONST | (e->flags & E_FUNARG);
+        left->next = e->next;
+        left->left = NULL;
+        left->right = NULL;
+        FreeExpr(right);
+        e->left = NULL;
+        e->next = NULL;
+        e->right = NULL;
+        freeNode(e);
+        return left;
+    }
+
     /* Both operands must be constants for full folding */
     if (!(left->flags & E_CONST) || !(right->flags & E_CONST))
         return e;

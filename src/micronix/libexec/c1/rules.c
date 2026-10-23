@@ -1730,8 +1730,9 @@ struct rule rules[] = {
 	 *
 	 * Only for a mask that is one bit: P matches a power of two, and
 	 * RF_POW2 turns the mask into the bit number the instruction
-	 * wants.  Neither admits 1, so bit 0 is still tested the long
-	 * way - ispow2 answers 0 for it and both guards read that as no.
+	 * wants.  ispow2 answers the exponent plus one, so mask 1 - bit
+	 * 0 - is admitted as readily as the rest; the one is subtracted
+	 * where the number is emitted.
 	 *
 	 * The first two test the byte where it lies, through an index
 	 * register or through HL, and are a byte shorter again than
