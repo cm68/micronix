@@ -117,7 +117,10 @@ getw:
 	rrca			/now a = 2 * high nibble of addr
 	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &curmem[2*page]
+	ld	e,a
+	jr	nc,8f
+	inc	d
+8:				; de = &curmem[2*page]
 	ld	a,h
 	and	0x0F
 	or	0xC0		; window nibble -> the 0xc000 remap page
@@ -209,6 +212,9 @@ putb:
 	ld	de,(_curmem)
 	add	a,e
 	ld	e,a
+	jr	nc,8f
+	inc	d
+8:				; de = &curmem[2*page]
 	ld	a,h
 	and	0x0F
 	or	0xC0		; window nibble -> the 0xc000 remap page
@@ -376,7 +382,10 @@ _copyin:
 	rrca			/now a = 2 * high nibble of from
 	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &curmem[2*page]
+	ld	e,a
+	jr	nc,8f
+	inc	d
+8:				; de = &curmem[2*page]
 	ld	a,(de)
 	ld	(MAP0+24),a	; map the page
 
@@ -541,7 +550,10 @@ _copyout:
 	rrca			/now a = 2 * high nibble of to
 	ld	de,(_curmem)
 	add	a,e
-	ld	e,a		; de = &curmem[2*page]
+	ld	e,a
+	jr	nc,8f
+	inc	d
+8:				; de = &curmem[2*page]
 	ld	a,(de)
 	ld	(MAP0+24),a	; map the page
 
@@ -613,7 +625,10 @@ _zerouser:
 	push	bc		; save count
 	ld	de,(_curmem)	; de, not bc: hl is the user addr and is
 	add	a,e		; wanted below
-	ld	e,a		; de = &curmem[2*page]
+	ld	e,a
+	jr	nc,8f
+	inc	d
+8:				; de = &curmem[2*page]
 	call	_di
 	ld	a,(de)
 	ld	(MAP0+2),a	; map page N
@@ -771,6 +786,9 @@ _memrw:
 	ld	hl,(_curmem)	; addr, and both are wanted below, so the
 	add	a,l		; map lookup goes through hl and comes back
 	ld	l,a
+	jr	nc,8f
+	inc	h
+8:
 	ld	a,(hl)
 	pop	hl
 	ld	(MAP0+2),a
