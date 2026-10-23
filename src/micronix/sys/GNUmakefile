@@ -67,7 +67,7 @@ MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
 	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
 	pic.o pic_init.o picdata.o probe.o probe_init.o \
-	ss1_clock.o ss1clk_init.o upd1990_init.o picvec.o ss1vec.o
+	ss1_clock.o ss1clk_init.o upd1990_init.o
 
 # The compiler and linker are this tree's own.  CCC defaults to
 # $(BIN)/mxccc in GNUmakefile.inc; the linker mxld is beside it.
@@ -162,7 +162,7 @@ KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
 	picdata.o netint.o
 WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
-HIGHMEM_AS_OBJ = inits.o unbcd.o ss1vec.o
+HIGHMEM_AS_OBJ = inits.o unbcd.o
 HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 
 # The generic .c and .s objects, named outright so that a stray generated
@@ -208,10 +208,10 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
 	 uio.c user.c pic.c picdata.c \
 	 pic_init.c probe_init.c \
-	 upd1990_init.c ss1clk_init.c picvec.c
+	 upd1990_init.c ss1clk_init.c
 ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
 	 ovlslot.s qadd.s qand.s qcmp.s qinc.s qldst.s qmul.s qor.s qsar.s \
-	 qshl.s qshr.s qsub.s slavevec.s ss1vec.s sub8.s swdisp.s swdispw.s textpad.s \
+	 qshl.s qshr.s qsub.s slavevec.s sub8.s swdisp.s swdispw.s textpad.s \
 	 tramp.s uhdr.s unbcd.s unixtobcd.s
 
 include $(DEPTH)/GNUmakefile.inc
@@ -372,9 +372,9 @@ upage.o: $(LEAF_AS) $(LEAF_C) pic.o user.o
 # it.  The two slave PIC variants come from the one file; ccc's -c names
 # the object, so they live side by side.
 highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		pic_init.o probe_init.o upd1990_init.o ss1clk_init.o picvec.o ss1vec.o
+		pic_init.o probe_init.o upd1990_init.o ss1clk_init.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-		pic_init.o probe_init.o upd1990_init.o ss1clk_init.o picvec.o ss1vec.o
+		pic_init.o probe_init.o upd1990_init.o ss1clk_init.o
 
 # probe.c and probe_init.c carry ovlint[MAXNOVLINE] and walk the boot-found
 # nlines, so they are compiled once and one kernel boots every board.

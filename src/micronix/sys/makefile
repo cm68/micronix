@@ -136,12 +136,12 @@ WIN_C_OBJ = open.o sys2.o rdwri.o memdev.o link.o access.o
 # their one-page modules, and so does the whole PIC/probe bring-up.
 #
 HIGHMEM_C_SRC  = main_init.c cus.c djinit.c ncrinit.c pic_init.c \
-	probe_init.c upd1990_init.c ss1clk_init.c picvec.c
+	probe_init.c upd1990_init.c ss1clk_init.c
 HIGHMEM_C_OBJ  = main_init.o cus.o djinit.o ncrinit.o pic_init.o \
-	probe_init.o upd1990_init.o ss1clk_init.o picvec.o
+	probe_init.o upd1990_init.o ss1clk_init.o
 
-HIGHMEM_AS_SRC = inits.s unbcd.s ss1vec.s
-HIGHMEM_AS_OBJ = inits.o unbcd.o ss1vec.o
+HIGHMEM_AS_SRC = inits.s unbcd.s
+HIGHMEM_AS_OBJ = inits.o unbcd.o
 
 # The u struct itself, which lives in the u page's segment (USERSEG).
 USER_C_SRC = user.c
@@ -185,8 +185,7 @@ WIN_C     = $(WIN_C_OBJ)
 # unbcd land between cus and the driver inits, and the PIC bring-up after
 # them.  The source lists above are only what has to be compiled.
 HIGHMEM   = main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
-	pic_init.o probe_init.o upd1990_init.o ss1clk_init.o \
-	picvec.o ss1vec.o
+	pic_init.o probe_init.o upd1990_init.o ss1clk_init.o
 
 OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) \
 	$(WIN_C) low.o win.o ovlslot.o
@@ -512,7 +511,6 @@ picdata.o: $(SYS)/pic8259.h $(SYS)/tty.h
 ss1_uart.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/pic8259.h
 ss1_clock.o: $(SYS)/sys.h
 upd1990_init.o: $(SYS)/sys.h
-picvec.o: $(SYS)/pic.h
 nd.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/ioctl.h $(SYS)/nd.h $(SYS)/ovl.h
 ndhdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/nd.h $(SYS)/ovl.h
 disk1.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk1.h $(SYS)/ovl.h $(SYS)/dlabel.h $(SYS)/ioctl.h

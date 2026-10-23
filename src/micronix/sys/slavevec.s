@@ -13,7 +13,7 @@
 	.globl	_slave_vectors
 	.extern	intrupt, _ovlntr
 	.globl	_ovlint2, _ovlint3, _ovlint4
-	.globl	sint0, sint1, sint2
+	.globl	_sint0, _sint1, _sint2
 
 	.defw	0,0,0,0		; 32 bytes of slack, the copy's target
 	.defw	0,0,0,0
@@ -22,22 +22,22 @@
 
 _slave_vectors:
 	.defb	0xC3		; jp sint0 -- explicit, so asz won't relax jp to jr
-	.defw	sint0
+	.defw	_sint0
 	.defb	0
 	.defb	0xC3		; jp sint1
-	.defw	sint1
+	.defw	_sint1
 	.defb	0
 	.defb	0xC3		; jp sint2
-	.defw	sint2
+	.defw	_sint2
 	.defb	0
 
-sint0:
+_sint0:
 	call	intrupt
 	.defw	_ovlint2
-sint1:
+_sint1:
 	call	intrupt
 	.defw	_ovlint3
-sint2:
+_sint2:
 	call	intrupt
 	.defw	_ovlint4
 

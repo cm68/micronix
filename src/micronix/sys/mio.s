@@ -157,7 +157,7 @@ TTSIZE2=76
 TTSIZE3=114
 	.globl	miobase, _ace_start, _ace_stop
 	.globl	_ace_putc, _ace_set, _console, intrupt, m1int, m2int
-	.globl	m3int, clkint, ss1_clkint, ss1_txint, ss1_rxint
+	.globl	m3int, clkint, _ss1_clkint, _ss1_txint, _ss1_rxint
 	.extern	_di, _ei, dicount, _mttys, _ttyin, _ttyout
 	.extern	_mumint, _ttyerror, _clock
 MBASE=0x48
@@ -351,7 +351,7 @@ clkint:
 ; the slave (level 1) and to the master's cascade (level 7), where the
 ; MultIO clears a clock latch instead.
 ;
-ss1_clkint:
+_ss1_clkint:
 	call	intrupt
 	.defw	ss1_clk
 
@@ -373,7 +373,7 @@ ss1_clk:
 ; the SS1 is minor 1 and lives in mttys[0].  EOI before the return: if the
 ; queue still has characters, TxRDY is asserted again and the next
 ; interrupt takes one more, which is how the queue drains.
-ss1_txint:
+_ss1_txint:
 	call	intrupt
 	.defw	ss1_tx
 
@@ -390,7 +390,7 @@ ss1_tx:
 ; The 2651's receiver-ready interrupt, the slave's IR7.  Read the data
 ; register and hand the character to ttyin with the SS1 tty (minor 1,
 ; mttys[0]).
-ss1_rxint:
+_ss1_rxint:
 	call	intrupt
 	.defw	ss1_rx
 

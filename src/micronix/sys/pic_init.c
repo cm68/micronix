@@ -21,9 +21,83 @@
 extern int in(), out();
 extern int di(), ei();
 
-extern char vectors[];          /* sys/intrpt.s: the WB/MultIO master table */
-extern char ss1_master_vec[], ss1_slave_vec[]; /* sys/ss1vec.s */
-extern int vecalign();          /* sys/picvec.c */
+/*
+ * The vector stubs the tables jump to.  There is no source table and no
+ * copy: the vector setting code writes the four bytes of each entry at
+ * its home in low memory, where the 8259 will fetch it.
+ */
+extern int int0(), int1(), int2(), int3(), int4(), int5(), int6(), int7();
+extern int sint0(), sint1(), sint2();
+extern int ovlint5(), ovlint6(), ovlint7();
+extern int spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
+
+/*
+ * Write one vector entry: jp <fn>, padded to the 8259's four bytes.
+ */
+static
+vecset(v, fn)
+    UINT v;
+    int (*fn) ();
+{
+    register unsigned char *p;
+
+    p = (unsigned char *) v;
+    *p++ = 0xC3;
+    *p++ = (unsigned char) ((unsigned int) fn);
+    *p++ = (unsigned char) ((unsigned int) fn >> 8);
+    *p++ = 0;
+}
+
+/*
+ * The Wunderbus/MultIO master: IR0..IR7 are the eight resident stubs.
+ */
+static
+master_vectors()
+{
+    vecset(0x200, int0);
+    vecset(0x204, int1);
+    vecset(0x208, int2);
+    vecset(0x20c, int3);
+    vecset(0x210, int4);
+    vecset(0x214, int5);
+    vecset(0x218, int6);
+    vecset(0x21c, int7);
+}
+
+/*
+ * The SS1 master: IR0/IR1 are the master stubs, IR2..IR4 the slave's
+ * cascade stubs, IR5/IR6 the resident overlay lines, IR7 the cascade
+ * itself (the slave vectors itself).
+ */
+static
+ss1_mvec()
+{
+    vecset(0x200, int0);
+    vecset(0x204, int1);
+    vecset(0x208, sint0);
+    vecset(0x20c, sint1);
+    vecset(0x210, sint2);
+    vecset(0x214, ovlint5);
+    vecset(0x218, ovlint6);
+    vecset(0x21c, spurious);
+}
+
+/*
+ * The SS1 slave: IR0 is VI7, IR1 the 8253 heartbeat, IR6/IR7 the 2651,
+ * and the FPU lines are spurious.
+ */
+static
+ss1_svec()
+{
+    vecset(0x220, ovlint7);
+    vecset(0x224, ss1_clkint);
+    vecset(0x228, spurious);
+    vecset(0x22c, spurious);
+    vecset(0x230, spurious);
+    vecset(0x234, spurious);
+    vecset(0x238, ss1_txint);
+    vecset(0x23c, ss1_rxint);
+}
 
 /* the two clock boards' entry points (ss1_clock*.c, upd1990*.c) */
 extern int ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
@@ -117,13 +191,15 @@ pic_init()
     pics[1].polled = 0;
 
     /* the slave first, so it is not signalling when the master arms */
-    base = vecalign(ss1_slave_vec, 0x220);
+    ss1_svec();
+    base = 0x220;
     out(SS1SPIC0, 0x1d | (base & 0xe0));   /* ICW1: cascade, level, ICW4 */
     out(SS1SPIC1, (base >> 8) & 0xff);     /* ICW2: vector base high byte */
     out(SS1SPIC1, 7);                      /* ICW3: slave id = master IR7 */
     out(SS1SPIC1, 0x08);                   /* ICW4: buffered slave */
     out(SS1SPIC1, 0xff);                   /* OCW1: mask everything */
-    base = vecalign(ss1_master_vec, 0x200);
+    ss1_mvec();
+    base = 0x200;
     out(SS1MPIC0, 0x1d | (base & 0xe0));   /* ICW1: cascade, level, ICW4 */
     out(SS1MPIC1, (base >> 8) & 0xff);     /* ICW2: vector base high byte */
     out(SS1MPIC1, 0x80);                   /* ICW3: the cascade is IR7 */
@@ -175,7 +251,8 @@ pic_init()
     pics[1].polled = 1;
 
     /* the master */
-    base = vecalign(vectors, 0x200);
+    master_vectors();
+    base = 0x200;
     out(MSELECT, PENABLE);
     out(PIC0, 0x1f | (base & 0xe0));    /* ICW1: level, 4-byte, single, ICW4 */
     out(PIC1, (base >> 8) & 0xff);      /* ICW2: vector base high byte */

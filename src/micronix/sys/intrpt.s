@@ -5,33 +5,22 @@
 ;
 ; ------- A-NATURAL SOURCE: declarations -------
 ; /*
-;  * Interrupt dispatch table.  The table itself is copied to 0x200 at
-;  * boot (sys/picvec.c) and the 8259's ICW2 names that address; here it
-;  * is only the source.  Most of the interrupt catchers are in mio.s.
+;  * Interrupt dispatch stubs.  The vector entries are written directly
+;  * at 0x200 by the setting code (sys/pic_init.c) and the 8259's ICW2
+;  * names that address.  Most of the interrupt catchers are in mio.s.
 ;  *
 ;  * sys/intrpt.s
 ;  * Changed: <2021-12-24 06:08:17 curt>
 ;  */
 ;
-; public	vectors
+; The vector setting code (sys/pic_init.c) writes the entries directly at
+; 0x200; these are the stubs those entries jump to.
 ;
-	.globl	_vectors
 	.extern	intrupt, m1int, m2int
 	.extern	m3int, clkint, _ovlntr
 	.globl	_ovlint0, _ovlint1, _ovlint5, _ovlint6, _ovlint7
-	.globl	int0, int1, spurious
+	.globl	_int0, _int1, _int2, _int3, _int4, _int5, _int6, _int7, _spurious
 
-; ------- A-NATURAL SOURCE: vectors -------
-; vectors:
-; 	jmp int0; 0
-; 	jmp int1; 0
-; 	jmp int2; 0
-; 	jmp int3; 0
-; 	jmp int4; 0
-; 	jmp int5; 0
-; 	jmp int6; 0
-; 	jmp int7; 0
-;
 ; int0:	call intrupt; &_mwint		/see below
 ; int1:	call intrupt; &_djint		/floppy disk interrupt
 ; int2:	call intrupt; &_ideint		/ide hard disk (was: slave Mult I/O)
@@ -62,53 +51,28 @@
 ; claimed returns without doing anything.  int3 through int7 are the
 ; resident ACE, parallel and clock handlers and are unchanged.
 ;
-_vectors:
-	.defb	0xC3		; jp int0 -- explicit, so asz won't relax jp to jr
-	.defw	int0
-	.defb	0
-	.defb	0xC3
-	.defw	int1
-	.defb	0
-	.defb	0xC3
-	.defw	int2
-	.defb	0
-	.defb	0xC3
-	.defw	int3
-	.defb	0
-	.defb	0xC3
-	.defw	int4
-	.defb	0
-	.defb	0xC3
-	.defw	int5
-	.defb	0
-	.defb	0xC3
-	.defw	int6
-	.defb	0
-	.defb	0xC3
-	.defw	int7
-	.defb	0
-int0:
+_int0:
 	call	intrupt
 	.defw	_ovlint0
-int1:
+_int1:
 	call	intrupt
 	.defw	_ovlint1
-int2:
+_int2:
 	call	intrupt
 	.defw	cascade
-int3:
+_int3:
 	call	intrupt
 	.defw	m1int
-int4:
+_int4:
 	call	intrupt
 	.defw	m2int
-int5:
+_int5:
 	call	intrupt
 	.defw	m3int
-int6:
+_int6:
 	call	intrupt
-	.defw	spurious
-int7:
+	.defw	_spurious
+_int7:
 	call	intrupt
 	.defw	clkint
 
@@ -181,7 +145,7 @@ casnone:
 ; (or one from a card that never attached) is still a master line in
 ; service, so dismiss it before returning.
 ;
-spurious:
+_spurious:
 	ld	a,0x28		; PENABLE to MSELECT: the controller group
 	out	(04fh),a
 	ld	a,0x66		; specific EOI, master IR6
