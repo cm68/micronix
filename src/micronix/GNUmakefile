@@ -431,3 +431,19 @@ tarfile:
 #
 footprint:
 	$(MAKE) -C libexec footprint
+
+#
+# The controller regression matrix: a floppy install, a hard disk boot,
+# and a native build - install, clobber, build again, verify - for each
+# of the disk controllers, preceded by a complete host rebuild.  The
+# script finds the tree from its own path, so it is invoked here by
+# path; -n skips the host rebuild, -d names the working directory and
+# -c restricts the controllers (see the script's usage).
+#
+REGRESSION	= ../../disks/hdinstall/matrix_test
+REGRESSIONDIR	?= /tmp/matrix
+REGRESSIONFLAGS	?=
+
+.PHONY: regression-test
+regression-test:
+	$(REGRESSION) -d $(REGRESSIONDIR) $(REGRESSIONFLAGS)

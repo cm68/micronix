@@ -1,0 +1,481 @@
+#!/bin/sh
+#
+# The controller matrix: for each hard disk controller, install from the
+# distribution floppies, boot the installed disk, and rebuild the system
+# natively twice.
+#
+#	./matrix_test [-n] [-x] [-s] [-d <dir>] [-c "<controllers>"]
+#
+# Controllers: hdcdma (Morrow HD-DMA), hdca (Morrow HDCA/M26), ncr (NCR
+# 5380 SCSI) and ide (the 8255/ATA board).  The default is all four, in
+# that order.
+#
+# Each controller gets a work directory under <dir> (default /tmp/matrix)
+# holding its two volumes and one log per stage:
+#
+#	<dir>/<controller>/root.img	the disk /b is on (slice a) with
+#					swap on slice b
+#	<dir>/<controller>/usr.img	the disk /usr/src is on
+#	<dir>/<controller>/<stage>.log	what the console said
+#
+# The stages, per controller:
+#
+#   1. install passes   the 8 inch distribution diskettes, four at a
+#			time (fla..fld), cptree'd onto the root volume
+#			and its /usr/src.  One boot per pass; the marker is
+#			"=== PASS-DONE".
+#   2. hard disk boot   the installed system, no floppies, no card but
+#			the one under test.  "=== HDBOOT-DONE".
+#   3. build            mount /usr/src; "make", "make install",
+#			"make clobber", "make", "make verify", with a
+#			marker after each and "=== TEST-DONE" at the end.
+#
+# The volumes are made from scratch on the host, before the first pass:
+# a minimal root (sh, mount, cptree and friends) carrying the
+# controller's level 2 boot image and a kernel pointed at that
+# controller, and an empty /usr/src volume.  The distribution brings the
+# rest.  /micronix is not on the distribution disks (create_dist drops
+# it), so the kernel written here is the one every later boot uses.
+#
+# The whole matrix is preceded by a complete host rebuild and a rebuild
+# of the distribution media, because the point is to test the tree as it
+# stands.  -n skips both, for a rerun against what is already built.
+# -s stops after the volumes are made, which is the quick way to check
+# the per-controller geometry, boot image and device names without
+# waiting for four installs.
+#
+# The simulator is the fast one (d1 -F, which execs d1p).  Every boot is
+# a boot of the target volume through mon500's level 1 ROM, which probes
+# the cards and boots the first labeled disk it finds; the target disk is
+# first in the probe order, so no menu input is needed even when the
+# floppies are attached.
+#
+# The wiring override matters.  The default multio profile names the
+# alternative disk cards on the same VI lines (hddma/hdca/disk2/disk3 on
+# VI0, djdma/disk1 on VI1).  The simulator instantiates every card, and
+# with more than one card on a line the HD-DMA family's level-triggered
+# request is left high by the attach, so later completions raise no edge
+# and reads time out.  Each controller leg therefore moves every disk
+# card except the one under test and the DJ-DMA off to VI6/VI7, which the
+# MultIO does not connect to the 8259 at all.
+#
+# Exit status is 0 only when every requested controller passed every
+# stage.  A summary is printed and left in <dir>/summary.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+repo=`cd "$here/../.." && pwd` || exit 1
+
+mx="$repo/src/micronix"
+mnix="$repo/src/tools/mnix"
+setdev="$repo/src/tools/setdev"
+bootdir="$mx/stand/boot"
+d1dir="$repo/src/hwsim/d1"
+devlist="$mx/dev/devlist"
+kernel="$mx/sys/unix"
+rootfiles="$mx/rootfiles"
+srcdir="$mx"
+filesystem="$repo/filesystem"
+dist="$repo/dist"
+
+controllers="hdcdma hdca ncr ide"
+work="${WORK:-/tmp/matrix}"
+rebuild=1
+stopfirst=0
+volonly=0
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-n)	rebuild=0 ;;
+	-x)	stopfirst=1 ;;
+	-s)	volonly=1 ;;
+	-d)	shift; [ $# -gt 0 ] || { echo "$0: -d wants a directory" >&2; exit 1; }
+		work=$1 ;;
+	-c)	shift; [ $# -gt 0 ] || { echo "$0: -c wants a controller list" >&2; exit 1; }
+		controllers=$1 ;;
+	-h)	sed -n '2,60p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+	*)	echo "$0: $1: unknown option" >&2; exit 1 ;;
+	esac
+	shift
+done
+
+mkdir -p "$work" || exit 1
+summary="$work/summary"
+: > "$summary"
+
+say() {
+	echo "$*"
+	echo "$*" >> "$summary"
+}
+
+#
+# One controller's geometry: the drive's medium (initialize), the level 2
+# boot image, the slices mkfs puts the filesystem and swap on, the drive
+# the simulator is given, and the /dev node /usr/src is mounted from.
+# The software slice number is always 0 for a, 1 for b, so swap's minor
+# is 32 on every controller.
+#
+set_controller() {
+	case "$1" in
+	hdcdma)
+		major=3; medium=m40; bootimg=bootimg
+		aend=480; bstart=481
+		drive=hdcdma; devusr=/dev/hd1a
+		wire="vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		;;
+	hdca)
+		major=1; medium=m26; bootimg=hdcabootimg
+		aend=192; bstart=193
+		drive=hdca; devusr=/dev/hdb
+		wire="vi6=hddma,vi6=disk2,vi6=disk3,vi7=disk1"
+		;;
+	ide)
+		major=4; medium=m16; bootimg=idebootimg
+		aend=284; bstart=285
+		drive=ide; devusr=/dev/ide1
+		wire="vi6=hddma,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		;;
+	ncr)
+		major=5; medium=m16; bootimg=ncrbootimg
+		aend=284; bstart=285
+		drive=scsi; devusr=/dev/scsi1
+		wire="vi6=hddma,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		;;
+	*)
+		echo "$0: $1: no such controller" >&2
+		return 1 ;;
+	esac
+	return 0
+}
+
+#
+# Build the two volumes for the current controller.  The root is the
+# minimal install system: enough to boot, mount, and run cptree.  The
+# usr volume is an empty filesystem with the same geometry.
+#
+build_volumes() {
+	rootvol="$w/root.img"
+	usrvol="$w/usr.img"
+	rm -f "$rootvol" "$usrvol" "$rootvol.lock" "$usrvol.lock" \
+		"$rootvol-delta" "$usrvol-delta"
+
+	"$mnix" initialize "$medium" "$rootvol" || return 1
+	"$mnix" label "$rootvol" -s a 1 "$aend" -s b "$bstart" || return 1
+	"$mnix" mkfs "$rootvol" -i "$bootdir/$bootimg" -f || return 1
+
+	tmp=`mktemp` || return 1
+	kern=`mktemp` || return 1
+
+	tar -C "$filesystem" -c -f "$tmp" \
+		bin/sh bin/login bin/ls bin/cp bin/mv bin/rm bin/cat \
+		bin/mkdir bin/mount bin/umount bin/chmod bin/cptree \
+		bin/mknod bin/ln bin/sync bin/echo bin/tar || return 1
+	"$mnix" -f "$rootvol" tar x "$tmp" || return 1
+
+	tar -C "$srcdir" -c -f "$tmp" etc || return 1
+	"$mnix" -f "$rootvol" tar x "$tmp" || return 1
+	"$mnix" -f "$rootvol" write "$filesystem/etc/init" /etc/init || return 1
+
+	for d in /dev /tmp /usr /usr/src /f; do
+		"$mnix" -f "$rootvol" mkdir "$d" >/dev/null 2>&1 || true
+	done
+	while read dtype dmaj dmin dname; do
+		case "$dtype" in ''|\#*) continue ;; esac
+		"$mnix" -f "$rootvol" mknod "/dev/$dname" "$dtype" "$dmaj" "$dmin" \
+			>/dev/null 2>&1 || true
+	done < "$devlist"
+
+	cp "$kernel" "$kern" || return 1
+	"$setdev" "$kern" "$major/0" "$major/32" || return 1
+	"$mnix" -f "$rootvol" write "$kern" /micronix || return 1
+	"$mnix" -f "$rootvol" mknod /dev/root b "$major" 0 || return 1
+	"$mnix" -f "$rootvol" mknod /dev/swap b "$major" 32 || return 1
+
+	"$mnix" initialize "$medium" "$usrvol" || return 1
+	"$mnix" label "$usrvol" -s a 1 "$aend" || return 1
+	"$mnix" mkfs "$usrvol" -i "$bootdir/$bootimg" -f || return 1
+
+	rm -f "$tmp" "$kern"
+	return 0
+}
+
+#
+# Write one of the generated .login scripts onto the root volume.
+#
+write_login() {
+	"$mnix" -f "$rootvol" write "$1" /.login
+}
+
+#
+# The hard disk boot on its own: the installed system, nothing attached
+# but its own two drives.
+#
+hdlogin() {
+	cat <<EOF
+echo === HDBOOT-START
+mount $devusr /usr/src
+sync
+echo === HDBOOT-DONE
+EOF
+}
+
+#
+# The build.  Gen 1 is the tree's own make, then install; clobber, gen 2,
+# and verify compares gen 2 against what install put down.
+#
+buildlogin() {
+	cat <<EOF
+mount $devusr /usr/src
+cd /usr/src
+make
+echo === COMPILE-DONE
+make install
+echo === INSTALL-DONE
+make clobber
+echo === CLOBBER-DONE
+make
+echo === GEN2-DONE
+make verify
+echo === VERIFY-DONE
+sync
+echo === TEST-DONE
+EOF
+}
+
+#
+# Start one boot and wait for its marker.  $1 is the stage name (the log
+# is <stage>.log), $2 the marker, $3 the timeout in seconds, and the
+# rest is the drive list.  Returns 0 on the marker, 1 if the simulator
+# went away first, 2 on a panic, 3 on the timeout.
+#
+boot_stage() {
+	stage=$1; marker=$2; limit=$3; shift 3
+	log="$w/$stage.log"
+	rm -f "$log" "$rootvol.lock" "$usrvol.lock"
+	cmd="./d1 -F -H -w multio,$wire -L $log $*"
+	( cd "$d1dir" && exec setsid script -qec "$cmd" /dev/null ) \
+		</dev/null >/dev/null 2>&1 &
+	pid=$!
+	rc=1
+	n=0
+	while kill -0 "$pid" 2>/dev/null; do
+		if grep -q "$marker" "$log" 2>/dev/null; then
+			rc=0
+			break
+		fi
+		if grep -q "panic:" "$log" 2>/dev/null; then
+			rc=2
+			break
+		fi
+		n=`expr $n + 2`
+		if [ "$n" -ge "$limit" ]; then
+			rc=3
+			break
+		fi
+		sleep 2
+	done
+	kill -TERM -"$pid" 2>/dev/null
+	sleep 1
+	kill -KILL -"$pid" 2>/dev/null
+	return $rc
+}
+
+#
+# Things the console says when a stage did not really do its work, even
+# if the marker at the end of the script was still printed (the guest
+# shell has no && and cannot stop on a failed command).
+#
+stage_errors() {
+	log="$w/$1.log"
+	[ -f "$log" ] || return 0
+	bad=0
+	shift
+	for p in "$@"; do
+		if grep -q "$p" "$log"; then
+			echo "    found: $p"
+			bad=1
+		fi
+	done
+	return $bad
+}
+
+#
+# The complete host rebuild.  One log; any failure stops the matrix
+# because nothing downstream can be trusted.
+#
+host_rebuild() {
+	echo "host rebuild -> $work/host.log"
+	{
+		cd "$mx" || exit 1
+		make clobber || exit 1
+		make bootstrap || exit 1
+		make tarfile || exit 1
+		( cd stand/boot && make bootimgs idebootimgs ncrbootimgs \
+			hdcabootimgs djbootimgs ) || exit 1
+		( cd "$repo/src/tools" && make ) || exit 1
+		( cd "$d1dir" && make && make NODEBUG=1 ) || exit 1
+		rm -f "$dist"/mx2.0-8-*.IMD
+		( cd "$dist" && ./create_dist 8 ) || exit 1
+	} > "$work/host.log" 2>&1 || {
+		echo "$0: host rebuild failed; see $work/host.log" >&2
+		tail -20 "$work/host.log" >&2
+		return 1
+	}
+	return 0
+}
+
+#
+# Which 8 inch diskettes exist, in disk-number order.  ten is not a
+# number to a lexical sort, so the trailing field is sorted as an
+# integer.
+#
+dist_media() {
+	ls "$dist"/mx2.0-8-*.IMD 2>/dev/null | sort -t- -k3,3n
+}
+
+#
+# The four-controller run for one controller.
+#
+run_controller() {
+	name=$1
+	set_controller "$name" || return 1
+	w="$work/$name"
+	mkdir -p "$w" || return 1
+	echo
+	echo "===== $name ($medium, major $major, $drive) ====="
+
+	if ! build_volumes; then
+		say "$name: volume build FAILED"
+		return 1
+	fi
+	if [ "$volonly" = 1 ]; then
+		say "$name: volumes only (root $rootvol, usr $usrvol)"
+		return 0
+	fi
+
+	# 1. the install passes, four diskettes at a time
+	pass=0
+	set -- `dist_media`
+	while [ $# -gt 0 ]; do
+		pass=`expr $pass + 1`
+		stage=install-$pass
+		n=0
+		fl=""
+		login=$(mktemp) || return 1
+		{
+			echo "mount $devusr /usr/src"
+			while [ $# -gt 0 ] && [ $n -lt 4 ]; do
+				case $n in
+				0) d=fla ;; 1) d=flb ;;
+				2) d=flc ;; 3) d=fld ;;
+				esac
+				echo "mount /dev/$d /f -r ; cptree -v /f / ; umount /dev/$d"
+				fl="$fl djdma$n:$1"
+				n=`expr $n + 1`
+				shift
+			done
+			echo "sync"
+			echo "echo === PASS-DONE"
+		} > "$login" || return 1
+		write_login "$login" || { rm -f "$login"; return 1; }
+		rm -f "$login"
+		echo "  pass $pass: $n diskette(s)"
+		boot_stage "$stage" "=== PASS-DONE" 7200 \
+			"$drive"0:"$rootvol" "$drive"1:"$usrvol" $fl
+		rc=$?
+		case $rc in
+		0)	say "$name: $stage ok" ;;
+		1)	say "$name: $stage FAILED (simulator exited)"; return 1 ;;
+		2)	say "$name: $stage FAILED (panic)"; return 1 ;;
+		3)	say "$name: $stage FAILED (timeout)"; return 1 ;;
+		esac
+		if ! stage_errors "$stage" "not a file system" \
+			"No more space" "No such device" "out of memory"; then
+			say "$name: $stage FAILED (console errors)"
+			return 1
+		fi
+	done
+
+	# 2. the installed system on its own
+	login=$(mktemp) || return 1
+	hdlogin > "$login" || return 1
+	write_login "$login" || { rm -f "$login"; return 1; }
+	rm -f "$login"
+	boot_stage "hdboot" "=== HDBOOT-DONE" 1800 \
+		"$drive"0:"$rootvol" "$drive"1:"$usrvol"
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		say "$name: hdboot FAILED ($rc)"
+		return 1
+	fi
+	say "$name: hdboot ok"
+
+	# 3. build, install, clobber, build, verify
+	login=$(mktemp) || return 1
+	buildlogin > "$login" || return 1
+	write_login "$login" || { rm -f "$login"; return 1; }
+	rm -f "$login"
+	boot_stage "build" "=== TEST-DONE" 21600 \
+		"$drive"0:"$rootvol" "$drive"1:"$usrvol"
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		say "$name: build FAILED ($rc)"
+		return 1
+	fi
+	for m in COMPILE-DONE INSTALL-DONE CLOBBER-DONE GEN2-DONE \
+		VERIFY-DONE TEST-DONE; do
+		if ! grep -q "=== $m" "$w/build.log"; then
+			say "$name: build FAILED (no $m)"
+			return 1
+		fi
+	done
+	if ! stage_errors build "Build unsuccessful" \
+		"*** Error code" "Don't know how to make" " differ:" "panic:" \
+		"out of memory" "swap error" "process table full"; then
+		say "$name: build FAILED (build errors)"
+		return 1
+	fi
+	say "$name: build ok"
+	return 0
+}
+
+# ---- main ----------------------------------------------------------
+
+for f in "$mnix" "$setdev" "$devlist" "$rootfiles"; do
+	if [ ! -e "$f" ]; then
+		echo "$0: $f not found - not in the tree this script is in" >&2
+		exit 1
+	fi
+done
+
+if [ "$rebuild" = 1 ]; then
+	host_rebuild || exit 1
+fi
+if [ ! -f "$filesystem/bin/sh" ] || [ ! -f "$kernel" ]; then
+	echo "$0: $filesystem/bin/sh or $kernel missing - build the tree" >&2
+	exit 1
+fi
+if [ -z "`dist_media`" ]; then
+	echo "$0: no distribution diskettes in $dist" >&2
+	exit 1
+fi
+
+failed=""
+for c in $controllers; do
+	if ! run_controller "$c"; then
+		failed="$failed $c"
+		if [ "$stopfirst" = 1 ]; then
+			break
+		fi
+	fi
+done
+
+echo
+if [ -z "$failed" ]; then
+	say "MATRIX PASSED: $controllers"
+	exit 0
+else
+	say "MATRIX FAILED:$failed"
+	exit 1
+fi
