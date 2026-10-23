@@ -1485,7 +1485,7 @@ applyrules(void)
 			return 1;
 		if (r_pushswap())
 			return 1;
-		if (r_bytestore())
+		if (0 && r_bytestore())
 			return 1;
 		if (r_pushsave())
 			return 1;
@@ -1508,7 +1508,7 @@ applyrules(void)
 		if (k[3] == 'd' && r_m1cmp())	/* ld de,-1 */
 			return 1;
 		if (k[3] == 'a') {
-			if (r_astore())		/* ld a,x ; ld (hl),a */
+			if (0 && r_astore())		/* ld a,x ; ld (hl),a */
 				return 1;
 			if (r_bounce())		/* ld a,x then ld r,a */
 				return 1;
