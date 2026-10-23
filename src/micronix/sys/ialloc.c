@@ -16,6 +16,7 @@
 
 extern char *swin();            /* uio.c: the scratch window */
 extern void srel();
+extern struct inode ilist[];
 
 extern long seconds;
 
@@ -25,6 +26,29 @@ extern long seconds;
  */
 
 static unsigned lastiblock = 2;
+
+/*
+ * Is this inode allocated in core?  A disk inode's image can lag what
+ * the kernel has made of it: a file created since the last flush still
+ * has its old, free block on disk.  ifill() would find that and put the
+ * number back on the free list; when the inode is the directory the
+ * allocation is being made in - imkfile() holds it busy across ialloc()
+ * - the iget() that pops it blocks on the busy inode and nothing is left
+ * to release it.  In core is the truth; never offer a number the kernel
+ * already owns.
+ */
+static int
+iincore(inum, dev)
+    int inum, dev;
+{
+    register struct inode *ip;
+
+    for (ip = ilist; ip < ilist + NINODE; ip++)
+        if (ip->i_inum == inum && ip->i_dev == dev &&
+            (ip->i_mode & IALLOC))
+            return (1);
+    return (0);
+}
 
 /*
  * Allocate an inode from the inode free list.
@@ -59,6 +83,15 @@ ialloc(dev)
         }
         inum = sup->s_inode[--sup->s_ninode];
         brel();
+
+        /*
+         * The list can outlive the truth it was filled from (it is part
+         * of the superblock, and a stale entry rides it across a mount).
+         * If the kernel already owns this number, drop it rather than
+         * let iget() block on the inode.
+         */
+        if (iincore(inum, dev))
+            continue;
 
         if ((ip = iget(inum, dev)) == 0) {
             /*
@@ -149,7 +182,7 @@ ifill(sb, dev)
         dp = (struct dsknod *) ((char *) SCRWIN + (chunk & 0xfff));
         inum = 16 * iblk - 31;
         for (n = 16; n; n--, dp++, inum++)
-            if ((dp->d_mode & IALLOC) == 0)
+            if ((dp->d_mode & IALLOC) == 0 && !iincore(inum, dev))
                 if (sup->s_ninode < 100)
                     sup->s_inode[sup->s_ninode++] = inum;
         srel();
