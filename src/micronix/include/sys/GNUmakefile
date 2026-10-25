@@ -9,7 +9,11 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/include/sys, so ../../../.. is
+# the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../../filesystem)
 DEST	 = $(ROOT)/usr/src/include/sys
 INCDIR	 = $(ROOT)/usr/include/sys
 NOWARN	 = --warning=no-ignore-newer

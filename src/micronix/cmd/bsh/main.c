@@ -145,12 +145,23 @@ BOOL		prof;
 			prs(ps1nod.namval); alarm(TIMEOUT); flags |= waiting;
 		FI
 
+		/*
+		 * A ^Z typed at the prompt must not look like one that
+		 * interrupted a command, and the line about to be read is
+		 * the name a detached job will be given.  The snapshot
+		 * starts before the first character is fetched: readc()
+		 * below takes it, and the parser then sees it again
+		 * through peekc.
+		 */
+		backnote=0;
+		joblinep=0; jobline[0]=0; jobsnap=1;
 		trapnote=0; peekc=readc();
 		IF eof
 		THEN	return;
 		FI
 		alarm(0); flags &= ~waiting;
 		execute(cmd(NL,MTFLG),0);
+		jobsnap=0;
 		eof |= (flags&oneflg);
 	POOL
 }

@@ -7327,14 +7327,20 @@ void insymtab(char *name)
 	t = (struct stab *) tempbuf;
 	if (!(sfile = fopen(name, "rb")))
 		return;
-	fread((char *)t, 1, sizeof *t, sfile);
-	if (t->t_value != SYMMAJIC)
+	if (fread((char *)t, 1, sizeof *t, sfile) != sizeof *t) {
+		fclose(sfile);
 		return;
+	}
+	if (t->t_value != SYMMAJIC) {
+		fclose(sfile);
+		return;
+	}
 
-	
+
 	s = t->t_token;
 	for (i=0; i<s; i++) {
-		fread((char *)t, 1, sizeof *t, sfile);
+		if (fread((char *)t, 1, sizeof *t, sfile) != sizeof *t)
+			break;
 		if (tokenofitem(UNDECLARED, 0, 0) != UNDECLARED)
 			continue;
 		yylval.itemptr->i_token = t->t_token;

@@ -230,6 +230,48 @@ extra/sim:
 	a bunch of 8 bit simulators for cribbing ideas/code from.
 	these all are licensed by thier original authors, so...
 
+build prerequisites
+-------------------
+
+the tree builds with the host's make and gcc, but nearly all of it is
+built for 32 bits: src/GNUmakefile.inc sets MACHINE = -m32, and the
+host tools the cross toolchain runs are 32-bit as well.  a host with no
+32-bit target and no 32-bit libraries will not build it.  on
+debian/ubuntu:
+
+	apt install build-essential gcc-multilib libc6-dev-i386 \
+		lib32ncurses-dev bison
+
+	build-essential		gcc, make and the C library
+	gcc-multilib		the -m32 target and its runtime
+	libc6-dev-i386		32-bit libc headers and crt files
+	lib32ncurses-dev	the 32-bit curses the simulators and
+				host tools link with -lcurses
+	bison			generates src/tools/zmac.c from zmac.y
+
+on a red hat family host the equivalents are gcc, make, glibc-devel.i686,
+ncurses-devel.i686 and bison, with the 32-bit packages from a multilib
+channel.  centos is the baseline the tree was developed against.
+
+one build is separate from the tree's own.  the ESP32 network card
+firmware in src/micronix/stand/nic is a PlatformIO project
+(platformio.ini, the arduino framework, the esp32doit-devkit-v1 board);
+it is not part of the top level make.  install PlatformIO Core -
+"pipx install platformio", or the installer from platformio.org - so
+that pio is on PATH, then
+
+	make -C src/micronix/stand/nic		# pio run
+
+the ESP32 tool chain and the arduino framework are downloaded on the
+first build.  flashing (make upload) wants the board's USB-UART as
+/dev/ttyUSB* or /dev/ttyACM*; on debian/ubuntu that means membership in
+the dialout group.
+
+xterm is not needed to build, but the hardware simulator's -c option
+puts each simulated terminal in one; without it d1 uses the controlling
+terminal.  it is a separate package ("apt install xterm" on
+debian/ubuntu) and needs an X display.
+
 running micronix in simulation
 ------------------------------
 

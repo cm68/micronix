@@ -46,7 +46,7 @@ console_log(int c)
     char ch = c;
 
     if (console_logfd != -1)
-        write(console_logfd, &ch, 1);
+        ignore_result(write(console_logfd, &ch, 1));
 }
 
 /*

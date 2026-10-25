@@ -24,7 +24,10 @@
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 #
 
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/etc, so ../../.. is the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../filesystem)
 ETCDIR	 = $(ROOT)/etc
 
 #

@@ -1,0 +1,98 @@
+.he "jobctl (2)                    10/25/26                    jobctl (2)"
+.fo "				    -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+jobctl
+- control a process' scheduling and terminal input
+
+
+.in -5
+.bd
+C
+.in +5
+.br
+jobctl(pid, op)
+
+
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Jobctl
+sets or clears two switches the kernel keeps for the process with the
+given ID.
+
+.bd
+JOBSTOP
+takes the process off the scheduler; it is not run until
+.bd
+JOBCONT
+clears the switch.  A stopped process is still alive: it may be
+signalled, and it may be waited for.
+
+.bd
+JOBTTYOUT
+closes the process' terminal input.  A read from the controlling
+terminal returns end of file, and a read already asleep in the terminal
+is woken and returns end of file without taking a line from the
+foreground.
+.bd
+JOBTTYIN
+opens it again.
+
+The kernel knows nothing of jobs - not grouping, not job numbers, not
+names.  These are the two things a shell cannot do for itself, and it
+stops and resumes a pipeline by naming each of its processes.
+
+The sending and receiving processes must have the same effective user
+IDs, or the sender must be the super-user.
+
+A process can never name itself.
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+A 0 indicates success, a -1 indicates failure.
+
+
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+ESRCH
+if there is no such process, it has exited, or it is the caller.
+
+
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(jobctl = 57)
+.br
+.bd
+(process ID in hl)
+.br
+.bd
+sys; jobctl; op
+
+
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The carry flag is cleared on success, or set on failure.

@@ -83,7 +83,10 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
     if (!fontsize) {
         fontsize = "9";
     }
-    pipe(pipe_up);
+    if (pipe(pipe_up) < 0) {
+        perror("pipe");
+        exit(1);
+    }
 
     // we need to capture the tty name so we can send output to it
     sprintf(cmd,
@@ -144,8 +147,10 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
     termpids = realloc(termpids, sizeof(int) * ++ntermpids);
     termpids[ntermpids - 1] = pid;
 
-    pipe(pipe_up);
-    pipe(pipe_down);
+    if (pipe(pipe_up) < 0 || pipe(pipe_down) < 0) {
+        perror("pipe");
+        exit(1);
+    }
 
     pid = fork();
     if (!pid) {     // polling child
@@ -185,7 +190,8 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
                     kill(mypid, SIGHUP);
                     _exit(0);
                 }
-                write(pipe_up[1], &c, 1);
+                if (write(pipe_up[1], &c, 1) != 1)
+                    _exit(0);
                 if (signum) {
                     kill(mypid, signum);
                 }
@@ -196,7 +202,8 @@ open_terminal(char *name, int signum, int *in_p, int *out_p, int cooked, char *l
                 if (i <= 0) {
                     _exit(0);
                 }
-                write(in, &c, 1);
+                if (write(in, &c, 1) != 1)
+                    _exit(0);
             }
         }
     }

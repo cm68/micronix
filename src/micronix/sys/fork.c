@@ -73,6 +73,7 @@ procopy(child)
     copy(u.p, child, sizeof(struct proc));
     child->time = 0;
     child->task = 0;            /* its own slot, not its parent's */
+    jctl[child - plist] = 0;    /* a new process is nobody's stopped job */
 
     child->parent = u.p;
     child->pid = newpid();

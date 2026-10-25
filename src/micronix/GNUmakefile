@@ -74,7 +74,7 @@ SYSHDRS	 = 8080.h alloc.h bios.h crypt.h dirent.h dtab.h dump.h fio.h \
 
 include $(DEPTH)/GNUmakefile.inc
 
-.PHONY: hostcc hostrt bootstrap sysinstall sysrt install-man-host install-host footprint
+.PHONY: hostcc hostrt toolchain bootstrap sysinstall sysrt install-man-host install-host footprint
 
 #
 # The librarian, built for the HOST.
@@ -157,13 +157,35 @@ HOSTCFLAGS ?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 # so the librarian exists before lib is archived.  This is a
 # prerequisite line only - the recipe is GNUmakefile.inc's.
 #
-all: $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
+# They are listed once because toolchain wants the same set, and a
+# second listing would drift.
+#
+HOSTTOOLS = $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
+
+all: $(HOSTTOOLS)
+
+#
+# Everything a directory rule needs to RUN, and nothing that is built
+# with it: the compiler and its passes (hostcc), the host tools in
+# $(BIN), the runtime archives built with that compiler (lib), and
+# those archives where the driver looks for them (hostrt).  After this,
+# "make -C cmd/make" - and every other GNUmakefile in the tree - has
+# what it needs.
+#
+# It is bootstrap up to the point it starts cross building, and it is
+# a separate target for the reason hostcc is: the runtime cannot be a
+# prerequisite of the compiler that makes it.  bootstrap depends on it
+# so the order is written down once.
+#
+toolchain: hostcc $(HOSTTOOLS)
+	$(MAKE) -C lib
+	$(MAKE) hostrt
 
 #
 # clobber removes the host tools and src.tar as well as what the
 # recursion removes.  GNUmakefile.inc's clobber reads GENERATED.
 #
-GENERATED = src.tar srctar.tar $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
+GENERATED = src.tar srctar.tar $(HOSTTOOLS)
 
 $(ARMX): $(ARSRC)
 	mkdir -p $(BIN)
@@ -304,15 +326,11 @@ sysrt:
 #
 # The order is the whole of it, the INSTALLATION.md recipe as one target:
 #
-#	hostcc		the cross compiler (mxccc) and its passes, and mxar
-#	lib		libc, libunix, libccc, crt0 - built with mxccc
-#	hostrt		those archives where mxccc looks for them
-#	all		the host tools, the boot images, every Z80 binary
+#	toolchain	hostcc, the host tools, lib and hostrt
+#	all		every Z80 binary (the host tools are already there)
 #	install		every Z80 binary, into the filesystem
 #
-bootstrap: hostcc
-	$(MAKE) -C lib
-	$(MAKE) hostrt
+bootstrap: toolchain
 	$(MAKE) all
 	$(MAKE) install
 
@@ -373,9 +391,8 @@ install-host:
 #
 # This update is top-specific: it ships src.tar (the makefile above),
 # which GNUmakefile.inc's update does not know about, so it overrides
-# that rule.
+# that rule.  ROOT comes from GNUmakefile.inc, included above.
 #
-ROOT	?= ~/src/micronix/filesystem
 DEST	 = $(ROOT)/usr/src
 NOWARN	 = --warning=no-ignore-newer
 src.tar: makefile

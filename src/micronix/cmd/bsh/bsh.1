@@ -300,6 +300,8 @@ BUILTINS
 .nf
      . file        read file in this shell; PATH is searched
      :             do nothing, successfully
+     bg id         let a stopped job run in the background, with its
+                   terminal input closed
      break [n]     leave n loops
      cd [dir]      change to dir, or to HOME
      continue      start the next turn of the loop
@@ -310,6 +312,9 @@ BUILTINS
      export [name ...]  put the names in the environment of every
                         command run from now on; with no names, list
                         the exported ones
+     fg id         bring a stopped or background job to the
+                   foreground and wait for it
+     jobs          list the jobs stopped with ^Z
      login [args]  run login in place of the shell
      newgrp [args] run newgrp in place of the shell
      read name ...  read a line from the standard input, split on
@@ -333,6 +338,14 @@ BUILTINS
 There is no echo builtin: /bin/echo is the command.  Signals are
 named by number, 0 through 16; 0 is the shell exiting, and the shell
 ignores 3 and, when interactive, 15.
+.sp
+^Z stops the foreground pipeline and returns the shell to its prompt.
+The job keeps its processes, a name taken from the command line, and a
+number that jobs prints; fg and bg take that number.  A job stopped by
+^Z is not scheduled until fg or bg resumes it.  A job in the background
+has no terminal input: a read from the terminal returns end of file, and
+a read already waiting for a line is released without taking one from
+the foreground.
 .sp
 A builtin runs in the shell, so a redirection on one is refused as an
 illegal io.  exec is the exception, and on : the redirection is

@@ -156,7 +156,7 @@ net.o: net.c
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o malloc.o name.o queue.o \
+	ialloc.o iget.o imap.o job.o malloc.o name.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
 	picdata.o netint.o
@@ -200,7 +200,7 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 disk1.c disk1hdr.c disk2.c disk2hdr.c disk3.c disk3hdr.c \
 	 dj.c djhdr.c djinit.c dlabel.c exec.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
-	 link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
+	 job.c link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
 	 net.c netint.c open.c ovl.c probe.c \
 	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \

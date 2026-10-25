@@ -44,6 +44,30 @@ ttyclose(tty)
 }
 
 /*
+ * Signal the processes on a terminal that are in its foreground job.
+ *
+ * The terminal's own signals - interrupt, quit and input available -
+ * belong to the foreground job.  A process the shell has stopped, or
+ * one whose terminal input it has closed, is not in it, so ^C typed at
+ * the shell must not reach it.  An explicit kill still does; this only
+ * filters what the tty generates.
+ */
+killfg(tty, sig)
+    register struct tty *tty;
+    UINT8 sig;
+{
+    register struct proc *p;
+    register UINT8 j;
+
+    for (p = plist; p < plist + NPROC; p++) {
+        j = jctl[p - plist];
+        if (p->tty == tty && (p->mode & ALIVE) &&
+            !(j & (JOBSTOP | JOBTTYOUT)))
+            send(p, sig);
+    }
+}
+
+/*
  * High level output. Write characters to the terminal.
  */
 ttywrite(tty)
@@ -76,10 +100,8 @@ ttyread(tty)
         return;
     }
 
-    /*
-     *      if (u.p->mode & BACK)
-     *              return;         /* eof for read in background *
-     */
+    if (jctl[u.p - plist] & JOBTTYOUT)
+        return;                 /* eof for read in background */
 
     cok = &tty->cokque;
 
@@ -87,10 +109,18 @@ ttyread(tty)
         cookin(tty);
     }
 
+    /*
+     * The shell may have closed this job's input while cookin() was
+     * asleep.  The line it took is in the cooked queue and belongs to
+     * the foreground, so return eof and leave it there.
+     */
+    if (jctl[u.p - plist] & JOBTTYOUT)
+        return;
+
     sendque(cok);
 
     if (cok->count != 0) {
-        killall(tty, SIGTINT);  /* term input available */
+        killfg(tty, SIGTINT);   /* term input available */
     }
 }
 
@@ -110,6 +140,8 @@ cookin(tty)
 
     if (tty->mode & (RAW | CBREAK)) {
         c = cwait(tty);         /* at least one char */
+        if (c < 0)
+            return;             /* input closed while we slept */
 
         do {
             di();
@@ -137,6 +169,10 @@ cookin(tty)
         di();
         if (tty->nbreak)
             break;
+        if (jctl[u.p - plist] & JOBTTYOUT) {
+            ei();
+            return;             /* input closed while we slept */
+        }
         tty->state |= HISLEEP;
         sleep(raw, PRIUSER);
     }
@@ -223,6 +259,10 @@ cwait(tty)
     raw = &tty->rawque;
 
     while (di(), raw->count == 0) {
+        if (jctl[u.p - plist] & JOBTTYOUT) {
+            ei();
+            return (-1);        /* input closed while we slept */
+        }
         tty->state |= HISLEEP;
         sleep(raw, PRIUSER);
     }
@@ -439,6 +479,34 @@ ttyhangup(t)
 }
 
 /*
+ * Tell the shell that ^Z was typed.
+ *
+ * The terminal does not know which processes form the foreground job,
+ * and must not guess: stopping every process on the tty would stop the
+ * shell with them, and stopping none would leave the job running.  So
+ * the kernel only notifies the shell - the process asleep in wait()
+ * that has asked for SIGBACK - and the shell stops the pipeline it
+ * recorded.  It is the handler, not the default, that identifies the
+ * shell here: a program that calls wait() but never asked for the
+ * signal is left alone.
+ */
+ttynotify(tty)
+    register struct tty *tty;
+{
+    register struct proc *p;
+
+    for (p = plist; p < plist + NPROC; p++)
+        if (p->tty == tty && (p->mode & ALIVE) && !(p->mode & AWAKE) &&
+            p->event == (UINT) p && p->slist[SIGBACK] > 1)
+            break;
+
+    if (p >= plist + NPROC)
+        return;
+
+    send(p, SIGBACK);
+}
+
+/*
  * Low level input, called from the keyboard interrupt.
  * Put the character into the raw input queue, and echo
  * it if necessary.
@@ -490,13 +558,18 @@ ttyin(c, tty)
              * return;
              */
 
+        case SUSP:
+            ttynotify(tty);
+            ustart(tty);
+            return;
+
         case QUIT:
-            killall(tty, SIGQUIT);
+            killfg(tty, SIGQUIT);
             ustart(tty);
             return;
 
         case RUB:
-            killall(tty, SIGINT);
+            killfg(tty, SIGINT);
             ustart(tty);
             return;
 
@@ -566,7 +639,7 @@ ttyin(c, tty)
             tty->state &= ~HISLEEP;
             wakeup(raw);
         }
-        killall(tty, SIGTINT);
+        killfg(tty, SIGTINT);
         tty->line = 0;
     }
 }

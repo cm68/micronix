@@ -156,6 +156,14 @@ sched()
             if ((p->mode & (ALIVE | AWAKE | LOADED)) !=
                 (ALIVE | AWAKE | LOADED))
                 continue;
+            /*
+             * A stopped job is awake in every other sense - it may be
+             * waiting for a wakeup that has already come - but the
+             * shell has taken it off the cpu, so it is not a candidate
+             * until jobctl() says so.
+             */
+            if (jctl[p - plist] & JOBSTOP)
+                continue;
             if (next == 0 || priority(p) > priority(next)) {
                 next = p;
             }

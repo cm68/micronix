@@ -31,7 +31,10 @@ RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
 	done
 
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/libexec, so ../../.. is the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../filesystem)
 DEST	 = $(ROOT)/usr/src/libexec
 NOWARN	 = --warning=no-ignore-newer
 

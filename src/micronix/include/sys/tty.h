@@ -22,6 +22,7 @@
 #define XON	021             /* sent to input devices to restart input */
 #define XOFF	023             /* sent by printers to hold up output */
 #define STOP	033             /* Escape */
+#define SUSP	032             /* Suspend (cntrl Z) */
 #define QUIT	034             /* Quit (cntrl \) */
 #define BSLASH	0134            /* Back slash \ */
 #define RUB	0177            /* Rubout or Delete */

@@ -166,6 +166,10 @@ static void emulate();
 void SystemCall();
 void int_handler();
 void quit_handler();
+void catchsig(int hsig, void (*fn)());
+void tty_wake();
+void initpids();
+void initinums();
 int hostsig(int gsig);
 void initmemdev();
 void procroot(int lpid);
@@ -1077,7 +1081,8 @@ fname(char *orig)
      */
     slash = strrchr(workbuf, '/');
     *slash = '\0';
-    realpath(workbuf, namebuf);
+    if (!realpath(workbuf, namebuf))
+        strcpy(namebuf, workbuf);
     *slash = '/';
     strcat(namebuf, slash);
     return (namebuf);
@@ -1525,9 +1530,11 @@ main(int argc, char **argv)
     /*
      * make our rootdir absolute
      */
-    chdir(rootdir);
-    getcwd(workbuf, sizeof(workbuf));
-    realpath(workbuf, namebuf);
+    if (chdir(rootdir) < 0 || !getcwd(workbuf, sizeof(workbuf)) ||
+        !realpath(workbuf, namebuf)) {
+        perror("rootdir");
+        exit(2);
+    }
     rootdir = strdup(namebuf);
     lstat(rootdir, &sbuf);
     rootinode = sbuf.st_ino;
@@ -1601,7 +1608,10 @@ main(int argc, char **argv)
         *argp++ = cmd;
         *argp++ = (char *) 0;
 
-        pipe(pipefd);
+        if (pipe(pipefd) < 0) {
+            perror("pipe");
+            exit(2);
+        }
         sprintf(cmd,
             "tty > /proc/%d/fd/%d ; while test -d /proc/%d ; do sleep 1 ; done",
             mypid, pipefd[1], mypid);
@@ -1642,6 +1652,7 @@ main(int argc, char **argv)
      */
     catchsig(SIGINT, int_handler);
     catchsig(SIGQUIT, quit_handler);
+    catchsig(SIGUSR2, tty_wake);
 
     /*
      * Remember the terminal so the guest cannot leave it raw.  Saved
@@ -1754,6 +1765,17 @@ void
 bg_handler()
 {
     schedule_signal(6);
+}
+
+/*
+ * jobctl(JOBTTYOUT) sends this to interrupt a read that is asleep in
+ * the terminal.  It is not a guest signal: signalled stays clear, so
+ * the read's EINTR retry loop sees nothing pending, retries, and finds
+ * the input closed (case 3 reads pids->jtty).
+ */
+void
+tty_wake()
+{
 }
 
 /*
@@ -2026,8 +2048,12 @@ do_exec(char *name, char *guest, char **argv, char **envp, int report)
         return (errno);
     }
     fseek(file, 0, SEEK_SET);
-    fread(&header, 1, sizeof(header), file);
-    isobj = header.ident == OBJECT;
+    if (fread(&header, 1, sizeof(header), file) != sizeof(header)) {
+        memset(&header, 0, sizeof(header));     /* too short to be an object */
+        isobj = 0;
+    } else {
+        isobj = header.ident == OBJECT;
+    }
     if (!isobj) {
         fseek(file, 0, SEEK_END);
         header.text = ftell(file);
@@ -2067,6 +2093,7 @@ do_exec(char *name, char *guest, char **argv, char **envp, int report)
     }
     catchsig(SIGINT, int_handler);
     catchsig(SIGQUIT, quit_handler);
+    catchsig(SIGUSR2, tty_wake);
 
     /*
      * the new image gets its own accounting: the counters below belong
@@ -2110,9 +2137,17 @@ do_exec(char *name, char *guest, char **argv, char **envp, int report)
         put_byte(i, 0);
     }
 
-    fread(iobuf, 1, header.text, file);
+    if (fread(iobuf, 1, header.text, file) != header.text) {
+        message("Can't read text from %s!\n", name);
+        fclose(file);
+        return ENOEXEC;
+    }
     copyout(iobuf, header.textoff, header.text);
-    fread(iobuf, 1, header.data, file);
+    if (fread(iobuf, 1, header.data, file) != header.data) {
+        message("Can't read data from %s!\n", name);
+        fclose(file);
+        return ENOEXEC;
+    }
     copyout(iobuf, header.dataoff, header.data);
 
     /*
@@ -2136,7 +2171,8 @@ do_exec(char *name, char *guest, char **argv, char **envp, int report)
             printf("got %d symbols\n", (int)(header.table / symsize));
         }
         for (i = 0; i < header.table / symsize; i++) {
-            fread(&fsym, 1, symsize, file);
+            if (fread(&fsym, 1, symsize, file) != symsize)
+                break;
             add_sym(fsym.name, fsym.t, fsym.v);
         }
     }
@@ -2599,6 +2635,16 @@ struct dirfd
 #define NPIDS   (MAXPID + 1)    /* linuxpid[] is indexed BY micronix pid */
 
 /*
+ * The jobctl() operation bits, from micronix/include/sys/sys.h.  The
+ * kernel is not linked in here, so they are spelled out rather than
+ * included; they are the syscall's interface and must not drift.
+ */
+#define JOBSTOP   01
+#define JOBCONT   02
+#define JOBTTYOUT 04
+#define JOBTTYIN  010
+
+/*
  * pids are longer in linux, so we need to manage them too in shared memory.
  *
  * This is a registry, not a counter: linuxpid[] is indexed by the pid
@@ -2611,6 +2657,12 @@ struct dirfd
 struct pids {
     pthread_mutex_t mutex;
     int linuxpid[NPIDS];
+    /*
+     * The kernel's JOBTTYOUT bit, shared by all the host processes
+     * that make up the simulation.  jobctl() is called on someone
+     * else's pid, so the bit cannot live in the caller.
+     */
+    unsigned char jtty[NPIDS];
     unsigned short next;
 } *pids;
 
@@ -2677,6 +2729,7 @@ allocpid(int lpid)
             p = MINPID;
         if (pids->linuxpid[p] == 0) {
             pids->linuxpid[p] = lpid;
+            pids->jtty[p] = 0;
             pids->next = (p == MAXPID) ? MINPID : p + 1;
             pthread_mutex_unlock(&pids->mutex);
             return p;
@@ -2708,6 +2761,32 @@ hostpid(int gpid)
     lpid = pids->linuxpid[gpid];
     pthread_mutex_unlock(&pids->mutex);
     return lpid ? lpid : -1;
+}
+
+/*
+ * Has this host process exited but not yet been reaped?
+ *
+ * micronix's kill(pid, 0) asks whether the process is ALIVE, and a
+ * zombie is not - exit() clears the bit.  The host still counts the
+ * unreaped child alive, so read the state the host keeps for it.
+ * Nothing is reaped here: the guest's wait() still has to collect it.
+ */
+static int
+hostexited(int lpid)
+{
+    char b[256], *q;
+    int f, n;
+
+    sprintf(b, "/proc/%d/stat", lpid);
+    if ((f = open(b, O_RDONLY)) < 0)
+        return 1;               /* the entry itself is gone */
+    n = read(f, b, sizeof(b) - 1);
+    close(f);
+    if (n <= 0)
+        return 1;
+    b[n] = 0;
+    q = strrchr(b, ')');
+    return (q != 0 && q[2] == 'Z');
 }
 
 /*
@@ -2868,6 +2947,7 @@ freepid(int lpid)
     for (p = MINPID; p <= MAXPID; p++) {
         if (pids->linuxpid[p] == lpid) {
             pids->linuxpid[p] = 0;
+            pids->jtty[p] = 0;
             break;
         }
     }
@@ -2889,7 +2969,7 @@ initinums()
     pthread_mutexattr_t attr;
 
     inums = (struct inums *)mmap((void *)NULL, sizeof(struct inums), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0);
-    if (inums == (struct inum *)-1) {
+    if (inums == (struct inums *)-1) {
         perror("initinums");
         exit(2);
     }
@@ -4243,6 +4323,13 @@ SystemCall()
                     iobuf[i] = b;
             }
             copyout(iobuf, arg1, ret);
+        } else if (pids->jtty[selfgpid()] && isatty(fd)) {
+            /*
+             * The shell closed this job's terminal input with
+             * JOBTTYOUT.  sys/tty.c's ttyread() returns at once in
+             * that state, so the guest sees end of file here too.
+             */
+            ret = 0;
         } else {
             if ((ret = seekfile(fd)) == 0) {
                 /*
@@ -4255,6 +4342,10 @@ SystemCall()
                  * copyout with ret of 0xffff on a failed read.
                  */
                 for (;;) {
+                    if (pids->jtty[selfgpid()] && isatty(fd)) {
+                        ret = 0;    /* closed while we slept */
+                        break;
+                    }
                     ret = read(fd, iobuf, arg2);
                     if (ret != 0xffff || errno != EINTR)
                         break;
@@ -4868,6 +4959,36 @@ SystemCall()
         free(envvec);
         break;
 
+    case 57:                   /* jobctl <pid in hl> op */
+        /*
+         * The guest shell stops and resumes a job here, and takes its
+         * terminal input away.  JOBSTOP rides the host's stop signal:
+         * an emulated process that is not running needs no scheduler
+         * of its own.  JOBTTYOUT cannot be a signal - a background
+         * reader must see end of file, not be stopped - so it is kept
+         * in the shared table for the target's own simulator to read
+         * in case 3.
+         */
+        if ((lpid = hostpid(fd)) < 0 || lpid == getpid()) {
+            errno = ret = ESRCH;
+            carry_set();
+            break;
+        }
+        if (arg1 & JOBSTOP)
+            kill(lpid, SIGSTOP);
+        if (arg1 & JOBCONT)
+            kill(lpid, SIGCONT);
+        if (arg1 & JOBTTYOUT) {
+            pids->jtty[fd] = 1;
+            /* wake a read already asleep in the terminal */
+            kill(lpid, SIGUSR2);
+        }
+        if (arg1 & JOBTTYIN)
+            pids->jtty[fd] = 0;
+        ret = 0;
+        carry_clear();
+        break;
+
     case 12:                   /* chdir <ptr to name> */
         {
             char abs[PATH_MAX];
@@ -4921,7 +5042,8 @@ SystemCall()
             }
 
             sprintf(workbuf, "%s/%s", rootdir, abs);
-            realpath(workbuf, namebuf);
+            if (!realpath(workbuf, namebuf))
+                strcpy(namebuf, workbuf);
             ret = stat(filename = namebuf, &sbuf);
             if (ret || !(S_ISDIR(sbuf.st_mode))) {
                 ret = 20;
@@ -5603,6 +5725,23 @@ SystemCall()
             errno = ret = ESRCH;
             carry_set();
             break;
+        }
+        if (i == 0) {
+            /*
+             * The existence probe.  sys/sig.c asks that the process
+             * still be ALIVE, and exit() has cleared ALIVE by the
+             * time a child is a zombie - so a finished job is gone
+             * as far as the shell is concerned.  The host still
+             * calls the unreaped zombie alive, so look at its state;
+             * waitid(WNOWAIT) would say the same but answers EINVAL
+             * in this 32-bit program, and /proc reaps nothing, so
+             * the guest's wait() can still collect the status.
+             */
+            if (hostexited(lpid)) {
+                errno = ret = ESRCH;
+                carry_set();
+                break;
+            }
         }
         if (kill(lpid, i) < 0) {
             ret = errno;

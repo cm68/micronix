@@ -199,10 +199,18 @@ compact(struct kv *kv)
         hdr[0] = e->klen;
         hdr[1] = e->vlen & 0xff;
         hdr[2] = (e->vlen >> 8) & 0xff;
-        write(tfd, hdr, 3);
-        write(tfd, e->key, e->klen);
+        if (write(tfd, hdr, 3) != 3 ||
+            write(tfd, e->key, e->klen) != e->klen) {
+            free(val);
+            close(tfd);
+            return -1;
+        }
         e->off = lseek(tfd, 0, SEEK_CUR);
-        write(tfd, val, e->vlen);
+        if (e->off < 0 || write(tfd, val, e->vlen) != e->vlen) {
+            free(val);
+            close(tfd);
+            return -1;
+        }
         free(val);
     }
     fsync(tfd);

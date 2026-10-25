@@ -677,8 +677,10 @@ blank_load(char *fname, int drive, int mode)
     fd = open(fname, O_RDWR | O_CREAT | O_TRUNC, 0777);
     if (fd < 0)
         return 0;
-    write(fd, "IMD ", 4);
-    write(fd, "\x1a", 1);
+    if (write(fd, "IMD ", 4) != 4 || write(fd, "\x1a", 1) != 1) {
+        close(fd);
+        return 0;
+    }
 
     ip = calloc(1, sizeof(*ip));
     ip->fd = fd;                    /* open to append track records */
@@ -754,7 +756,12 @@ imd_load(char *fname, int drive, int mode)
     ip->comment = malloc(clen + 1);
 
     lseek(fd, 0, SEEK_SET);
-    read(fd, ip->comment, clen);
+    if (read(fd, ip->comment, clen) != clen) {
+        free(ip->comment);
+        free(ip);
+        close(fd);
+        return 0;
+    }
     ip->comment[clen] = 0;
     ip->drive = drive;
     ip->cyls = 0;
@@ -1243,7 +1250,7 @@ imd_track(struct imd *ip, int cyl, int head)
  * The framing is out of band to the data, like the label, so it goes into
  * the image and the delta never sees it.
  */
-static void
+static int
 write_track(struct imd *ip, struct imd_trk *tp, int fill)
 {
     unsigned char hdr[5];
@@ -1256,8 +1263,9 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
     hdr[2] = tp->fixed.head;
     hdr[3] = tp->fixed.nsec;
     hdr[4] = tp->fixed.size;
-    write(ip->fd, hdr, 5);
-    write(ip->fd, tp->secmap, tp->fixed.nsec);
+    if (write(ip->fd, hdr, 5) != 5 ||
+        write(ip->fd, tp->secmap, tp->fixed.nsec) != tp->fixed.nsec)
+        return -1;
 
     if (ip->mode == IMD_INPLACE) {
         /*
@@ -1268,18 +1276,24 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
          */
         code = IMD_DATA;
         for (i = 0; i < tp->fixed.nsec; i++) {
-            write(ip->fd, &code, 1);
+            if (write(ip->fd, &code, 1) != 1)
+                return -1;
             tp->data_off[i] = lseek(ip->fd, 0, SEEK_CUR);
-            lseek(ip->fd, tp->secsize, SEEK_CUR);
+            if (tp->data_off[i] < 0 ||
+                lseek(ip->fd, tp->secsize, SEEK_CUR) < 0)
+                return -1;
         }
-        ftruncate(ip->fd, lseek(ip->fd, 0, SEEK_CUR));
+        if (ftruncate(ip->fd, lseek(ip->fd, 0, SEEK_CUR)) < 0)
+            return -1;
     } else {
         code = IMD_FILL;
         for (i = 0; i < tp->fixed.nsec; i++) {
-            write(ip->fd, &code, 1);
-            write(ip->fd, &fb, 1);
+            if (write(ip->fd, &code, 1) != 1 ||
+                write(ip->fd, &fb, 1) != 1)
+                return -1;
         }
     }
+    return 0;
 }
 
 int
@@ -1302,8 +1316,8 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     if (ip->mode == IMD_INPLACE) {
         /* the offset table; the data itself lives in the file's holes */
         tp->data_off = malloc(sizeof(long) * secs);
-        if (ip->fd >= 0)
-            write_track(ip, tp, fill);
+        if (ip->fd >= 0 && write_track(ip, tp, fill) < 0)
+            return 0;
         return 1;
     }
 
@@ -1318,7 +1332,8 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
      * alone lands in the overlay as data.
      */
     if (ip->fd >= 0) {
-        write_track(ip, tp, fill);
+        if (write_track(ip, tp, fill) < 0)
+            return 0;
     } else if (ip->delta) {
         for (i = 0; i < secs; i++)
             imd_write(ip, cyl, head, firstsec + i, tp->data[i]);

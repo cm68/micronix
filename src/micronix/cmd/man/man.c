@@ -50,6 +50,7 @@
 #include <sys/stat.h>
 #include <sys/sgtty.h>
 #include <sys/dir.h>
+#include <unistd.h>
 #endif
 
 /*
@@ -85,6 +86,17 @@ static char *scan;				/* 0x3018 */
 static char *found;				/* 0x301a */
 
 /*
+ * $PAGER.  pager is the path to run, or 0 when the variable was not set,
+ * did not name anything executable, or the output is not a terminal.
+ * pagerpid is the child once it has started, and 0 until then - the
+ * pager is started only when the first page is ready for form, so a
+ * man that finds nothing never leaves one waiting on an empty pipe.
+ */
+static char *pager;
+static int pagerpid;
+static char pagerbuf[520];
+
+/*
  * The digit that names the section being tried.
  *
  * In the binary this is a char * in the data segment pointing at the
@@ -115,6 +127,7 @@ extern int putstr(int, ...);
 #else
 extern char *concat();
 extern int putstr();
+extern char *getenv();
 #endif
 
 /*
@@ -293,6 +306,78 @@ char *dir;
 #endif
 
 /*
+ * Work out what $PAGER names, if anything.
+ *
+ * A name with a slash in it is a path and is used as given; a bare name
+ * is looked for in /bin and then /usr/bin, the same two places run()
+ * looks for form.  Either way it has to be executable, so a stale value
+ * leaves the page on stdout instead of producing an exec failure and an
+ * empty screen.
+ */
+char *
+pagerpath(name)
+char *name;
+{
+	char *p;
+
+	if (name == 0 || name[0] == 0)
+		return 0;
+	for (p = name; *p; p++) {
+		if (*p == '/')
+			return access(name, X_OK) == 0 ? name : 0;
+	}
+	concat(pagerbuf, "/bin/", name, 0);
+	if (access(pagerbuf, X_OK) == 0)
+		return pagerbuf;
+	concat(pagerbuf, "/usr/bin/", name, 0);
+	if (access(pagerbuf, X_OK) == 0)
+		return pagerbuf;
+	return 0;
+}
+
+/*
+ * Put $PAGER between form and the terminal.
+ *
+ * The pager keeps the terminal it was started on as its output, and gets
+ * the read end of a pipe as its input.  The write end is duplicated onto
+ * man's stdout, so every form child inherits it; closing it in main()
+ * when the last page is done is the pager's end of file.
+ *
+ * A failure here is not fatal - the page still prints, just unpaged - so
+ * the caller forgets the pager and carries on.
+ */
+static int
+startpager()
+{
+	int fd[2];
+	int pid;
+	char *pargv[2];
+
+	if (pipe(fd) < 0)
+		return 0;
+	if ((pid = fork()) == -1) {
+		close(fd[0]);
+		close(fd[1]);
+		return 0;
+	}
+	if (pid == 0) {
+		dup2(fd[0], 0);
+		close(fd[0]);
+		close(fd[1]);
+		pargv[0] = pager;
+		pargv[1] = 0;
+		execv(pager, pargv);
+		perror(pager);
+		exit(1);
+	}
+	close(fd[0]);
+	dup2(fd[1], 1);
+	close(fd[1]);
+	pagerpid = pid;
+	return 1;
+}
+
+/*
  * Run form on the page.
  *
  * The child tries /bin/ first and then /usr/bin, and the second of those
@@ -302,8 +387,10 @@ char *dir;
  * the first exec succeeds, and the bug has never been reached.  See
  * README.
  *
- * The parent waits for every child rather than for this one; man has no
- * others, so it comes to the same thing.
+ * The pager, if there is one, is started before the first form and is a
+ * child too, so the parent waits for this form and not for every child:
+ * waiting for all of them would wait for a pager that is itself waiting
+ * for the rest of the pages.
  */
 run(av)
 char **av;
@@ -312,12 +399,14 @@ char **av;
 	int status;
 	char path[520];
 
+	if (pager && pagerpid == 0 && !startpager())
+		pager = 0;
 	if ((pid = fork()) == -1) {
 		perror(0);
 		return;
 	}
 	if (pid != 0) {
-		while (wait(&status) >= 0)
+		while (wait(&status) != pid)
 			;
 		return;
 	}
@@ -449,7 +538,9 @@ char **argv;
 /*
  * The -t that form is given when the output is a terminal is decided
  * here, by asking descriptor 1 for its modes: gtty fails on anything that
- * is not a typewriter, and that is the whole test.
+ * is not a typewriter, and that is the whole test.  The same test decides
+ * whether $PAGER is used - a page going into a file or a pipeline is not
+ * something to page.
  *
  * The exit status is 1 whatever happened, and 0 from the usage - which is
  * the wrong way round and is what the binary does.  Nothing in the system
@@ -459,6 +550,7 @@ main(argc, argv)
 int argc;
 char **argv;
 {
+	int status;
 #ifdef linux
 	char *r;
 #else
@@ -475,7 +567,18 @@ char **argv;
 #else
 	istty = gtty(1, &sg) >= 0;
 #endif
+	if (istty)
+		pager = pagerpath(getenv("PAGER"));
 	doargs(argc, argv);
+	if (pagerpid) {
+		/*
+		 * The pages are formatted; drop the write end so the pager
+		 * sees end of file, and let it finish at its own pace.
+		 */
+		close(1);
+		while (wait(&status) >= 0)
+			;
+	}
 	exit(1);
 }
 

@@ -32,7 +32,7 @@ TARGET	= libunix.a
 MANSEC	 = 2
 MANSRCS	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 close.2 \
 	 creat.2 csw.2 dup.2 dup2.2 exec.2 execve.2 exit.2 fork.2 fstat.2 ftruncate.2 getpid.2 \
-	 getuid.2 gtty.2 indir.2 kill.2 link.2 mknod.2 mount.2 nice.2 open.2 \
+	 getuid.2 gtty.2 indir.2 jobctl.2 kill.2 link.2 mknod.2 mount.2 nice.2 open.2 \
 	 pipe.2 read.2 seek.2 setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 \
 	 sync.2 time.2 times.2 umount.2 unlink.2 wait.2 write.2
 
@@ -73,7 +73,7 @@ CSRCS	= signal.c lseek.c seek.c rename.c buf.c cleanup.c fclose.c \
 	 fprintf.c scanf.c fscanf.c isatty.c open.c
 ASSRCS	= access.s alarm.s _break.s chdir.s chmod.s chown.s close.s \
 	 creat.s dup.s dup2.s errno.s exec.s execve.s execv.s exit.s _exit.s fork.s fstat.s \
-	 getpid.s getuid.s gtty.s kill.s link.s mknod.s mount.s nice.s sysopen.s \
+	 getpid.s getuid.s gtty.s jobctl.s kill.s link.s mknod.s mount.s nice.s sysopen.s \
 	 pause.s perror.s pipe.s read.s reboot.s seekraw.s setuid.s _signal.s \
 	 sleep.s stat.s stime.s sbrk.s stty.s sync.s time.s times.s umount.s \
 	 unlink.s wait.s write.s ioctl.s fputc.s fgetc.s ftruncate.s

@@ -29,7 +29,10 @@ RECURSE = @for d in $(DIRS) ; do \
 # and --keep-newer-files for the same reason: a makefile edited inside
 # micronix is not to be overwritten by one older than it.
 #
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/stand, so ../../.. is the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../filesystem)
 DEST	 = $(ROOT)/usr/src/stand
 NOWARN	 = --warning=no-ignore-newer
 

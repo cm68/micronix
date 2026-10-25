@@ -181,7 +181,11 @@ execute(argt, execflg, pf1, pf2)
 	
 					IF a1
 					THEN	WHILE *++com
-						DO attrib(lookup(*com), exitval) OD
+						DO IF any('=', *com)
+						   THEN setname(*com, exitval);
+						   ELSE attrib(lookup(*com), exitval);
+						   FI
+						OD
 					ELSE	namscan(printflg);
 					FI
 					exitval=0;
@@ -210,6 +214,28 @@ execute(argt, execflg, pf1, pf2)
                                                 newline();
                                         }
                                         break;
+
+				case SYSJOBS:
+					joblist();
+					break;
+
+				case SYSFG:
+					IF a1
+					THEN	jobfg(stoi(a1));
+					ELSE	prs("fg: job id required");
+						newline();
+						exitval = 1;
+					FI
+					break;
+
+				case SYSBG:
+					IF a1
+					THEN	jobbg(stoi(a1));
+					ELSE	prs("bg: job id required");
+						newline();
+						exitval = 1;
+					FI
+					break;
 	
 				default:
 					internal=builtin(argn,com);

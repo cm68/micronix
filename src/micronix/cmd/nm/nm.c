@@ -164,6 +164,7 @@ struct syscall {
     {1, "bad"},     /* 54 */
     {3, "reboot"},  /* 55 */
     {7, "execve"},  /* 56 */
+    {3, "jobctl"},  /* 57 */
     {0, 0}
 };
 #define NSYS (sizeof(syscalls)/sizeof(syscalls[0]) - 1)

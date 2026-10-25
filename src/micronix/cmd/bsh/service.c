@@ -218,7 +218,22 @@ VOID	await(i)
 		   OD
 		END
 
-		IF p == -1 THEN continue FI
+		IF p > 0 THEN jobreaped(p) FI
+
+		IF p == -1
+		THEN	/*
+			 * ^Z: the terminal has told the shell to take the
+			 * foreground pipeline back.  Stop it and record it;
+			 * the job ids, names and policy are all ours.
+			 */
+			IF backnote
+			THEN	backnote = 0;
+				jobstop();
+				rc = 0;
+				wx = 0;
+			FI
+			continue;
+		FI
 
 		w_hi = (w>>8)&LOBYTE;
 
@@ -245,6 +260,249 @@ VOID	await(i)
 	THEN	exitsh(rc);
 	FI
 	exitval=rc; exitset();
+}
+
+/* ========	job control	======== */
+
+/*
+ * A job is the pipeline the shell was running when ^Z interrupted its
+ * wait.  The kernel keeps only per-process switches (sys/job.c); ids,
+ * grouping, names and every policy decision are here, so the two do
+ * not have to agree about what a job is.
+ */
+#define MAXJOBS	6		/* detached pipelines remembered at once */
+#define JSTOP	1		/* stopped by ^Z */
+#define JBG	2		/* running, terminal input closed */
+#define JFG	3		/* in the foreground now */
+
+LOCAL struct jobent {
+	INT	jid;		/* 0 = free */
+	INT	npids;
+	INT	state;
+	INT	pids[MAXP];
+	CHAR	name[JOBNM];
+} jobtab[MAXJOBS];
+
+LOCAL INT	curjob = -1;	/* the entry jobfg is waiting for */
+
+LOCAL VOID
+jobname(j)
+	REG struct jobent *j;
+{
+	REG INT	i;
+
+	FOR i=0; i<JOBNM-1 ANDF jobline[i]; i++
+	DO j->name[i] = jobline[i] OD
+	j->name[i] = 0;
+}
+
+/*
+ * A child has been reaped, so it is no longer part of any job.
+ */
+LOCAL VOID
+jobreaped(p)
+	INT	p;
+{
+	REG INT		i, k;
+	REG struct jobent *j;
+
+	IF p > 0
+	THEN	FOR i=0; i<MAXJOBS; i++
+		DO	j = &jobtab[i];
+			IF j->jid
+			THEN	FOR k=0; k<j->npids; k++
+				DO IF j->pids[k] == p
+				   THEN	WHILE k < j->npids-1
+					DO j->pids[k] = j->pids[k+1]; k++ OD
+					j->npids--;
+					IF j->npids == 0
+					THEN	IF curjob == i THEN curjob = -1 FI
+						j->jid = 0;
+					FI
+					return;
+				   FI
+				OD
+			FI
+		OD
+	FI
+}
+
+/*
+ * Stop the pids still in the wait list and make them a job.
+ *
+ * The wait list is not compact - reaped pids leave holes - so it is
+ * scanned whole.  The pids that refuse to stop have already gone and
+ * are not recorded; jobs will reap them when it next looks.
+ */
+LOCAL VOID
+jobstop()
+{
+	REG INT		i, pid;
+	REG struct jobent *j;
+	INT		stopped = 0;
+	INT		newname = 0;
+
+	IF pwc
+	THEN	IF curjob >= 0 ANDF jobtab[curjob].jid
+		THEN	j = &jobtab[curjob];
+		ELSE	FOR i=0; i<MAXJOBS; i++
+			DO IF jobtab[i].jid == 0 THEN break FI OD
+			IF i >= MAXJOBS
+			THEN	prs("jobs: table full"); newline();
+				FOR i=0; i<MAXP; i++
+				DO IF pwlist[i] > 0
+				   THEN jobctl(pwlist[i], JOBSTOP);
+				   FI
+				OD
+				FOR i=0; i<MAXP; i++ DO pwlist[i] = 0 OD
+				pwc = 0;
+				return;
+			FI
+			j = &jobtab[i];
+			j->jid = i+1;
+			newname = 1;
+		FI
+
+		j->npids = 0;
+		FOR i=0; i<MAXP; i++
+		DO	pid = pwlist[i];
+			IF pid > 0 ANDF jobctl(pid, JOBSTOP) == 0
+			THEN	j->pids[j->npids++] = pid;
+				stopped++;
+			FI
+		OD
+		FOR i=0; i<MAXP; i++ DO pwlist[i] = 0 OD
+		pwc = 0;
+
+		IF stopped
+		THEN	IF newname THEN jobname(j) FI
+			j->state = JSTOP;
+			prc('['); prn(j->jid); prs("] Stopped ");
+			prs(j->name); newline();
+		ELSE	j->jid = 0;
+			IF curjob >= 0 THEN curjob = -1 FI
+		FI
+	FI
+}
+
+/*
+ * Reap the job's dead members.
+ *
+ * A pid the kernel says is not alive is a zombie - it has exited but
+ * its parent has not collected it - and wait() returns at once.  It is
+ * the shell's own child, and await() reports every pid it reaps to
+ * jobreaped(), so a pid still here cannot have been collected already.
+ */
+LOCAL VOID
+jobpoll(j)
+	REG struct jobent *j;
+{
+	REG INT		k, p, pid;
+	INT		w;
+
+	LOOP	pid = 0;
+		FOR k=0; k<j->npids; k++
+		DO IF kill(j->pids[k], 0) < 0
+		   THEN pid = j->pids[k]; break;
+		   FI
+		OD
+		IF pid == 0 THEN break FI
+		p = wait(&w);
+		IF p > 0
+		THEN	jobreaped(p);
+		ELSE	jobreaped(pid);	/* no child left to reap */
+		FI
+	POOL
+}
+
+LOCAL struct jobent *
+jobfind(id)
+	INT	id;
+{
+	REG INT	i;
+
+	FOR i=0; i<MAXJOBS; i++
+	DO IF jobtab[i].jid == id THEN return(&jobtab[i]) FI OD
+	return(0);
+}
+
+VOID
+joblist()
+{
+	REG INT		i;
+	REG struct jobent *j;
+
+	FOR i=0; i<MAXJOBS; i++
+	DO	j = &jobtab[i];
+		IF j->jid
+		THEN	jobpoll(j);
+			IF j->jid
+			THEN	prc('['); prn(j->jid); prs("] ");
+				IF j->state == JSTOP
+				THEN	prs("Stopped ");
+				ELSE	prs("Running ");
+				FI
+				prs(j->name); newline();
+			FI
+		FI
+	OD
+}
+
+VOID
+jobfg(id)
+	INT	id;
+{
+	REG INT		i;
+	REG struct jobent *j;
+
+	IF (j = jobfind(id)) == 0
+	THEN	prs("fg: no such job"); newline();
+		exitval = 1;
+		return;
+	FI
+	jobpoll(j);
+	IF j->jid == 0
+	THEN	prs("fg: job finished"); newline();
+		exitval = 1;
+		return;
+	FI
+
+	FOR i=0; i<MAXP; i++ DO pwlist[i] = 0 OD
+	pwc = 0;
+	FOR i=0; i<j->npids; i++
+	DO	post(j->pids[i]);
+		jobctl(j->pids[i], JOBCONT|JOBTTYIN);
+	OD
+	j->state = JFG;
+	curjob = j - jobtab;
+	backnote = 0;
+	await(0);
+	curjob = -1;
+}
+
+VOID
+jobbg(id)
+	INT	id;
+{
+	REG INT		i;
+	REG struct jobent *j;
+
+	IF (j = jobfind(id)) == 0
+	THEN	prs("bg: no such job"); newline();
+		exitval = 1;
+		return;
+	FI
+	jobpoll(j);
+	IF j->jid == 0
+	THEN	prs("bg: job finished"); newline();
+		exitval = 1;
+		return;
+	FI
+
+	FOR i=0; i<j->npids; i++
+	DO jobctl(j->pids[i], JOBCONT|JOBTTYOUT) OD
+	j->state = JBG;
+	prc('['); prn(j->jid); prs("] "); prs(j->name); prs(" &"); newline();
 }
 
 BOOL		nosubst;

@@ -21,7 +21,7 @@ extern int indir(), exit(), r_fork(), read(), write(), open(),
     unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), stty(), gtty(),
     r_ioctl(),
     permission(), nice(), snooze(), sync(), reboot(), kill(), r_csw(), ssw(),
-    dup(), dup2(), r_pipe(), signal();
+    dup(), dup2(), r_pipe(), signal(), jobctl();
 
 /*
  * System call branch table.  Arguments from registers, and returns to
@@ -87,6 +87,7 @@ struct syscall syssw[] = {
     4, &r_ioctl,                /* 54 ioctl */
     2, &reboot,                 /* 55 */
     6, &execve,                 /* 56 execve(name, argv, envp) */
+    2, &jobctl,                 /* 57 jobctl(pid in hl, op) */
 };
 
 int ncalls = sizeof(syssw) / sizeof(struct syscall);

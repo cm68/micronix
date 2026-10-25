@@ -134,5 +134,8 @@ struct sysnod commands[] = {
 		{"exit",	SYSEXIT},
 		{"exec",	SYSEXEC},
 		{"umask",	SYSUMASK},
+		{"jobs",	SYSJOBS},
+		{"fg",		SYSFG},
+		{"bg",		SYSBG},
 		{0,	0},
 };

@@ -92,6 +92,13 @@ send(p, sig)
     if (p->slist[0] == SIGKILL)
         return;
     p->slist[0] = sig;
+    /*
+     * A stopped job still has to die.  The scheduler will not look at
+     * it, so the one signal the shell's stop cannot hold off lets it
+     * through - otherwise ^Z would make a process unkillable.
+     */
+    if (sig == SIGKILL)
+        jctl[p - plist] &= ~JOBSTOP;
     if (p->pri < SIGPRI && !(p->mode & AWAKE) && sig != SIGTINT)
         run(p);
 }

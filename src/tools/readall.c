@@ -56,8 +56,8 @@ dive(struct dsknod *container, char *name)
     namebuf = malloc(strlen(name) + 15);
 
     sprintf(namebuf, "mkdir -p %s\n", name);
-    if (!dryrun) {
-        system(namebuf);
+    if (!dryrun && system(namebuf) != 0) {
+        lose("mkdir");
     }
     dirp = getdir(container);
     entries = filesize(container) / sizeof(struct dir);
@@ -101,16 +101,23 @@ dofile(char *name, struct dsknod *dp)
     }
 
     unlink(name);
-    if ((fd = open(name, O_CREAT | O_RDWR | O_TRUNC)) < 0) {
+    if ((fd = open(name, O_CREAT | O_RDWR | O_TRUNC, 0666)) < 0) {
         perror(name);
+        return;
     }
 
     for (off = 0; off < size; off += 512) {
+        int n = (size - off > 512) ? 512 : size - off;
+
         fileread(dp, off, buf);
         if (traceflags & extra) {
             printf("\noffset %d logical block %d\n", off, off / 512);
         }
-        write(fd, buf, (size - off > 512) ? 512 : size - off);
+        if (write(fd, buf, n) != n) {
+            perror(name);
+            close(fd);
+            return;
+        }
     }
     close(fd);
     chmod(name, dp->d_mode & 0777);
@@ -138,7 +145,8 @@ dospecial(char *name, struct dsknod *dp)
         return;
 
     unlink(name);
-    symlink(linkname, name);
+    if (symlink(linkname, name) < 0)
+        perror(name);
 }
 
 char *pname;

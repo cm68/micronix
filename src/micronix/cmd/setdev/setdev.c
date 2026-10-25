@@ -95,7 +95,8 @@ say(f, s)
 
     for (p = s; *p; p++)
         ;
-    write(f, s, p - s);
+    /* a failed diagnostic write is not worth unwinding for */
+    (void)!write(f, s, p - s);
 }
 
 /*
@@ -122,7 +123,7 @@ saynum(f, v, base, width, pad)
     }
     while (sizeof(buf) - i < width && i > 0)
         buf[--i] = pad;
-    write(f, &buf[i], sizeof(buf) - i);
+    (void)!write(f, &buf[i], sizeof(buf) - i);
 }
 
 static void

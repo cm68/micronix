@@ -51,6 +51,18 @@
 #define SYSREAD 16
 #define SYSTST	17
 #define	SYSUMASK	18
+#define SYSJOBS	19
+#define SYSFG	20
+#define SYSBG	21
+
+/*
+ * jobctl() operations, from include/sys/sys.h.  JOBSTOP and JOBTTYOUT
+ * are also state bits; JOBCONT and JOBTTYIN clear them.
+ */
+#define JOBSTOP		01
+#define JOBCONT		02
+#define JOBTTYOUT	04
+#define JOBTTYIN	010
 
 /* used for input and output of shell */
 #define INIO 10
@@ -235,6 +247,7 @@ extern BLKPTR		bloktop;
 
 #define INTR	2
 #define QUIT	3
+#define BKGND	6
 #define MEMF	11
 #define ALARM	14
 #define KILL	15
@@ -244,8 +257,25 @@ extern BLKPTR		bloktop;
 
 VOID		fault();
 extern BOOL		trapnote;
+extern BOOL		backnote;
 extern STRING		trapcom[];
 extern BOOL		trapflg[];
+
+/*
+ * The line that made the command now running, kept for the name a
+ * detached job will be listed under.  readc() copies it as it is read,
+ * up to the first newline, and jobsnap says whether it is still
+ * collecting.
+ */
+#define JOBNM	64
+extern CHAR		jobline[JOBNM];
+extern INT		joblinep;
+extern BOOL		jobsnap;
+
+extern VOID		joblist();
+extern VOID		jobfg();
+extern VOID		jobbg();
+extern INT		kill();
 
 /* name tree and words */
 extern STRING		*environ;

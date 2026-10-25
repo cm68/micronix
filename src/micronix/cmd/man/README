@@ -105,9 +105,30 @@ The rest it uses are ordinary: fopen 0x0886, fclose 0x0b4f, fread 0x0bee,
 exit 0x155e, perror 0x19a0, execv 0x1b54.
 
 
+$PAGER
+------
+
+This is an addition, not something the binary does.  When $PAGER names an
+executable and descriptor 1 is a terminal, man starts the pager before the
+first form and puts it between form and the terminal: the pipe is man's
+stdout, so every form child for every page writes into the one pager, and
+closing it at exit is the pager's end of file.  The test for a terminal is
+gtty(1), the same one that decides whether form gets -t, so "man ls >
+file" and "man ls | grep" are not paged.
+
+$PAGER is a program name, not a command line: a name with a slash is used
+as a path, and a bare name is looked for in /bin and then /usr/bin, the
+same two places run() looks for form.  It has to be executable; if it is
+not, or if the pipe or fork fails, the page prints directly as before.
+$PAGER has to be in the environment the shell passes to man - in bsh that
+means the "PAGER=less man ls" form, or an export.
+
+
 Not run yet
 -----------
 
-man.c compiles into the cross build.  It has not been run: the thing to
-try it on is a Micronix boot with form(1) present, comparing its output
-against the original binary's for the same page.
+man.c compiles into the cross build.  It has been run under the usersim
+shell against the pages in the tree, and on the host as mxman against
+mxform; both show a page correctly.  It has not been run on a real
+Micronix boot, which is what would check the reconstruction against the
+original binary's output for the same page.

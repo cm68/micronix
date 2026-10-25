@@ -95,10 +95,12 @@ readc()
 	REG CHAR	c;
 	REG INT		len;
 	REG FILE	f;
+	BOOL		peeked;
 
 retry:
+	peeked = 0;
 	IF peekc
-	THEN	c=peekc; peekc=0;
+	THEN	c=peekc; peekc=0; peeked=1;
 	ELIF (f=standin, f->fnxt!=f->fend)
 	THEN	IF (c = *f->fnxt++)==0
 		THEN	IF f->feval
@@ -117,6 +119,25 @@ retry:
 	THEN	close(f->fdes); f->fdes = -1; c=EOF; f->feof++;
 	ELSE	f->fend = (f->fnxt = f->fbuf)+len;
 		goto retry;
+	FI
+	/*
+	 * Keep the line that is being read for the name a detached job
+	 * will be listed under.  This is the raw text, before quoting
+	 * or expansion; it stops at the first newline, so a here
+	 * document or a continuation does not become part of the name.
+	 * A character put back with peekc has been recorded once already.
+	 */
+	IF jobsnap ANDF peeked==0
+	THEN	IF c == NL
+		THEN	jobsnap = 0;
+			jobline[joblinep] = 0;
+		ELIF joblinep < JOBNM-1
+		THEN	IF (c & STRIP) >= SP ANDF (c & STRIP) != 0177
+			THEN	IF (c & STRIP) != SP ORF joblinep
+				THEN	jobline[joblinep++] = c & STRIP;
+				FI
+			FI
+		FI
 	FI
 	return(c);
 }

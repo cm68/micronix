@@ -48,8 +48,12 @@ struct reloc {
     struct reloc *next;
 } *rlhead, *rltail;
 
-#define	SEG_TEXT	0
-#define	SEG_DATA	1
+/*
+ * A relocation's segment, as this tool tags it for dumprelocs: not
+ * obj.h's segment numbers, just text/data for the report.
+ */
+#define	RELOC_TEXT	0
+#define	RELOC_DATA	1
 
 /*
  * the current object header
@@ -76,7 +80,8 @@ get_byte(unsigned short addr)
     } else {
         return 0;
     }
-    read(fd, &c, 1);
+    if (read(fd, &c, 1) != 1)
+        return 0;
     return c;
 }
 
@@ -229,9 +234,14 @@ outimage()
     char c;
  
     fd = creat("imagefile", 0777);
+    if (fd < 0) {
+        perror("imagefile");
+        return;
+    }
     for (i = 0; i < 65536; i++) {
-        c = get_byte(i);            
-        write(fd, &c, 1);
+        c = get_byte(i);
+        if (write(fd, &c, 1) != 1)
+            break;
     }
     close(fd);
 }
@@ -319,7 +329,10 @@ do_object(int fd, int limit)
     unsigned char flag;
     unsigned char l;
 
-    read(fd, &head, sizeof(head));
+    if (read(fd, &head, sizeof(head)) != sizeof(head)) {
+        printf("cannot read object header\n");
+        return;
+    }
     if (verbose) {
         printf
             ("magic %x text:%d data:%d bss:%d heap:%d symbols:%d textoff:%x dataoff:%x\n",
@@ -351,7 +364,8 @@ do_object(int fd, int limit)
         sym = syms;
         l = sizeof(*sym) - (15 - symlen);
         for (i = 0; i < nsyms; i++) {
-            read(fd, sym, l);
+            if (read(fd, sym, l) != l)
+                break;
             if (sflag) {
                 printf("%5d %15s: ", i, sym->name);
                 value = sym->value;
@@ -403,8 +417,8 @@ do_object(int fd, int limit)
 
     if (!(head.conf & CONF_NORELO)) {
         relocp = relocbuf;
-        makerelocs(SEG_TEXT);
-        makerelocs(SEG_DATA);
+        makerelocs(RELOC_TEXT);
+        makerelocs(RELOC_DATA);
     }
     endoff = lseek(fd, 0, SEEK_CUR);
 
@@ -437,7 +451,11 @@ nm(char *oname)
         printf("cannot open %s\n", oname);
         return;
     }
-    read(fd, &magic, sizeof(magic));
+    if (read(fd, &magic, sizeof(magic)) != sizeof(magic)) {
+        printf("%s: cannot read\n", oname);
+        close(fd);
+        return;
+    }
     if (magic == OBJECT) {
         printf("%s:\n", oname);
         lseek(fd, 0, SEEK_SET);

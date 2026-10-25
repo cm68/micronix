@@ -40,7 +40,10 @@ do_object(int fd, int limit)
 	unsigned short value;
 	unsigned char flag;
 
-	read(fd, &head, sizeof(head));
+	if (read(fd, &head, sizeof(head)) != sizeof(head)) {
+		printf("cannot read object header\n");
+		return;
+	}
 	printf("magic %x sym:%d text:%d data:%d bss:%d heap:%d textoff:%x dataoff:%x\n",
 		(head.ident << 8) + head.conf, 
 		head.table, head.text, head.data, head.bss, head.heap, head.textoff, head.dataoff);
@@ -66,7 +69,11 @@ size(char *oname)
 		printf("cannot open %s\n", oname);
 		return;
 	}
-	read(fd, &magic, sizeof(magic));
+	if (read(fd, &magic, sizeof(magic)) != sizeof(magic)) {
+		printf("%s: cannot read\n", oname);
+		close(fd);
+		return;
+	}
 	if (magic == OBJECT) {
 		printf("%s:\n", oname);
 		lseek(fd, 0, SEEK_SET);

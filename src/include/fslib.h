@@ -62,7 +62,7 @@ extern void dumpsb(struct super *sb);
 extern void secdump(unsigned char *buf);
 extern UINT secmap(struct super *fs, UINT blkno);
 extern UINT bmap(struct dsknod *ip, off_t offset, int alloc);
-extern struct dsknod *namei(struct super *f, char *name);
+extern struct dsknod *namei(struct super *f, const char *name);
 extern struct dir *getdir(struct dsknod *ip);
 extern struct dir *getdirent(struct dsknod *ip, int index);
 extern UINT balloc(struct super *f);

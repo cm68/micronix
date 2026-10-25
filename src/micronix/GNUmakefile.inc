@@ -129,7 +129,15 @@ INC	?= -i$(DEPTH)/lib/include -I$(DEPTH)/include
 #
 TREELIBS ?= $(DEPTH)/lib/libc/libc.a $(DEPTH)/lib/libunix/libunix.a
 
-ROOT	?= ~/src/micronix/filesystem
+#
+# The tree's own filesystem, not a path from somebody's home directory.
+# This used to say ~/src/micronix/filesystem, which was one developer's
+# layout in 2023 and put every install somewhere the tree had never
+# heard of.  HOSTROOT is the top of this tree - the directory holding
+# src/, bin/ and filesystem/ - so ROOT follows the tree wherever it is
+# checked out.
+#
+ROOT	?= $(HOSTROOT)/filesystem
 ifeq ($(strip $(CLASS)),)
 SRCDIR	?= /usr/src/$(DIR)
 else

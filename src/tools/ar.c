@@ -39,7 +39,10 @@ art(char *oname)
 		printf("cannot open input\n");
 		exit(1);
 	}
-	read(archive, &head, sizeof(head));
+	if (read(archive, &head, sizeof(head)) != sizeof(head)) {
+		printf("cannot read archive header\n");
+		exit(1);
+	}
 	if (verbose) {
 		printf("magic %x \n", head.magic);
 	}
@@ -54,11 +57,20 @@ art(char *oname)
 			value);
 		if (xflag) {
 			buf = malloc(value);
-			read(archive, buf, value);
+			if (!buf || read(archive, buf, value) != value) {
+				printf("cannot read %s\n", entry.fname);
+				free(buf);
+				exit(1);
+			}
 			ofile = open(entry.fname, O_CREAT|O_RDWR, 0777);
-			write(ofile, buf, value);
+			if (ofile < 0) {
+				perror(entry.fname);
+			} else {
+				if (write(ofile, buf, value) != value)
+					perror(entry.fname);
+				close(ofile);
+			}
 			free(buf);
-			close(ofile);
 		} else {
 			lseek(archive, value, SEEK_CUR);
 		}

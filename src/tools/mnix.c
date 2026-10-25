@@ -333,7 +333,10 @@ catfile(char *name, int opts)
     size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
         valid = fileread(dp, i, buf);
-        write(1, buf, valid);
+        if (write(1, buf, valid) != valid) {
+            perror("cat");
+            break;
+        }
     }
     ifree(dp);
 }
@@ -438,7 +441,12 @@ readcmd(int c, char **a)
     size = (dp->d_size0 << 16) + dp->d_size1;
     for (i = 0; i < size; i += 512) {
         valid = fileread(dp, i, buf);
-        write(outfd, buf, valid);
+        if (write(outfd, buf, valid) != valid) {
+            perror(*a);
+            ifree(dp);
+            close(outfd);
+            return 2;
+        }
     }
     ifree(dp);
     close(outfd);
@@ -1224,7 +1232,10 @@ tarx(char *tarfile)
 		filefree(dp);
 		nblocks = (size + TBLOCK - 1) / TBLOCK;
 		for (i = 0; i < nblocks; i++) {
-			read(infd, buf, TBLOCK);
+			if (read(infd, buf, TBLOCK) != TBLOCK) {
+				printf("tar: short read in archive\n");
+				break;
+			}
 			filewrite(dp, i * TBLOCK, buf);
 		}
 		dp->d_size0 = (size >> 16) & 0xff;
@@ -1242,6 +1253,19 @@ tarx(char *tarfile)
 	}
 	close(infd);
 	return 0;
+}
+
+/*
+ * A short write would leave a malformed archive, and tarput is too deep
+ * to unwind for it, so report and stop.
+ */
+static void
+tarwrite(int fd, const void *buf, int n)
+{
+	if (write(fd, buf, n) != n) {
+		perror("tar");
+		exit(1);
+	}
 }
 
 /*
@@ -1303,7 +1327,7 @@ tarput(char *path, int outfd)
 	sprintf(dblock.dbuf.size, "%11lo ", isdir ? 0L : size);
 	sprintf(dblock.dbuf.mtime, "%11lo ", (long)dp->d_mtime);
 	sprintf(dblock.dbuf.chksum, "%6o", checksum());
-	write(outfd, &dblock, TBLOCK);
+	tarwrite(outfd, &dblock, TBLOCK);
 
 	if (isdir) {
 		entries = size / sizeof(struct dir);
@@ -1323,7 +1347,7 @@ tarput(char *path, int outfd)
 		for (i = 0; i < size; i += TBLOCK) {
 			memset(buf, 0, TBLOCK);
 			fileread(dp, i, buf);
-			write(outfd, buf, TBLOCK);
+			tarwrite(outfd, buf, TBLOCK);
 		}
 	}
 	ifree(dp);
@@ -1352,8 +1376,8 @@ tarc(int c, char **a)
 			tarput(a[i], outfd);
 
 	memset(&dblock, 0, TBLOCK);
-	write(outfd, &dblock, TBLOCK);
-	write(outfd, &dblock, TBLOCK);
+	tarwrite(outfd, &dblock, TBLOCK);
+	tarwrite(outfd, &dblock, TBLOCK);
 	close(outfd);
 	return 0;
 }

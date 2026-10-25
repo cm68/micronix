@@ -22,7 +22,10 @@ VOID	fault(sig)
 	REG INT		flag;
 
 	signal(sig,fault);
-	IF sig==MEMF
+	IF sig==BKGND
+	THEN	/* ^Z: the foreground pipeline is ours to stop and record */
+		backnote = 1;
+	ELIF sig==MEMF
 	THEN	IF setbrk(brkincr) == -1
 		THEN	error(nospace);
 		FI
@@ -40,6 +43,13 @@ stdsigs()
 {
 	ignsig(QUIT);
 	getsig(INTR);
+	/*
+	 * Not getsig(): init ignores SIGBACK, and the ignore is inherited
+	 * through login and exec, so getsig() would leave it ignored.
+	 * This handler is how the tty driver recognises the shell that
+	 * owns a job, so it has to be installed.
+	 */
+	signal(BKGND,fault);
 	getsig(MEMF);
 	getsig(ALARM);
 }
@@ -76,6 +86,14 @@ oldsigs()
 	    FI
 	    trapflg[i]=0;
 	OD
+	/*
+	 * ^Z belongs to the shell above the fork, not to this child:
+	 * the signal is how the terminal names the process that owns a
+	 * job, and a child that caught it would both miss its own stop
+	 * and answer for the shell.  stdsigs installed it before the
+	 * fork, so it has to be put back explicitly here.
+	 */
+	signal(BKGND,0);
 	trapnote=0;
 }
 

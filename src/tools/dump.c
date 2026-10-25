@@ -23,17 +23,30 @@ int infd;
 int outfd;
 unsigned char sum;
 
+/*
+ * The hex file is the tool's whole output, so a failed write is fatal
+ * rather than something to carry on past.
+ */
+static void
+put(const void *buf, size_t n)
+{
+	if (write(outfd, buf, n) != n) {
+		perror("write");
+		exit(1);
+	}
+}
+
 void
 eol()
 {
-	write(outfd, "\n", 1);
+	put("\n", 1);
 }
 
 void
 outhex(unsigned char v)
 {
 	sprintf(outbuf, "%02X", v);
-	write(outfd, outbuf, 2);
+	put(outbuf, 2);
 	sum += v;
 }
 
@@ -44,7 +57,7 @@ record(int addr, int len)
 
 	sum = 0;
 
-	write(outfd, ":", 1);
+	put(":", 1);
 	outhex(len);
 	outhex((addr >> 8) & 0xff);
 	outhex(addr & 0xff);
@@ -92,7 +105,7 @@ dump(char *name)
 		record(addr, len);
 		addr += len;
 	}
-	write(outfd, ":0000000000", 11);
+	put(":0000000000", 11);
 	eol();
 	close(infd);
 	close(outfd);

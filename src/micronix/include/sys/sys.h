@@ -52,6 +52,26 @@
 #define SCRWIN  (SCRSEG * 0x1000)   /* ... its page base, 0xc000 */
 
 /*
+ * Per-process job control state.
+ *
+ * The shell owns job identity, grouping and policy; the kernel only
+ * remembers two switches per process, because only the kernel can act
+ * on them: whether the scheduler may run the process, and whether its
+ * terminal input is open.  They are indexed by process slot rather
+ * than added to struct proc, whose layout is pinned by ps, kstat and
+ * the simulator.
+ *
+ * The same names are the jobctl() operation bits.  JOBSTOP and
+ * JOBTTYOUT are also the state bits; JOBCONT and JOBTTYIN clear them.
+ */
+#define JOBSTOP		01	/* not scheduled */
+#define JOBCONT		02	/* schedulable again */
+#define JOBTTYOUT	04	/* terminal input closed: reads see eof */
+#define JOBTTYIN	010	/* terminal input open again */
+
+extern UINT8 jctl[];
+
+/*
  * Priorities
  */
 #define PRIMEM	100

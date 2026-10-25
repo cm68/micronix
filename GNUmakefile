@@ -1,5 +1,6 @@
 #
-# this is just a top-level makefile to build the simulator
+# this is the top-level makefile: the simulators, the image tools, and
+# the cross toolchain every GNUmakefile under src/micronix builds with
 #
 # GNUmakefile
 # Changed: <2023-07-05 23:17:23 curt>
@@ -7,7 +8,7 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim d1 filesystem
+all: sim d1 filesystem toolchain
 	cd src ; make
 
 #
@@ -20,6 +21,18 @@ all: sim d1 filesystem
 sim: bin/sim
 
 d1: bin/d1
+
+#
+# The cross toolchain: the compiler and its passes, the host tools in
+# bin/, and the runtime archives built with that compiler and put where
+# it looks for them (see "toolchain" in src/micronix/GNUmakefile).
+# This is what every GNUmakefile under src/micronix needs before it can
+# run, so it is part of all; building one directory by hand, "make -C
+# src/micronix/cmd/make", then works without a bootstrap.
+#
+.PHONY: toolchain
+toolchain:
+	$(MAKE) -C src/micronix toolchain
 
 bin/sim: src/usersim/sim
 	mkdir -p bin
@@ -38,6 +51,30 @@ src/hwsim/d1/d1:
 
 test: filesystem  src/usersim/sim
 	src/usersim/sim
+
+#
+# The native self-compile, timed.  /usr/src inside the simulator's
+# filesystem is rebuilt by the guest's own make and ccc: build and
+# install, clobber, build a second generation, then verify it against
+# what the first installed.  It is the build stage of the controller
+# regression matrix (disks/hdinstall/matrix_test) without a disk or a
+# boot - usersim hosts the same commands against filesystem/.
+#
+# The recipe prepares what the guest tree needs first (the cross
+# bootstrap that supplies the seed compiler, and the source staging the
+# host filesystem target does not do), so this runs from a clean tree.
+#
+SELFCOMPILE = cd /usr/src ; make ; make install ; make clobber ; make ; make verify
+
+.PHONY: selfcompile
+selfcompile: filesystem src/usersim/sim
+	$(MAKE) -C src/micronix bootstrap
+	$(MAKE) -C src/micronix update ROOT=$(abspath filesystem)
+	@start=$$(date +%s); \
+	src/usersim/sim -d filesystem -r /bin/sh -c '$(SELFCOMPILE)'; \
+	rc=$$?; \
+	echo "=== selfcompile: $$(( $$(date +%s) - start ))s, exit $$rc"; \
+	exit $$rc
 
 DISKS = $(shell cat disks/dist/MICRONIX | grep -v ^# | cut -f 1)
 DISKS1 = $(shell cat disks/dist/NEWER | grep -v ^# | cut -f 1)
@@ -111,7 +148,7 @@ rebuildfs:
 #
 BOOTDISKS = d8ss d8ds d5ds
 
-bootdisks: filesystem src/tools/mnix src/tools/setdev
+bootdisks: filesystem src/tools/mnix src/tools/setdev toolchain
 	$(MAKE) -C src/micronix/stand/boot djbootimgs bootimgs
 	for i in $(BOOTDISKS) ; do \
 		disks/bootdisks/create_bootdisk $$i || exit 1 ; \

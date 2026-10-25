@@ -19,6 +19,16 @@
 int traceflags;
 int trace_bio;
 
+/*
+ * write a whole buffer, or report that the merge file went bad.  The
+ * caller turns -1 into a message naming the file.
+ */
+static int
+put(int fd, const void *buf, size_t n)
+{
+    return write(fd, buf, n) == n ? 0 : -1;
+}
+
 void
 summarize_imd(struct imd *imd, char *filename)
 {
@@ -183,9 +193,21 @@ merge_imd(struct imd *imd, char *filename, int altcyl)
      */
     sprintf(merge, "%s-merge", filename);
     fd = open(merge, O_RDWR|O_CREAT|O_TRUNC, 0777);
-    write(fd, imd->comment, strlen(imd->comment) - 1);
+    if (fd < 0) {
+        perror(merge);
+        return;
+    }
+    if (put(fd, imd->comment, strlen(imd->comment) - 1) < 0) {
+        perror(merge);
+        close(fd);
+        return;
+    }
     value = IMD_EOC;
-    write(fd, &value, 1);
+    if (put(fd, &value, 1) < 0) {
+        perror(merge);
+        close(fd);
+        return;
+    }
     for (trk = 0; trk < imd_ntracks(imd); trk++) {
         tp = imd->tracks[trk];
         if (!tp) continue;
@@ -206,11 +228,15 @@ merge_imd(struct imd *imd, char *filename, int altcyl)
             hdr[2] = tp->fixed.head;
             hdr[3] = tp->fixed.nsec;
             hdr[4] = tp->fixed.size;
-            write(fd, hdr, sizeof(hdr));
+            if (put(fd, hdr, sizeof(hdr)) < 0)
+                goto bad;
         }
-        if (tp->secmap) write(fd, tp->secmap, tp->fixed.nsec);
-        if (tp->cylmap) write(fd, tp->cylmap, tp->fixed.nsec);
-        if (tp->headmap) write(fd, tp->headmap, tp->fixed.nsec);
+        if (tp->secmap && put(fd, tp->secmap, tp->fixed.nsec) < 0)
+            goto bad;
+        if (tp->cylmap && put(fd, tp->cylmap, tp->fixed.nsec) < 0)
+            goto bad;
+        if (tp->headmap && put(fd, tp->headmap, tp->fixed.nsec) < 0)
+            goto bad;
         /*
          * The secmap stays the identity and the alternation goes in the
          * data, which is where a shipped diskette has it: the sector
@@ -233,18 +259,26 @@ merge_imd(struct imd *imd, char *filename, int altcyl)
                         break;
                     }
                 }
-                write(fd, &type, 1);
+                if (put(fd, &type, 1) < 0)
+                    goto bad;
                 if (type == IMD_FILL) {
-                    write(fd, &value, 1);
+                    if (put(fd, &value, 1) < 0)
+                        goto bad;
                 } else {
-                    write(fd, buf, tp->secsize);
+                    if (put(fd, buf, tp->secsize) < 0)
+                        goto bad;
                 }
             } else {
                 type = IMD_ABSENT;
-                write(fd, &type, 1);                
+                if (put(fd, &type, 1) < 0)
+                    goto bad;
             }
-        }    
+        }
     }
+    close(fd);
+    return;
+  bad:
+    perror(merge);
     close(fd);
 }
 

@@ -13,7 +13,10 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/cpm, so ../../.. is the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../filesystem)
 INCDIR	 = $(ROOT)/usr/cpm/include
 
 .PHONY: all update install install-man install-man-host clean clobber doc

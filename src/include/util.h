@@ -9,6 +9,14 @@ typedef unsigned long long u64;
 typedef unsigned short u16;
 typedef unsigned char u8;
 
+/*
+ * Say that a call's result is deliberately not checked, while keeping
+ * -Wunused-result quiet.  Only for calls whose failure is harmless -
+ * console output, best-effort logging.  I/O whose failure matters gets
+ * checked.
+ */
+#define ignore_result(e)    ((void)!(e))
+
 extern char *bitdef(u8 v, char**defs);
 void skipwhite(char **s);
 

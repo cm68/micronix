@@ -1263,7 +1263,7 @@ isummary(char *name, struct dsknod *dp)
         printf("%3d,%3d ", 
             (dp->d_addr[0] >> 8) & 0xff, dp->d_addr[0] & 0xff);
     } else {
-        printf("%7d ", filesize(dp));
+        printf("%7lld ", (long long)filesize(dp));
     }
     printf("%14s\n", name);
 }
@@ -1411,7 +1411,7 @@ lookup(struct dsknod *dp, char *name)
  * given a path, return the inode
  */
 struct dsknod *
-namei(struct super *fs, char *name)
+namei(struct super *fs, const char *name)
 {
     char *s;
     struct dsknod *dp;

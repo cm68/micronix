@@ -33,7 +33,7 @@ int
 acquire_lock(const char *image)
 {
     char real[PATH_MAX];
-    char lockpath[PATH_MAX];
+    char lockpath[PATH_MAX + 5];    /* room for ".lock" after a full path */
     char pidbuf[32];
     int fd;
     int n;
@@ -66,7 +66,8 @@ acquire_lock(const char *image)
     }
     /* we hold it: leave our pid for whoever comes asking */
     n = snprintf(pidbuf, sizeof(pidbuf), "%d\n", getpid());
-    (void)ftruncate(fd, 0);
-    (void)write(fd, pidbuf, n);
+    if (ftruncate(fd, 0) < 0 || write(fd, pidbuf, n) != n)
+        fprintf(stderr, "lock: can't record holder pid in %s: %s\n",
+            lockpath, strerror(errno));
     return fd;
 }

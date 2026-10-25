@@ -75,7 +75,7 @@
 # from.  It is also the one command whose micronix interface differs
 # from the one it was ported from - see the head of cmd/owner/owner.c.
 #
-DIRS = ar asz awk bsh cal cat ccc change chg chgrp chmod chown clean cmp comm common compare compress concat copy cp cpp crypt cu date dc dcheck dd detab df diff djformat down du echo ed edit entab expand expr false far fd2 fdj fgrep field file find form fsck grep group halt hdformat icheck include init kill kstat kwic label last ld less ln login ls lz4 m4 macro mail make makekey md man mkdir mkfs mknod more mount mv mwformat ncheck netconf newuser nm od overstrike owner packsrc passwd pr print ps pwd ratfor rcp rm rmdir s scsiformat sed setdev sh size sort split strings strip stty su sum sync tail tar td tr tee test touch translit tree true tty umount unique unlz4 unrot update upm uudecode uuencode vi wall wc who write xargs yacc lex
+DIRS = ar asz awk bsh cal cat ccc change chg chgrp chmod chown clean cmp comm common compare compress concat copy cp cpp crypt cu date dc dcheck dd detab df diff djformat down du echo ed edit entab env expand expr false far fd2 fdj fgrep field file find form fsck grep group halt hdformat icheck include init kill kstat kwic label last ld less ln login ls lz4 m4 macro mail make makekey md man mkdir mkfs mknod more mount mv mwformat ncheck netconf newuser nm od overstrike owner packsrc passwd pr print ps pwd ratfor rcp rm rmdir s scsiformat sed setdev sh size sort split strings strip stty su sum sync tail tar td tr tee test touch translit tree true tty umount unique unlz4 unrot update upm uudecode uuencode vi wall wc who write xargs yacc lex
 
 #
 # "cd $$d &&", not "cd $$d ;".  With the semicolon, a directory named
@@ -96,7 +96,10 @@ RECURSE = @for d in $(DIRS) ; do \
 # same reason: a makefile edited inside micronix is not to be
 # overwritten by one older than it.
 #
-ROOT	?= ~/src/micronix/filesystem
+# The tree's own filesystem - see GNUmakefile.inc.  Not a home
+# directory: CURDIR here is src/micronix/cmd, so ../../.. is the top.
+#
+ROOT	?= $(abspath $(CURDIR)/../../../filesystem)
 DEST	 = $(ROOT)/usr/src/cmd
 NOWARN	 = --warning=no-ignore-newer
 

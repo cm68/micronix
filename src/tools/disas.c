@@ -157,6 +157,13 @@ char *linep;
 char col;
 char in_code;
 
+/*
+ * These index the disassembler's own seg[] table.  Text, data and bss
+ * happen to agree with obj.h's segment numbers, but the table has its
+ * own view beyond them, so SEG_UNDEF here is a table slot (5), not
+ * obj.h's undefined-segment marker (0).
+ */
+#undef SEG_UNDEF
 #define SEG_ZERO    0
 #define SEG_TEXT    1
 #define SEG_DATA    2

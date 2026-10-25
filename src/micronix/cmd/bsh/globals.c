@@ -41,6 +41,11 @@ jmp_buf		subshell;
 jmp_buf		errshell;
 
 BOOL		trapnote;
+BOOL		backnote;
+
+CHAR		jobline[JOBNM];
+INT		joblinep;
+BOOL		jobsnap;
 
 INT		exitval;
 BOOL		execbrk;
