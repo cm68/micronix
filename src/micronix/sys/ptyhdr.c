@@ -18,7 +18,7 @@
 
 extern struct ciovec ptycvec;
 
-struct ovlhdr ptyhdr = { 5, 0, 0, 0, 0, &ptycvec, 0, 0,
+struct ovlhdr ptyhdr = { 12, 0, 0, 0, 0, &ptycvec, 0, 0,
 	{ 'p', 't', 'y' } };
 
 /*

@@ -131,13 +131,26 @@ struct biovec biosw[] = {
     &ovlopen, &ovlclose, &ovlstrat, &ovlioctl,  /* 9 = DISK 1A, a module */
 };
 
+/*
+ * Character majors 2-9 are deliberately absent: they are the block
+ * majors of the disk drivers, and ovl keys a placed module by major
+ * alone.  The char drivers that are modules therefore live above the
+ * block table (10 mem, 11 io, 12 pty), and the default tty stays at 1.
+ */
 struct ciovec ciosw[] = {
     &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,   /* 0 = null */
     &muopen, &muclose, &muread, &muwrite, &mustty,      /* 1 = tty (root) */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 2 = mem */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 3 = io */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 4 = ovl */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 5 = pty */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 2 = block dj */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 3 = block mw */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 4 = block ide */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 5 = block ncr */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 6 = block nd */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 7 = block disk2 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 8 = block disk3 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 9 = block disk1 */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 10 = mem */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 11 = io */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 12 = pty */
 };
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

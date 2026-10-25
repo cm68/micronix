@@ -11,7 +11,7 @@
 #define PTY_H
 
 #define NPTY	1		/* pairs; two struct tty each */
-#define PTYMAJ	5
+#define PTYMAJ	12		/* a char major clear of the block table */
 #define PTYMST	0		/* first master minor */
 #define PTYSLV	8		/* first slave minor */
 

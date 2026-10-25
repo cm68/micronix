@@ -17,17 +17,17 @@ c 1 5 ttyC
 c 1 6 ttyD
 c 1 16 cent0
 #
-# Pseudo-terminals, major 5.  The master of a pair is minor 0 or 1 and
+# Pseudo-terminals, major 12.  The master of a pair is minor 0 or 1 and
 # the slave is minor 8 or 9, so one number names both ends.  A program
 # holds the master and runs its child on the slave, which behaves like
 # any other terminal to the child.
 #
-c 5 0 ptyp0
-c 5 1 ptyp1
-c 5 8 ttyp0
-c 5 9 ttyp1
-c 2 0 mem
-c 3 0 io
+c 12 0 ptyp0
+c 12 1 ptyp1
+c 12 8 ttyp0
+c 12 9 ttyp1
+c 10 0 mem
+c 11 0 io
 c 3 210 mediachg
 b 6 1 net
 b 1 0 hda

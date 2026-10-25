@@ -112,7 +112,7 @@ LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o slavevec.o $(LEAF_LIBC)
 # what the page holds.  Its callers are mount() and sys2.c and both are
 # resident, so nothing a driver module links against reaches it and it
 # is ordinary resident C again (KERNEL_C).
-LEAF_C    = consts.o bus.o pty_leaf.o
+LEAF_C    = consts.o pty_leaf.o
 
 # consts.c needs the same fold for the same reason, one literal at a
 # time: ccc puts the device-name strings the tables point at in .text,
@@ -125,17 +125,6 @@ consts.o: consts.c
 	$(CCC) $(CCFLAGS) $(INC) -c -o consts.rel $<
 	$(MXLD) -r -Sdata -o consts.o consts.rel
 	rm -f consts.rel
-
-# bus.c is the DMA bus lock mw.c and dj.c both call, which is what puts
-# it in the u page: the two are modules and cannot call into each other,
-# and the u page is resident, so a module finds busget/busgive in the
-# kernel's symbol table (-Aunix) the way it finds qadd and the rest of
-# the leaf runtime.  It is folded like the two above - it is code, and
-# without the fold the loader's data pass would write it over the u page.
-bus.o: bus.c
-	$(CCC) $(CCFLAGS) $(INC) -c -o bus.rel $<
-	$(MXLD) -r -Sdata -o bus.o bus.rel
-	rm -f bus.rel
 
 # pty_leaf.c is the pty driver's stateless half - the pair decode, the
 # four back-end calls the tty layer makes, and the pair's init and
@@ -167,7 +156,7 @@ net.o: net.c
 
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
-KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
+KERNEL_C      = mount.o balloc.o bus.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o job.o malloc.o name.o ptydata.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \

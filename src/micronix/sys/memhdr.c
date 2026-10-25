@@ -18,7 +18,7 @@
 
 extern struct ciovec memcvec;
 
-struct ovlhdr memhdr = { 2, 0, 0, 0, 0, &memcvec, 0, 0,
+struct ovlhdr memhdr = { 10, 0, 0, 0, 0, &memcvec, 0, 0,
 	{ 'm', 'e', 'm' } };
 
 /*
