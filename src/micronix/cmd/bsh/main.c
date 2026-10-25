@@ -31,8 +31,6 @@ main(c, v)
 	INT		c;
 	STRING		v[];
 {
-	REG INT		rflag=ttyflg;
-
 	/* initialise storage allocation */
 	stdsigs();
 	end=sbrk(0);
@@ -44,9 +42,6 @@ main(c, v)
 
 	/* set names from userenv */
 	getenv();
-
-	/* look for restricted */
-/*	IF c>0 ANDF any('r', *v) THEN rflag=0 FI */
 
 	/* look for options */
 	dolc=options(c,v);
@@ -76,9 +71,8 @@ main(c, v)
 	THEN	/* ? profile */
 		IF *cmdadr=='-'
 		    ANDF (input=pathopen(nullstr, profile))>=0
-		THEN	exfile(rflag); flags &= ~ttyflg;
+		THEN	exfile(0); flags &= ~ttyflg;
 		FI
-		IF rflag==0 THEN flags |= rshflg FI
 
 		/* open input file if specified */
 		IF comdiv

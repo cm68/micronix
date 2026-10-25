@@ -15,10 +15,10 @@ LOCAL DOLPTR	dolh;
 CHAR	flagadr[10];
 
 CHAR	flagchar[] = {
-	'x',	'n',	'v',	't',	's',	'i',	'e',	'r',	'k',	'u',	0
+	'x',	'n',	'v',	't',	's',	'i',	'e',	'k',	'u',	0
 };
 INT	flagval[]  = {
-	execpr,	noexec,	readpr,	oneflg,	stdflg,	intflg,	errflg,	rshflg,	keyflg,	setflg,	0
+	execpr,	noexec,	readpr,	oneflg,	stdflg,	intflg,	errflg,	keyflg,	setflg,	0
 };
 
 /* ========	option handling	======== */

@@ -8,7 +8,6 @@
  */
 
 
-#define N_RDONLY 0100000
 #define N_EXPORT 0040000
 #define N_ENVNAM 0020000
 #define N_ENVPOS 0007777

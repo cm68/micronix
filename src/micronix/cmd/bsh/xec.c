@@ -132,9 +132,7 @@ execute(argt, execflg, pf1, pf2)
 					oldsigs(); execa(com); done();
 	
 				case SYSCD:
-					IF flags&rshflg
-					THEN	failed(com[0],restricted);
-					ELIF (a1==0 ANDF (a1=homenod.namval)==0) ORF chdir(a1)<0
+					IF (a1==0 ANDF (a1=homenod.namval)==0) ORF chdir(a1)<0
 					THEN	failed(a1,baddir);
 					FI
 					break;
@@ -174,10 +172,8 @@ execute(argt, execflg, pf1, pf2)
 					FI
 					break;
 	
-				case SYSRDONLY:
-					exitval=N_RDONLY;
 				case SYSXPORT:
-					IF exitval==0 THEN exitval=N_EXPORT; FI
+					exitval=N_EXPORT;
 	
 					IF a1
 					THEN	WHILE *++com

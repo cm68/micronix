@@ -24,7 +24,6 @@ MSG	badparam	= "parameter not set";
 MSG	badsub		= "bad substitution";
 MSG	badcreate	= "cannot create";
 MSG	illegal		= "illegal io";
-MSG	restricted	= "restricted";
 MSG	piperr		= "cannot make pipe";
 MSG	badopen		= "cannot open";
 MSG	coredump	= " - core dumped";
@@ -37,7 +36,6 @@ MSG	badfile		= "bad file number";
 MSG	badshift	= "cannot shift";
 MSG	baddir		= "bad directory";
 MSG	badtrap		= "bad trap";
-MSG	wtfailed	= "is read only";
 MSG	notid		= "is not an identifier";
 
 /* built in names */
@@ -107,7 +105,6 @@ STRING	sysmsg[] = {
 };
 
 MSG		export = "export";
-MSG		readonly = "readonly";
 struct sysnod commands[] = {
 		{"cd",		SYSCD},
 		{"read",	SYSREAD},
@@ -125,7 +122,6 @@ struct sysnod commands[] = {
 		/* literals: a global pointer in an initializer is a
 		   relocation this compiler does not emit, and a null
 		   name ends the syslook scan */
-		{"readonly",	SYSRDONLY},
 		{"export",	SYSXPORT},
 		{"chdir",	SYSCD},
 		{"break",	SYSBREAK},

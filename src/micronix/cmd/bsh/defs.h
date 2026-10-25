@@ -45,7 +45,6 @@
 #define SYSBREAK 10
 #define SYSEVAL 11
 #define SYSDOT	12
-#define SYSRDONLY 13
 #define SYSXPORT 14
 #define SYSNULL 15
 #define SYSREAD 16
@@ -224,7 +223,6 @@ extern MSG		devnull;
 #define		ttyflg	040
 #define		forked	0100
 #define		oneflg	0200
-#define		rshflg	0400
 #define		waiting	01000
 #define		stdflg	02000
 #define		execpr	04000
@@ -281,7 +279,6 @@ extern INT		kill();
 extern STRING		*environ;
 extern CHAR		numbuf[];
 extern MSG		export;
-extern MSG		readonly;
 
 /* execflgs */
 extern INT		exitval;
@@ -301,10 +298,8 @@ extern MSG		badtrap;
 extern MSG		baddir;
 extern MSG		badshift;
 extern MSG		illegal;
-extern MSG		restricted;
 extern MSG		execpmsg;
 extern MSG		notid;
-extern MSG		wtfailed;
 extern MSG		badcreate;
 extern MSG		piperr;
 extern MSG		badopen;

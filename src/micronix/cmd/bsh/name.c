@@ -76,17 +76,11 @@ VOID	setname(argi, xp)
 		THEN	*argscan = 0;
 			n=lookup(argi);
 			*argscan++ = '=';
+			attrib(n, xp);
 			IF xp&N_ENVNAM
 			THEN	n->namenv = n->namval = argscan;
 			ELSE	assign(n, argscan);
 			FI
-			/*
-			 * Mark after assigning: assign() refuses a name
-			 * that is already readonly, and readonly FOO=bar
-			 * would otherwise refuse every name it was about
-			 * to make readonly.
-			 */
-			attrib(n, xp);
 			return;
 		FI
 	FI
@@ -113,10 +107,7 @@ assign(n,v)
 	NAMPTR		n;
 	STRING		v;
 {
-	IF n->namflg&N_RDONLY
-	THEN	failed(n->namid,wtfailed);
-	ELSE	replace(&n->namval,v);
-	FI
+	replace(&n->namval,v);
 }
 
 INT	readvar(names)
@@ -281,12 +272,7 @@ VOID	printflg(n)
 {
 	IF n->namflg&N_EXPORT
 	THEN	prs(export); blank();
-	FI
-	IF n->namflg&N_RDONLY
-	THEN	prs(readonly); blank();
-	FI
-	IF n->namflg&(N_EXPORT|N_RDONLY)
-	THEN	prs(n->namid); newline();
+		prs(n->namid); newline();
 	FI
 }
 

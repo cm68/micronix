@@ -51,8 +51,6 @@ VOID	initio(iop)
 				FI
 			ELIF (iof&IOPUT)==0
 			THEN	fd=chkopen(ion);
-			ELIF flags&rshflg
-			THEN	failed(ion,restricted);
 			ELIF iof&IOAPP ANDF (fd=open(ion,1))>=0
 			THEN	lseek(fd, 0L, 2);
 			ELSE	fd=create(ion);
@@ -70,10 +68,7 @@ STRING	getpath(s)
 {
 	REG STRING	path;
 	IF any('/',s)
-	THEN	IF flags&rshflg
-		THEN	failed(s, restricted);
-		ELSE	return(nullstr);
-		FI
+	THEN	return(nullstr);
 	ELIF (path = pathnod.namval)==0
 	THEN	return(defpath);
 	ELSE	return(cpystak(path));
