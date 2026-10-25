@@ -57,7 +57,7 @@ EXTRA	= BUILDING ARCHITECTURE.md FEATURES-2.md TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3
+MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3 pty mem io
 
 # Nothing is staged: every driver in the tree is linked into a module and
 # placed at boot.  A driver costs no address space when it is not placed -
@@ -112,7 +112,7 @@ LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o slavevec.o $(LEAF_LIBC)
 # what the page holds.  Its callers are mount() and sys2.c and both are
 # resident, so nothing a driver module links against reaches it and it
 # is ordinary resident C again (KERNEL_C).
-LEAF_C    = consts.o bus.o
+LEAF_C    = consts.o bus.o pty_leaf.o
 
 # consts.c needs the same fold for the same reason, one literal at a
 # time: ccc puts the device-name strings the tables point at in .text,
@@ -137,6 +137,18 @@ bus.o: bus.c
 	$(MXLD) -r -Sdata -o bus.o bus.rel
 	rm -f bus.rel
 
+# pty_leaf.c is the pty driver's stateless half - the pair decode, the
+# four back-end calls the tty layer makes, and the pair's init and
+# hangup.  It is the same trade as bus.c: pure code with no static data,
+# folded to data so it can ride the u page, which has room where the
+# resident text does not.  The pty state itself stays resident
+# (sys/pty.c): the u page is cloned per process, and the queues and the
+# p->tty pointer must name one object.
+pty_leaf.o: pty_leaf.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o pty_leaf.rel $<
+	$(MXLD) -r -Sdata -o pty_leaf.o pty_leaf.rel
+	rm -f pty_leaf.rel
+
 # The resident PIC half - pic_eoi and inton - is leaf code (it reaches
 # only in()/out()/di()/ei(), all in the u page) and carries no static
 # data, so it folds to .data and rides the u page like the leaf runtime,
@@ -156,11 +168,11 @@ net.o: net.c
 KERNEL_AS_OBJ = uhdr.o intrpt.o mio.o textpad.o
 KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o cio.o create.o exec.o fio.o fork.o \
-	ialloc.o iget.o imap.o job.o malloc.o name.o queue.o \
+	ialloc.o iget.o imap.o job.o malloc.o name.o ptydata.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
 	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
 	picdata.o netint.o
-WIN_C         = open.o sys2.o rdwri.o memdev.o link.o access.o
+WIN_C         = open.o sys2.o rdwri.o link.o access.o ttysys.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
 HIGHMEM_AS_OBJ = inits.o unbcd.o
 HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
@@ -170,7 +182,7 @@ HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 # .c the way a wildcard "%.o : %.s" would.  These two rules are the whole
 # of it; every other object has a rule of its own below.
 $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
-	$(MODS:%=%.o) $(MODS:%=%hdr.o): %.o: %.c
+	$(filter-out mem.o io.o,$(MODS:%=%.o)) $(MODS:%=%hdr.o): %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
 # The driver modules compile <sys/*.h> out of $(DEPTH)/include the same as
@@ -203,7 +215,7 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 job.c link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
 	 net.c netint.c open.c ovl.c probe.c \
-	 queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
+	 pty.c pty_leaf.c ptydata.c ptyhdr.c memhdr.c iohdr.c ttysys.c queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
 	 ss1_uart.c stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
 	 uio.c user.c pic.c picdata.c \
@@ -381,6 +393,14 @@ highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
 probe.o probe_init.o: %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
+# memdev.c is the driver behind two character majors (2 = memory,
+# 3 = ports) and is linked into both module pages.  It was in WIN_C
+# until the cdevs became modules; it has no static data and no hold
+# site, so either placement works, but a module page is where a driver
+# that is not the console belongs.
+memdev.o: memdev.c
+	$(CCC) $(CCFLAGS) $(INC) -c $<
+
 # win.o is the window-page cluster: the part of the resident kernel that
 # can live at BUFSEG, in the very page bhold() maps buffers into, so its
 # bytes stop competing with buffer headers for the space below.  The
@@ -488,8 +508,17 @@ unix.link: $(OBJS)
 # warning is the measure of what is left to do: it goes away when the
 # driver leaves the kernel.
 #
-$(MODS:%=%.mod): %.mod: %hdr.o %.o unix.link
+$(filter-out nd.mod mem.mod io.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
+
+# The memory and ports cdevs are the same driver (sys/memdev.c).  Each
+# carries its own copy of it: a page is linked at OVLBASE and a module
+# cannot name another module, so the two pages are independent.
+mem.mod: memhdr.o memdev.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ memhdr.o memdev.o
+
+io.mod: iohdr.o memdev.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ iohdr.o memdev.o
 
 # The ND module carries the network face too: net.o is its second
 # object, linked into the same page (sys/net.c, sys/nd.c).

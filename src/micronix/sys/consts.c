@@ -132,11 +132,12 @@ struct biovec biosw[] = {
 };
 
 struct ciovec ciosw[] = {
-    &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,
-    &muopen, &muclose, &muread, &muwrite, &mustty,
-    &nulldev, &nulldev, &memread, &memwrite, &nodev,   /* 2 = memory */
-    &nulldev, &nulldev, &memread, &memwrite, &nodev,   /* 3 = ports */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,
+    &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,   /* 0 = null */
+    &muopen, &muclose, &muread, &muwrite, &mustty,      /* 1 = tty (root) */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 2 = mem */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 3 = io */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 4 = ovl */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 5 = pty */
 };
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

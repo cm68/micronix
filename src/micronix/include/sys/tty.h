@@ -132,6 +132,7 @@ struct tty {
 #define WOPEN	001             /* waiting for CARRIER DETECT */
 #define CD      002             /* CARRIER DETECT is on */
 #define DTR     004             /* assert DATA TERMINAL READY */
+#define TTYHUP  010             /* hung up: reads see eof, writes fail */
 #define DIALER	040             /* don't wait for carrier */
 
 /*

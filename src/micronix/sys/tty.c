@@ -13,37 +13,6 @@
 #include <sys/pic8259.h>
 
 /*
- * Open a tty. Called by the device open routine.
- * Currently, this simply sets the process'
- * controlling tty.
- */
-ttyopen(tty)
-    struct tty *tty;
-{
-    if (u.p->tty == 0)
-        u.p->tty = tty;
-
-    tty->count++;
-    tty->state |= OPEN;
-}
-
-/*
- * Close a tty. Called by device close routine.
- */
-ttyclose(tty)
-    register struct tty *tty;
-{
-    /*
-     * count is a UINT8.  The old "if (!--count)" decremented before it
-     * tested, so a close that arrived with the count already at zero
-     * wrapped it to 255, and OPEN stayed set forever.  Decrement only a
-     * positive count, and drop OPEN when the last open goes away.
-     */
-    if (tty->count != 0 && --tty->count == 0)
-        tty->state &= ~OPEN;
-}
-
-/*
  * Signal the processes on a terminal that are in its foreground job.
  *
  * The terminal's own signals - interrupt, quit and input available -
@@ -64,63 +33,6 @@ killfg(tty, sig)
         if (p->tty == tty && (p->mode & ALIVE) &&
             !(j & (JOBSTOP | JOBTTYOUT)))
             send(p, sig);
-    }
-}
-
-/*
- * High level output. Write characters to the terminal.
- */
-ttywrite(tty)
-    register struct tty *tty;
-{
-    for (;;) {
-        fillque(&tty->outque);
-        cstart(tty);
-
-        if (u.count == 0)
-            break;
-
-        outwait(tty, LOWATER);
-    }
-}
-
-/*
- * High level input.
- * Read characters from the terminal
- */
-ttyread(tty)
-    register struct tty *tty;
-{
-    register struct que *cok;
-
-    if (tty->state & ERROR) {
-        tty->state &= ~ERROR;   /* clear the error condition */
-        drain(&tty->rawque);    /* discard input */
-        u.error = EIO;          /* cause the read to fail */
-        return;
-    }
-
-    if (jctl[u.p - plist] & JOBTTYOUT)
-        return;                 /* eof for read in background */
-
-    cok = &tty->cokque;
-
-    if (cok->count == 0) {
-        cookin(tty);
-    }
-
-    /*
-     * The shell may have closed this job's input while cookin() was
-     * asleep.  The line it took is in the cooked queue and belongs to
-     * the foreground, so return eof and leave it there.
-     */
-    if (jctl[u.p - plist] & JOBTTYOUT)
-        return;
-
-    sendque(cok);
-
-    if (cok->count != 0) {
-        killfg(tty, SIGTINT);   /* term input available */
     }
 }
 
@@ -172,6 +84,10 @@ cookin(tty)
         if (jctl[u.p - plist] & JOBTTYOUT) {
             ei();
             return;             /* input closed while we slept */
+        }
+        if (tty->mstate & TTYHUP) {
+            ei();
+            return;             /* hung up while we slept */
         }
         tty->state |= HISLEEP;
         sleep(raw, PRIUSER);
@@ -263,28 +179,16 @@ cwait(tty)
             ei();
             return (-1);        /* input closed while we slept */
         }
+        if (tty->mstate & TTYHUP) {
+            ei();
+            return (-1);        /* hung up while we slept */
+        }
         tty->state |= HISLEEP;
         sleep(raw, PRIUSER);
     }
 
     ei();
     return (getc(raw));
-}
-
-/*
- * Get/set tty status (for an sgtty routine)
- */
-ttymode(tty, flag)
-    register struct tty *tty;
-    UINT8 flag;
-{
-
-    /*
-     * outwait(tty, 0); 
-     */
-    iomove(flag, tty, 6);
-    if (flag == WRITE)
-        (*tty->set) (tty);
 }
 
 /*
@@ -662,26 +566,6 @@ ustart(tty)
 {
     tty->state &= ~LOSTOP;
     (*tty->start) (tty);
-}
-
-/*
- * Wait for output queue to drain.
- * Called by ttyclose, ttymode, and ttywrite().
- */
-outwait(tty, count)
-    register struct tty *tty;
-    register int count;
-{
-    register struct que *out;
-
-    out = &tty->outque;
-
-    while (di(), out->count > count) {
-        tty->state |= HOSLEEP;
-        sleep(out, PRIUSER);    /* wakeup in ttyout */
-    }
-
-    ei();
 }
 
 /*

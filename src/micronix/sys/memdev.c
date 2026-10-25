@@ -135,6 +135,18 @@ krw(dev, rw)
     }
 }
 
+/*
+ * The character entries these two majors register (sys/ovl.c copies
+ * them into ovlcvec when the module is placed).  One driver serves both
+ * major 2 and major 3, so the same vector serves both headers; each
+ * module page gets its own copy because memdev.o is linked into each.
+ */
+extern int nulldev(), nodev();
+
+struct ciovec memcvec = {
+    &nulldev, &nulldev, &memread, &memwrite, &nodev
+};
+
 static
 iorw(dev, rw)
     int dev;
