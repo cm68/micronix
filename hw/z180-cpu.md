@@ -545,12 +545,12 @@ for later traps; the selector path no longer depends on it.
 ### 5.1 Part and clock
 
 The recommended CPU is the **Z8S180** in the 64-pin DIP
-(`Z8S18020PSG`) for through-hole assembly, with the 68-pin PLCC
-(`Z8S18020VSC`) in a through-hole PLCC socket as the alternate.  The
+(`Z8S18010PSG`) for through-hole assembly, with the 68-pin PLCC
+(`Z8S18010VSC`) in a through-hole PLCC socket as the alternate.  The
 DIP package omits A19, which this board does not use; the external MMU
-supplies A19 from the PTE.  A 18.432 MHz oscillator is the clock; the
-U2 divides it for the S-100 bus clock.  The Z180's internal clock
-multiplier and refresh are not used.
+supplies A19 from the PTE.  A 10.000 MHz oscillator is the clock; U2
+divides it by five for the 2.000 MHz S-100 bus clock.  The Z180's
+internal clock multiplier and refresh are not used.
 
 ### 5.2 Internal MMU transparent
 
@@ -582,11 +582,12 @@ verify the MMU registers.  It does not enable any Z180 peripheral.
 
 ### 5.5 Wait states and bus timing
 
-The Z180 runs at 18.432 MHz, but the S-100 bus is asynchronous.  The
+The Z180 runs at 10 MHz, but the S-100 bus is asynchronous.  The
 bus-interface CPLD (U2) drives the S-100 cycle and holds the Z180 in
-`/WAIT` until the slave is ready.  Local memory is fast enough for one
-cycle or one wait state; the map lookup is pipelined (section 6.7).  U2
-also drives S-100 `pWAIT` while it is stretching a cycle.
+`/WAIT` until the slave is ready.  Local memory is fast enough for a
+single 10 MHz cycle; the CPLD can insert a wait state if a slower part
+is fitted.  The map lookup is pipelined (section 6.7).  U2 also drives
+S-100 `pWAIT` while it is stretching a cycle.
 
 ### 5.6 DMA
 
@@ -842,7 +843,9 @@ the local page and enable the 74AHCT138 low-address decode.
 
 The map RAM outputs are the S-100 address.  No address bit passes
 through a CPLD, and the map lookup is one 10 ns RAM access plus the
-74ABT driver.
+74ABT driver.  At 10 MHz (a 100 ns cycle), 10 ns RAM plus 7.5 ns CPLD
+is 17.5 ns, leaving ample margin; the S-100 cycle is wait-stated
+anyway.
 
 There is **no A12–A23 output mux**.  The 74ABT parts are line drivers
 (buffers) that meet the S-100 drive requirement; U1 controls only their
@@ -951,7 +954,7 @@ U2 owns these bus-side functions:
 - NMI passes to `/NMI`.
 - `pHOLD` -> Z180 `/BUSRQ`; `/BUSAK` -> `pHLDA`; U2 disables all S-100
   buffer enables while the bus is granted.
-- 18.432 MHz input; divide for the 2.048 MHz S-100 clock.
+- 10.000 MHz input; divide by five for the 2.000 MHz S-100 clock.
 - `pRESET`/`pPOC` and the reset button drive the Z180 `/RESET` and the
   CPLD reset; reset clears the task register, mask, trap window, and
   ROM-half latch.
@@ -1103,9 +1106,9 @@ sections 3.9 and 5.8.
 ### 7.5 Wait states
 
 U2 holds `/WAIT` and `pWAIT` until the S-100 slave answers or the
-fixed timeout expires.  Local memory uses one wait state if the map plus
-SRAM path needs it.  The Z180's own wait-state generator is reserved for
-the local devices.
+fixed timeout expires.  At 10 MHz the local map/SRAM path has ample
+margin; the CPLD can still insert a wait state for a slower part.  The
+Z180's own wait-state generator is reserved for the local devices.
 
 ### 7.6 Bus arbitration
 
@@ -1122,7 +1125,7 @@ not contain the PIC.  The mask and trap behavior are in section 3.8.
 
 ### 7.8 Clock and reset
 
-U2 divides the 18.432 MHz oscillator to a 2.048 MHz S-100 clock and
+U2 divides the 10.000 MHz oscillator to a 2.000 MHz S-100 clock and
 drives the bus clock buffer.  Reset comes from S-100 pRESET/pPOC and
 the on-board button; it clears the CPLDs and holds the Z180 in reset
 until the CPLDs are configured.
@@ -1276,12 +1279,12 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 
 | qty | part | use |
 |---|---|---|
-| 1 | Z8S18020PSG (DIP-64) or Z8S18020VSC (PLCC-68 socket) | CPU |
+| 1 | Z8S18010PSG (DIP-64) or Z8S18010VSC (PLCC-68 socket) | CPU, 10 MHz |
 | 2 | ATF1508AS-10JI84 in PLCC-84 socket | sequencer+translation, bus |
 | 2 | IS61C256AH-10 or AS7C256-10 (32K×8, 5 V, 10 ns) | map RAM A/B |
 | 1 | AS6C6264-55 or IS61C256AH-10 | local SRAM |
 | 1 | SST39SF080 (1M×8, 5 V) or equivalent | monitor flash |
-| 1 | 18.432 MHz 5 V oscillator | CPU/bus clock |
+| 1 | 10.000 MHz 5 V oscillator | CPU/bus clock |
 | 1 | 5 V regulator | +8 V -> +5 V |
 | — | 74ABT245/541/244 | S-100 high-drive output buffers |
 | — | 74AHCT244/245/541/138/157/161/163, 74AHCT30/688 | S-100 inputs, local decode/counter, flash-region compare |
