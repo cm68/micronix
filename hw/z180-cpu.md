@@ -228,6 +228,24 @@ buffer.  A12–A15 are the page index into the external map.  A16–A19
 are not used by the external MMU and are left unconnected.  The Z180's
 internal MMU must remain in its reset pass-through state; see section 5.
 
+### 2.8 The on-board flash region
+
+The top 1 MB of the physical space, **F00000–FFFFFF**, is the on-board
+flash.  A 1M×8 5 V flash fills it.  The CPLD decodes A23–A20 = F after
+translation and serves the access locally: the flash address is
+A0–A19, the data returns on the Z180 data bus, the S-100 address and
+data drivers are disabled, and no S-100 cycle occurs.  Any task can map
+a PTE to a page in this region; the normal PTE permissions apply.
+
+The kernel's 1 MB allocator (`MAXSEG 256`) never reaches this region.
+The monitor can map it to read boot images, the selector, or the rest
+of the flash.  The selector at physical `0xFF0000` is inside the
+region, so the existing selector PTE `0xF3F0` still points at it.
+
+The monitor's 2K alias at `0x800–0xbff` is the first (or DIP-selected)
+2K image of the same flash; the reset and trap windows use that alias.
+The region and the alias are two views of the same device.
+
 ## 3. Trap sequencing
 
 ### 3.1 Trap sources
@@ -664,6 +682,9 @@ U1 owns the CPU side, the local page, and the permission check:
 - task register, 8-M1 switch delay, mask/status;
 - 15-read trap window, user-halt data substitution, flash address
   counter control;
+- on-board flash region: `FLASH_PHYS` from the A23–A20 = F comparator;
+  selects the physical flash address mux, asserts LOCAL to U2 so the
+  S-100 drivers stay off, and drives the flash `/CE` and `/OE`;
 - trap-address shift register: this is the **only** use of A12–A15.
   The local decode uses SEG0/TASK0 and A11–A0, and the trap window is a
   read counter, not an address comparator;
@@ -711,11 +732,14 @@ the fitter.  The budget uses external 74AHCT logic to keep the CPLD
 counts down: a 74AHCT138 local decode (enabled by SEG0 and TASK0; U1
 receives its select lines), a SEG0 zero-detect on RAM A's output, a
 74AHCT157 flash-address mux, a 74AHCT157 map-address mux, a
-74AHCT161/163 trap-window counter, and a 74AHCT541 switch register.
-The CPLDs do not spend pins on the 11 flash address lines, the map RAM
-address lines, or the 8 DIP switches.
+74AHCT161/163 trap-window counter, a 74AHCT541 switch register, and a
+74AHCT30/688 comparator that detects A23–A20 = F for the on-board flash
+region.  The flash-address mux selects physical A0–A19 for
+F00000–FFFFFF, the local alias address, or the trap counter.  The CPLDs
+do not spend pins on the 19 flash address lines, the map RAM address
+lines, or the 8 DIP switches.
 
-**U1 — sequencer + translation (56 pins)**
+**U1 — sequencer + translation (58 pins)**
 
 | group | pins |
 |---|---|
@@ -732,15 +756,17 @@ address lines, or the 8 DIP switches.
 | A12–A23 address-driver `/OE` | 1 |
 | flash counter /LOAD, /CLR, COUNT | 3 |
 | flash half select | 1 |
+| FLASH_PHYS from A23–A20 = F comparator | 1 |
+| FLASH_MUX / TRAP_WIN to flash address mux | 1 |
 | flash /CE, /OE; local SRAM /OE, /WE | 4 |
 | trap data buffer /OE and 0x00/flash mux | 2 |
-| **total** | **56** |
+| **total** | **58** |
 
 The four A12–A15 pins are solely the trap-address shift register: the
 local decode is SEG0/TASK0 plus A11–A0, and the trap window is a
 15-read counter.  The task nibble goes directly to the map address mux.
 The map RAM `/CE` is tied active; the `/WE` low/high are generated
-externally from MAP_WE and CPU A0.  U1 has eight spare pins.
+externally from MAP_WE and CPU A0.  U1 has six spare pins.
 
 **U2 — S-100 bus interface (46 pins)**
 
@@ -765,7 +791,7 @@ debug header, or a future second VI input.  The switch register is an
 external 74AHCT541 whose inputs are the DIP switches and U2's INT
 PEND/TRAP RESET bits; U1 enables it on a 0x402 read.
 
-Two 84-pin devices are sufficient: U1 56 and U2 46, with 8 and 18 spare.
+Two 84-pin devices are sufficient: U1 58 and U2 46, with 6 and 18 spare.
 
 
 ### 6.6 Register decode
@@ -855,6 +881,11 @@ A12–A23 address drivers are disabled, the DO/DI data buffers are
 disabled, and the control outputs are inactive.  The low A11–A0 decode
 selects the on-board RAM, registers, map RAM or ROM on the Z180 data
 bus.
+
+On-board flash region: if the physical address is F00000–FFFFFF, the
+access is local.  The flash address mux selects A0–A19, the flash data
+returns on the Z180 data bus, and the S-100 address/data drivers stay
+off.  The region is never an S-100 cycle.
 
 I/O cycle:
 
@@ -1044,7 +1075,8 @@ through 74AHCT244 receivers.
   DI buffer is disabled then.
 - Local SRAM/flash data: the same Z180 data bus, selected by U1/U2.
   For a local access U2 and U1 disable the S-100 address and data
-  buffers; only the on-board devices see the cycle.
+  buffers; only the on-board devices see the cycle.  This includes the
+  F00000–FFFFFF flash region; its data never reaches the S-100 bus.
 - Clocks: U2 -> 74ABT541/clock buffer -> S-100.
 
 The 74ABT/74F parts are the current-drive elements.  The CPLD pins that
@@ -1110,22 +1142,36 @@ before the edge connector is committed.
 |---|---|---|---|
 | local SRAM | 2K×8 (1K used) | 0x000–0x3ff | MPZ80 low page |
 | map RAM A/B | 2× 32K×8 (512 B used) | 0x600–0x7ff | A12–A19 / A20–A23 + perms |
-| monitor flash | 32K/128K×8 | 0x800–0xbff window | two 1K halves |
+| monitor flash | 1M×8 | F00000–FFFFFF; 0x800–0xbff alias | flash region + monitor alias |
 | optional FPU | — | 0xc00–0xfff | not fitted |
 
 The local SRAM needs only 1 KB; a 2K×8 or 8K×8 5 V SRAM is fine.  The
 map is two 10 ns 32K×8 parts; their address outputs drive the A12–A23
 line drivers directly, and only the four permission bits go to U1
-(section 6.7).  The flash is a 5 V parallel part such as the SST39SF010A.
+(section 6.7).  The flash is a 1M×8 5 V parallel part (SST39SF080 or
+equivalent) that fills F00000–FFFFFF.
 
 ### 8.2 Flash layout
 
+The 1 MB flash is both the top physical megabyte and the source of the
+monitor alias:
+
+```
+flash offset        physical            use
+0x00000-0x007FF     F00000-F007FF       monitor image (two 1K halves)
+0x00800-0xEFFFF     F00800-FEFFFF       boot images, diagnostics, free
+0xF0000-0xFFFFF     FF0000-FFFFFF       64K selector/boot image
+```
+
 Each monitor image is 2 KB: a lower 1 KB reset half and an upper 1 KB
-trap half.  A 4-bit image-select DIP chooses one of 16 images in a
-32K flash (or one of 64 in a 128K part).  The CPLD selects the half:
-the lower half is visible after reset until a task-register write, then
-the upper half.  U1 controls the half select; the trap window forces
-the flash address to `0xbf0 + counter` in the selected half.
+trap half.  A 4-bit image-select DIP chooses the 2K image aliased at
+`0x800–0xbff`; the region at F00000–FFFFFF exposes every image without
+the alias.  The CPLD selects the half: the lower half is visible after
+reset until a task-register write, then the upper half.  U1 controls
+the half select; the trap window forces the flash address to
+`0xbf0 + counter` in the selected half.  The selector at `0xFF0000`
+is the top 64K of the same flash, so the selector PTE `0xF3F0` still
+works.
 
 ### 8.3 Reset window patch
 
@@ -1162,7 +1208,9 @@ buffer; bank back; write to physical 0x0F000; repeat 16 times; enter.
 
 New path:
 
-1. Map task 0 page 1 to `0xF3F0` (physical 0xFF0000).
+1. Map task 0 page 1 to `0xF3F0` (physical 0xFF0000), or map `0xF300`
+   (physical F00000) and read the selector at flash offset `0xF0000`.
+   Both are views of the same 1 MB flash region.
 2. Update the monitor's map image at `0x200`.
 3. Either jump to `0x1000` and run the selector in place, or map a
    second page to the destination and copy 4K there with a plain
@@ -1232,11 +1280,11 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 | 2 | ATF1508AS-10JI84 in PLCC-84 socket | sequencer+translation, bus |
 | 2 | IS61C256AH-10 or AS7C256-10 (32K×8, 5 V, 10 ns) | map RAM A/B |
 | 1 | AS6C6264-55 or IS61C256AH-10 | local SRAM |
-| 1 | SST39SF010A (128K×8, 5 V) or 32K×8 | monitor flash |
+| 1 | SST39SF080 (1M×8, 5 V) or equivalent | monitor flash |
 | 1 | 18.432 MHz 5 V oscillator | CPU/bus clock |
 | 1 | 5 V regulator | +8 V -> +5 V |
 | — | 74ABT245/541/244 | S-100 high-drive output buffers |
-| — | 74AHCT244/245/541/138/157/161/163 | S-100 inputs and local decode/counter |
+| — | 74AHCT244/245/541/138/157/161/163, 74AHCT30/688 | S-100 inputs, local decode/counter, flash-region compare |
 | — | PLCC-84 sockets, DIP-64 socket, JTAG header, reset button, 8-way DIP | assembly |
 | — | 0.1 µF, 10 µF, pull-ups, series resistors | decoupling/termination |
 
@@ -1316,10 +1364,11 @@ identical.
 - Z180 internal-I/O trap leak: accept and document, or relocate the
   internal block again.
 - Manual-accurate vs emulator-accurate permission/status details.
-- Two 84-pin CPLDs: U1 is 56 and U2 is 46, with 8 and 18 spare.  The
+- Two 84-pin CPLDs: U1 is 58 and U2 is 46, with 6 and 18 spare.  The
   merge of the old sequencer and translation devices is what makes the
   two-device build possible.
-- Flash size and image-select scheme.
+- Flash size is fixed at 1M×8; the image-select DIP chooses the 2K alias
+  image, while the F00000–FFFFFF region exposes all images.
 - Optional FPU and front-panel display/keyboard; the Z180 on-board
   UARTs are ignored and have no header or driver.
 - DIP-64 vs PLCC-68 Z180 (through-hole preference).
@@ -1336,7 +1385,9 @@ identical.
    the Z180 internal I/O.
 4. Confirm the selector rewrite maps 0xFF0000 through the PTE and needs
    neither the task register bank nor the RAM trampoline.
-5. Check the per-device 84-pin pin budget and the registered inter-CPLD
+5. Map a PTE to F00000 and read the flash region; confirm the same bytes
+   appear through the 0x800 alias and that no S-100 cycle is generated.
+6. Check the per-device 84-pin pin budget and the registered inter-CPLD
    timing.
 6. Check the BOM against available 5 V parts.
 7. Future: change hwsim `getpte()` to source A20–A23 from the PTE high
