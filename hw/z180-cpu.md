@@ -585,7 +585,9 @@ The 8259 vector path is unchanged.
 
 ### 5.8 Unused peripherals and the I/O trap leak
 
-The Z180's ASCI, PRT, CSI/O, DMA and internal MMU are unused.  The
+The Z180's on-board ASCI/UARTs, PRT, CSI/O, DMA and internal MMU are
+ignored.  The console and serial lines are on the S-100 MultIO or SS1
+boards; there is no on-board UART header or driver.  The
 internal I/O block at 0x80–0xbf remains decoded inside the Z180.  A
 user program that executes `IN`/`OUT` to that block bypasses the CPLD's
 I/O trap.  This is a deliberate, documented limitation; the kernel's
@@ -1148,7 +1150,8 @@ window and enters the monitor.
 
 `reset0` calls `z180init` before `uartst`.  It sets the Z180 wait-state
 control for local memory and leaves the internal MMU in pass-through.
-It does not enable the ASCI, PRT, CSI/O or DMA.  The internal block is
+It ignores the Z180's on-board ASCI/UARTs, PRT, CSI/O and DMA.  The
+internal block is
 already at 0x80–0xbf from the reset window.
 
 ### 8.5 Selector boot rewrite
@@ -1237,6 +1240,10 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 | — | PLCC-84 sockets, DIP-64 socket, JTAG header, reset button, 8-way DIP | assembly |
 | — | 0.1 µF, 10 µF, pull-ups, series resistors | decoupling/termination |
 
+There are no on-board UART/ASCI parts in the BOM.  The console and
+serial lines are on the S-100 MultIO or SS1 board; the Z180's on-board
+ASCIs are ignored.
+
 Part availability and exact speed grades must be checked before the
 board is ordered.
 
@@ -1246,8 +1253,8 @@ Standard 254 × 127 mm S-100 outline, 100-pin edge tongue along the
 bottom.  Place the Z180 and the two CPLDs in the center, the two map
 RAMs immediately beside the A12–A23 address drivers, the flash and
 local SRAM beside U1, and the bus buffers along the edge.  Put the JTAG header, reset button,
-image-select DIP, stop/aux/NMI header and optional ASCI debug header at
-the top.  Use through-hole PLCC sockets for the CPLDs and a DIP socket
+image-select DIP and stop/aux/NMI header at the top.  There is no
+on-board UART/ASCI header; the console is an S-100 MultIO or SS1 card.  Use through-hole PLCC sockets for the CPLDs and a DIP socket
 for the Z180 if the DIP part is used.
 
 The front-panel display/keyboard, the STOP and AUX inputs, and their
@@ -1313,7 +1320,8 @@ identical.
   merge of the old sequencer and translation devices is what makes the
   two-device build possible.
 - Flash size and image-select scheme.
-- Optional FPU, front-panel display/keyboard, ASCI debug header.
+- Optional FPU and front-panel display/keyboard; the Z180 on-board
+  UARTs are ignored and have no header or driver.
 - DIP-64 vs PLCC-68 Z180 (through-hole preference).
 - 10 ns 5 V map SRAM vs 8 ns 3.3 V with level shifting.
 
