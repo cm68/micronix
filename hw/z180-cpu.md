@@ -868,7 +868,8 @@ on the MPZ80.
 
 ### 6.7 Map RAM interface
 
-Two 5 V 32K×8 10 ns SRAMs (IS61C256AH-10 baseline):
+Two 5 V 32K×8 SRAMs, **CY7C199-15PC** baseline.  The 10 ns and 8 ns
+grades are rare; use them only if a stash turns up.
 
 - **RAM A (even byte):** output A19–A12 drives the 74ABT A12–A19 line
   driver directly.
@@ -880,11 +881,12 @@ RAM A's output also feeds the SEG0 zero-detect; SEG0 and TASK0 select
 the local page and enable the 74AHCT138 low-address decode.
 
 The map RAM outputs are the S-100 address.  No address bit passes
-through a CPLD, and the map lookup is one 10 ns RAM access plus the
-74ABT driver.  At 10 MHz (a 100 ns cycle), 10 ns RAM plus 7.5 ns CPLD
-is 17.5 ns, leaving ample margin; even at the 33 MHz part limit (30 ns)
-the map path fits.  The S-100 bus, not the CPU, sets system throughput;
-the bus cycle is wait-stated.
+through a CPLD, and the map lookup is one 15 ns RAM access plus the
+74ABT driver.  At 10 MHz (a 100 ns cycle), 15 ns RAM plus 7.5 ns CPLD
+is 22.5 ns, leaving ample margin.  At the 33 MHz part limit (30 ns) it
+is tight; the CPLD can insert a wait state, or use a 10 ns part if one
+turns up.  The S-100 bus, not the CPU, sets system throughput; the bus
+cycle is wait-stated.
 
 There is **no A12–A23 output mux**.  The 74ABT parts are line drivers
 (buffers) that meet the S-100 drive requirement; U1 controls only their
@@ -1190,7 +1192,7 @@ before the edge connector is committed.
 | optional FPU | — | 0xc00–0xfff | not fitted |
 
 The local SRAM needs only 1 KB; a 2K×8 or 8K×8 5 V SRAM is fine.  The
-map is two 10 ns 32K×8 parts; their address outputs drive the A12–A23
+map is two CY7C199-15PC 32K×8 parts; their address outputs drive the A12–A23
 line drivers directly, and only the four permission bits go to U1
 (section 6.7).  The flash is a 1M×8 5 V parallel part (SST39SF080 or
 equivalent) that fills F00000–FFFFFF.
@@ -1322,8 +1324,8 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 |---|---|---|
 | 1 | Z8S18033VSC in PLCC-68 socket | CPU, 33 MHz-rated, can-clocked |
 | 2 | ATF1508AS-10JI84 in PLCC-84 socket | sequencer+translation, bus |
-| 2 | IS61C256AH-10 or AS7C256-10 (32K×8, 5 V, 10 ns) | map RAM A/B |
-| 1 | AS6C6264-55 or IS61C256AH-10 | local SRAM |
+| 2 | CY7C199-15PC (15 ns), 32K×8, 5 V | map RAM A/B |
+| 1 | AS6C6264-55 or CY7C199-15PC | local SRAM |
 | 1 | SST39SF080 (1M×8, 5 V) or equivalent | monitor flash |
 | 1 | 4-pin can oscillator socket + 10.000 MHz 5 V can | CPU/bus clock, tunable |
 | 2 | MAX232A (5 V, 0.1 µF) | ASCI0/1 RS-232 level shifters |
@@ -1425,7 +1427,10 @@ identical.
   MultIO/SS1 and there is no ASCI driver yet.
 - CPU is fixed at Z8S18033VSC (PLCC-68); the socketed 4-pin can sets
   the actual speed (10 MHz default, 8/12/16 MHz cans).
-- 10 ns 5 V map SRAM vs 8 ns 3.3 V with level shifting.
+- Map RAM is CY7C199-15PC; 15 ns parts are the practical grade, while
+  10 ns and 8 ns are rare/unobtainable.  No 3.3 V rail or level shifting
+  is needed.  At high can frequencies the CPLD may insert a wait state
+  for the map lookup.
 
 ### 10.3 Verification checklist
 
@@ -1460,6 +1465,6 @@ identical.
   `extra/docs/MPZ8010.ECN.txt` — original hardware and ECN-10.
 - Zilog Z8S180 user manual/datasheet (external).
 - Atmel/Microchip ATF1508AS datasheet (external).
-- ISSI IS61C256AH, Alliance AS7C256, IDT71256SA datasheets (external).
+- Cypress CY7C199-15PC datasheet (external); 10/8 ns grades if found.
 - IEEE-696 S-100 bus standard.
 - `hw/esp32-nic.md` — document style and table conventions.
