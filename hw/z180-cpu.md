@@ -102,7 +102,7 @@ the RI10 bit set:
 | 2 | TINT disable | high forces user interrupts to trap to task 0 |
 | 3 | RUN enable | high allows a task to run; low single-steps |
 | 4 | HALT disable | high makes a user halt trap |
-| 5 | SINT enable | high allows supervisor interrupts |
+| 5 | SINT disable | high blocks supervisor interrupts; low enables (matches hwsim/KERMASK) |
 | 6 | I/O disable | high makes user I/O trap |
 | 7 | ZIO mode | high echoes the port address on A8–A15 |
 
@@ -390,8 +390,8 @@ the Z180's `/INT0`.  The mask decides:
 - user task, TINT high: do not pass the interrupt to the Z180; latch an
   interrupt trap instead.
 - user task, TINT low: pass it to `/INT0`.
-- task 0, SINT low: block it.
-- task 0, SINT high: pass it to `/INT0`.
+- task 0, SINT high: block it.
+- task 0, SINT low: pass it to `/INT0`.
 
 The kernel's 8259 is on an S-100 board.  During the Z180 interrupt
 acknowledge U2 drives S-100 `sINTA`, and the 8259 supplies its
@@ -731,6 +731,7 @@ U1 owns the CPU side, the local page, and the permission check:
 - reads the four permission bits from map RAM B; permission and RI10
   checks; controls the map RAM `/OE` and the A12–A23 address-driver
   `/OE`;
+- interrupt mask gating (TINT/SINT) and `INT_TO_CPU`;
 - local SRAM/flash chip selects and the trap data buffer;
 - inter-CPLD signals to U2.
 
@@ -741,7 +742,8 @@ U2 owns the bus side:
 - S-100 memory/I/O cycle state machine, pSYNC/pSTVAL/pDBIN/pWR,
   pWAIT/pRDY;
 - S-100 address/data/control buffer enables;
-- interrupt gating, NMI, and sINTA;
+- interrupt request to U1 (`INT_REQ`), NMI, and sINTA; the mask
+  gating is in U1;
 - DMA tri-state (`pHOLD`/`pHILDA`/Z180 `/BUSRQ`/`/BUSAK`);
 - clock divider and reset;
 - the switch-register buffer control.
@@ -756,7 +758,9 @@ drive the S-100 edge.
 | LOCAL, TRAP | U1 → U2 | 2 | bus cycle is local/trapping |
 | STOP, AUX | U2 → U1 | 2 | panel trap causes |
 | BUS_GRANT | U2 → U1 | 1 | tri-state A12–A23 buffer |
-| **total** | | **5** | |
+| INT_REQ | U2 → U1 | 1 | S-100 interrupt request |
+| INT_TO_CPU | U1 → U2 | 1 | allowed interrupt to Z180 /INT0 |
+| **total** | | **7** | |
 
 U1 owns the trap-address shift register; the 8-bit page pair does not
 cross between devices.  U1 also owns the permission check and the map
@@ -777,7 +781,7 @@ F00000–FFFFFF, the local alias address, or the trap counter.  The CPLDs
 do not spend pins on the 19 flash address lines, the map RAM address
 lines, or the 8 DIP switches.
 
-**U1 — sequencer + translation (58 pins)**
+**U1 — sequencer + translation (60 pins)**
 
 | group | pins |
 |---|---|
@@ -789,6 +793,7 @@ lines, or the 8 DIP switches.
 | permission bits from map RAM B | 4 |
 | BUS_GRANT from U2 | 1 |
 | inter-CPLD U2 (LOCAL/TRAP out; STOP/AUX in) | 4 |
+| INT_REQ in / INT_TO_CPU out | 2 |
 | map RAM `/OE` | 2 |
 | MAP_WE to map mux and `/WE` gate | 1 |
 | A12–A23 address-driver `/OE` | 1 |
@@ -798,24 +803,25 @@ lines, or the 8 DIP switches.
 | FLASH_MUX / TRAP_WIN to flash address mux | 1 |
 | flash /CE, /OE; local SRAM /OE, /WE | 4 |
 | trap data buffer /OE and 0x00/flash mux | 2 |
-| **total** | **58** |
+| **total** | **60** |
 
 The four A12–A15 pins are solely the trap-address shift register: the
 local decode is SEG0/TASK0 plus A11–A0, and the trap window is a
 15-read counter.  The task nibble goes directly to the map address mux.
 The map RAM `/CE` is tied active; the `/WE` low/high are generated
-externally from MAP_WE and CPU A0.  U1 has six spare pins.
+externally from MAP_WE and CPU A0.  U1 has four spare pins.
 
-**U2 — S-100 bus interface (48 pins)**
+**U2 — S-100 bus interface (51 pins)**
 
 | group | pins |
 |---|---|
-| Z180 /MREQ, /IORQ, /RD, /WR, /M1, /BUSAK | 6 |
+| Z180 /MREQ, /IORQ, /RD, /WR, /M1, /BUSAK, /BUSRQ | 7 |
 | CLK, /RESET | 2 |
 | CLKDIV0, CLKDIV1 (S-100 clock divider strap) | 2 |
 | S-100 inputs via 74AHCT244: pRDY, pHOLD, pRESET, pPOC, NMI, pINT, VI_OR | 7 |
 | panel STOP, AUX | 2 |
 | inter-CPLD U1 (LOCAL, TRAP in; STOP, AUX out) | 4 |
+| INT_REQ out / INT_TO_CPU in | 2 |
 | S-100 control buffer inputs (pSYNC, pSTVAL, pDBIN, pWR, sMEMR, sMEMW, sINP, sOUT, sM1, sINTA, pWAIT) | 11 |
 | buffer enables: A0–A11 /OE, DO /OE, DI /OE, control /OE | 4 |
 | BUS_GRANT to U1 | 1 |
@@ -823,14 +829,14 @@ externally from MAP_WE and CPU A0.  U1 has six spare pins.
 | pHLDA buffer input | 1 |
 | Z180 /WAIT, /NMI, /INT0, /RESET | 4 |
 | INT PEND, TRAP RESET to switch buffer | 2 |
-| **total** | **48** |
+| **total** | **51** |
 
-U2 has sixteen spare pins for the front-panel display/keyboard, a
+U2 has thirteen spare pins for the front-panel display/keyboard, a
 debug header, or a future second VI input.  The switch register is an
 external 74AHCT541 whose inputs are the DIP switches and U2's INT
 PEND/TRAP RESET bits; U1 enables it on a 0x402 read.
 
-Two 84-pin devices are sufficient: U1 58 and U2 48, with 6 and 16 spare.
+Two 84-pin devices are sufficient: U1 60 and U2 51, with 4 and 13 spare.
 
 
 ### 6.6 Register decode
@@ -990,8 +996,8 @@ Interrupt acknowledge is a separate path: M1 + IORQ -> sINTA, and the
 
 U2 owns these bus-side functions:
 
-- pINT and VI0–VI7 are ORed externally; the mask selects trap vs
-  `/INT0`.
+- pINT and VI0–VI7 are ORed externally; U2 sends `INT_REQ` to U1 and
+  drives Z180 `/INT0` from U1's `INT_TO_CPU`; the mask gating is in U1.
 - NMI passes to `/NMI`.
 - `pHOLD` -> Z180 `/BUSRQ`; `/BUSAK` -> `pHLDA`; U2 disables all S-100
   buffer enables while the bus is granted.
@@ -1460,7 +1466,7 @@ identical.
 - Z180 internal-I/O trap leak: accept and document, or relocate the
   internal block again.
 - Manual-accurate vs emulator-accurate permission/status details.
-- Two 84-pin CPLDs: U1 is 58 and U2 is 48, with 6 and 16 spare.  The
+- Two 84-pin CPLDs: U1 is 60 and U2 is 51, with 4 and 13 spare.  The
   merge of the old sequencer and translation devices is what makes the
   two-device build possible.
 - Flash size is fixed at 1M×8; the image-select DIP chooses the 2K alias

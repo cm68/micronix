@@ -1,0 +1,61 @@
+signal,dir,group,notes
+clk,I,clock,socketed 4-pin can oscillator
+reset_n,I,reset,global reset
+a0,I,address,register decode
+a1,I,address,register decode
+a2,I,address,register decode
+a3,I,address,register decode
+a12,I,address,trap-address page
+a13,I,address,trap-address page
+a14,I,address,trap-address page
+a15,I,address,trap-address page
+sel_ram_n,I,local-decode,from 74AHCT138
+sel_regs_n,I,local-decode,from 74AHCT138
+sel_map_n,I,local-decode,from 74AHCT138
+sel_rom_n,I,local-decode,from 74AHCT138
+sel_fpu_n,I,local-decode,from 74AHCT138 (or second RAM bank)
+d0,IO,data,Z180 data bus
+d1,IO,data,Z180 data bus
+d2,IO,data,Z180 data bus
+d3,IO,data,Z180 data bus
+d4,IO,data,Z180 data bus
+d5,IO,data,Z180 data bus
+d6,IO,data,Z180 data bus
+d7,IO,data,Z180 data bus
+m1_n,I,z180,M1
+mreq_n,I,z180,memory request
+iorq_n,I,z180,IO request
+rd_n,I,z180,read strobe
+wr_n,I,z180,write strobe
+halt_n,I,z180,unused in RTL; halt fail-safe reserved
+perm0,I,map,map RAM B bit 0 read enable
+perm1,I,map,map RAM B bit 1 execute enable
+perm2,I,map,map RAM B bit 2 RI10
+perm3,I,map,map RAM B bit 3 unused
+bus_grant,I,from-u2,DMA grant; tri-state A12-A23 driver
+stop_i,I,from-u2,front-panel stop
+aux_i,I,from-u2,front-panel aux
+flash_phys,I,flash,A23-A20 = F comparator
+int_req,I,from-u2,S-100 interrupt request
+task0,O,map-address-mux,task nibble
+task1,O,map-address-mux,task nibble
+task2,O,map-address-mux,task nibble
+task3,O,map-address-mux,task nibble
+local_o,O,to-u2,local page or flash region
+trap_o,O,to-u2,trap window/halt/fault
+mapram_oe_n0,O,map,map RAM A output enable
+mapram_oe_n1,O,map,map RAM B output enable
+map_we,O,map,map write strobe to mux and /WE gate
+addr12_23_oe_n,O,address,A12-A23 line-driver enable
+flash_cnt_load_n,O,flash,trap counter load
+flash_cnt_clr_n,O,flash,trap counter clear
+flash_cnt_clk,O,flash,trap counter clock
+flash_half,O,flash,monitor 1K half select
+flash_mux,O,flash,1 = trap counter selected
+flash_ce_n,O,flash,flash chip enable
+flash_oe_n,O,flash,flash output enable
+sram_oe_n,O,local-ram,local SRAM output enable
+sram_we_n,O,local-ram,local SRAM write enable
+trapbuf_oe_n,O,trap-data,trap data buffer enable
+trapdata_sel,O,trap-data,1 = flash / 0 = 0x00
+int_to_cpu,O,to-u2,interrupt allowed through to /INT0

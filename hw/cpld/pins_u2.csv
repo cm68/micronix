@@ -1,0 +1,52 @@
+signal,dir,group,notes
+clk,I,clock,socketed 4-pin can oscillator
+reset_n,I,reset,global reset
+clkdiv0,I,clock-strap,S-100 clock divider /4 /5 /6 /8
+clkdiv1,I,clock-strap,S-100 clock divider /4 /5 /6 /8
+mreq_n,I,z180,memory request
+iorq_n,I,z180,IO request
+rd_n,I,z180,read strobe
+wr_n,I,z180,write strobe
+m1_n,I,z180,M1
+busak_n,I,z180,bus acknowledge from Z180
+s100_rdy,I,s100,pRDY through 74AHCT244
+s100_hold_n,I,s100,pHOLD through 74AHCT244
+s100_reset_n,I,s100,pRESET through 74AHCT244
+s100_poc_n,I,s100,pPOC through 74AHCT244
+s100_nmi_n,I,s100,NMI through 74AHCT244
+s100_pint_n,I,s100,pINT through 74AHCT244
+s100_vi_or_n,I,s100,OR of VI0-VI7 through 74AHCT244
+panel_stop,I,panel,front-panel stop
+panel_aux,I,panel,front-panel aux
+local_i,I,from-u1,local page or flash region
+trap_i,I,from-u1,trap window/halt/fault
+int_to_cpu,I,from-u1,interrupt allowed through to /INT0
+stop_o,O,to-u1,front-panel stop
+aux_o,O,to-u1,front-panel aux
+bus_grant,O,to-u1,DMA grant; tri-state A12-A23 driver
+int_req,O,to-u1,S-100 interrupt request
+pSYNC,O,s100-control,pSYNC buffer input
+pSTVAL,O,s100-control,pSTVAL buffer input
+pDBIN,O,s100-control,pDBIN buffer input
+pWR,O,s100-control,pWR buffer input
+sMEMR,O,s100-control,active low
+sMEMW,O,s100-control,active low
+sINP,O,s100-control,active low
+sOUT,O,s100-control,active low
+sM1,O,s100-control,active low
+sINTA,O,s100-control,active low
+pWAIT,O,s100-control,active low
+a0_11_oe_n,O,buffer-enable,A0-A11 buffer output enable
+do_oe_n,O,buffer-enable,DO buffer output enable
+di_oe_n,O,buffer-enable,DI buffer output enable
+ctrl_oe_n,O,buffer-enable,S-100 control buffer output enable
+s100_clk1,O,s100-clock,S-100 clock buffer input
+s100_clk2,O,s100-clock,S-100 clock buffer input, complement
+phlda,O,buffer,pHLDA buffer input
+z180_wait_n,O,z180,Z180 /WAIT
+z180_nmi_n,O,z180,Z180 /NMI from S-100
+z180_int0_n,O,z180,Z180 /INT0
+z180_reset_n,O,z180,Z180 /RESET
+z180_busreq_n,O,z180,Z180 /BUSRQ from S-100 pHOLD
+int_pend,O,switch-buffer,INT PEND
+trap_reset,O,switch-buffer,TRAP RESET, active low
