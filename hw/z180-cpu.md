@@ -544,13 +544,18 @@ for later traps; the selector path no longer depends on it.
 
 ### 5.1 Part and clock
 
-The recommended CPU is the **Z8S180** in the 64-pin DIP
-(`Z8S18010PSG`) for through-hole assembly, with the 68-pin PLCC
-(`Z8S18010VSC`) in a through-hole PLCC socket as the alternate.  The
-DIP package omits A19, which this board does not use; the external MMU
-supplies A19 from the PTE.  A 10.000 MHz oscillator is the clock; U2
-divides it by five for the 2.000 MHz S-100 bus clock.  The Z180's
-internal clock multiplier and refresh are not used.
+The CPU is the **Z8S18033VSC** in a through-hole PLCC-68 socket.  The
+33 MHz rating is the part limit, not the board's target: the clock comes
+from a **socketed 4-pin can oscillator**, so the CPU speed can be tuned
+by swapping the can.  The default is 10.000 MHz; 8, 12 and 16 MHz cans
+are drop-in.
+
+The Z8S180's internal clock multiplier and refresh are not used.  The
+can output clocks the Z180 and both CPLDs.  U2 divides it for the S-100
+bus clock; a 2-bit `CLKDIV` strap selects /4, /5, /6 or /8 so an
+8/10/12/16 MHz can still yields a nominal 2 MHz S-100 clock.  The S-100
+bus is asynchronous and wait-stated, so CPU tuning does not change the
+bus protocol; it only changes how often the CPU reaches the bus.
 
 ### 5.2 Internal MMU transparent
 
@@ -582,12 +587,13 @@ verify the MMU registers.  It does not enable any Z180 peripheral.
 
 ### 5.5 Wait states and bus timing
 
-The Z180 runs at 10 MHz, but the S-100 bus is asynchronous.  The
-bus-interface CPLD (U2) drives the S-100 cycle and holds the Z180 in
-`/WAIT` until the slave is ready.  Local memory is fast enough for a
-single 10 MHz cycle; the CPLD can insert a wait state if a slower part
-is fitted.  The map lookup is pipelined (section 6.7).  U2 also drives
-S-100 `pWAIT` while it is stretching a cycle.
+The Z180 runs from the socketed can oscillator (10 MHz default, 33 MHz
+part rating), but the S-100 bus is asynchronous.  The bus-interface
+CPLD (U2) drives the S-100 cycle and holds the Z180 in `/WAIT` until
+the slave is ready.  Local memory is fast enough for the default
+10 MHz cycle; the CPLD can insert a wait state if a slower part or a
+faster can is fitted.  The map lookup is pipelined (section 6.7).  U2
+also drives S-100 `pWAIT` while it is stretching a cycle.
 
 ### 5.6 DMA
 
@@ -602,17 +608,48 @@ S-100 pINT and VI0–VI7 are ORed into `/INT0`; S-100 NMI goes to `/NMI`.
 The mask logic of section 3.8 gates user and supervisor interrupts.
 The 8259 vector path is unchanged.
 
-### 5.8 Unused peripherals and the I/O trap leak
+### 5.8 Peripherals and the I/O trap leak
 
-The Z180's on-board ASCI/UARTs, PRT, CSI/O, DMA and internal MMU are
-ignored.  The console and serial lines are on the S-100 MultIO or SS1
-boards; there is no on-board UART header or driver.  The
-internal I/O block at 0x80–0xbf remains decoded inside the Z180.  A
-user program that executes `IN`/`OUT` to that block bypasses the CPLD's
-I/O trap.  This is a deliberate, documented limitation; the kernel's
-userland does not use those ports.  If it matters, the monitor can
-relocate the internal block to 0xc0–0xff and accept the conflict with
-the disk controllers instead—neither choice is free.
+The Z180's PRT, CSI/O, DMA and internal MMU are ignored.  The two ASCI
+channels are brought out as RS-232 headers (section 5.9); Micronix's
+console remains on the S-100 MultIO or SS1 board, and the kernel has no
+ASCI driver.  The ASCI registers live in the internal I/O block at
+0x80–0xbf, which remains decoded inside the Z180.  A user program that
+executes `IN`/`OUT` to that block bypasses the CPLD's I/O trap.  This is
+a deliberate, documented limitation; the kernel's userland does not use
+those ports, and the ASCI driver would be supervisor code.  If it
+matters, the monitor can relocate the internal block to 0xc0–0xff and
+accept the conflict with the disk controllers instead—neither choice is
+free.
+
+### 5.9 ASCI serial headers
+
+Each of the two ASCI channels goes through a **MAX232A** to a 2×5,
+0.1-inch header:
+
+| pin | signal | direction |
+|---|---|---|
+| 1 | DCD | in, tied/pulled (ASCI does not use it here) |
+| 2 | RXD | in, MAX232 receiver to ASCI RxD |
+| 3 | TXD | out, ASCI TxD through MAX232 driver |
+| 4 | DTR | out, tied or a Z180 port pin |
+| 5 | GND | — |
+| 6 | DSR | in, tied |
+| 7 | RTS | out, tied or a Z180 port pin |
+| 8 | CTS | in, MAX232 receiver to ASCI CTS |
+| 9 | RI | in, tied |
+| 10 | +5 V | — |
+
+Each MAX232A uses its two drivers (TXD, RTS) and two receivers (RXD,
+CTS); DCD/DSR/RI are tied or pulled to valid RS-232 levels.  One
+MAX232A and one 2×5 header per ASCI channel, so two of each.  The
+MAX232A is a 5 V part with four 0.1 µF charge-pump capacitors per
+device.  The ASCI pin numbers are taken from the Z8S180 PLCC-68
+datasheet; confirm them against the package before layout.
+
+These headers are for firmware, debug, or an alternate OS.  Micronix
+itself still uses the S-100 console; adding an ASCI driver would mean
+using the internal I/O block at 0x80–0xbf.
 
 ## 6. CPLD partition and design
 
@@ -769,12 +806,13 @@ local decode is SEG0/TASK0 plus A11–A0, and the trap window is a
 The map RAM `/CE` is tied active; the `/WE` low/high are generated
 externally from MAP_WE and CPU A0.  U1 has six spare pins.
 
-**U2 — S-100 bus interface (46 pins)**
+**U2 — S-100 bus interface (48 pins)**
 
 | group | pins |
 |---|---|
 | Z180 /MREQ, /IORQ, /RD, /WR, /M1, /BUSAK | 6 |
 | CLK, /RESET | 2 |
+| CLKDIV0, CLKDIV1 (S-100 clock divider strap) | 2 |
 | S-100 inputs via 74AHCT244: pRDY, pHOLD, pRESET, pPOC, NMI, pINT, VI_OR | 7 |
 | panel STOP, AUX | 2 |
 | inter-CPLD U1 (LOCAL, TRAP in; STOP, AUX out) | 4 |
@@ -785,14 +823,14 @@ externally from MAP_WE and CPU A0.  U1 has six spare pins.
 | pHLDA buffer input | 1 |
 | Z180 /WAIT, /NMI, /INT0, /RESET | 4 |
 | INT PEND, TRAP RESET to switch buffer | 2 |
-| **total** | **46** |
+| **total** | **48** |
 
-U2 has eighteen spare pins for the front-panel display/keyboard, a
+U2 has sixteen spare pins for the front-panel display/keyboard, a
 debug header, or a future second VI input.  The switch register is an
 external 74AHCT541 whose inputs are the DIP switches and U2's INT
 PEND/TRAP RESET bits; U1 enables it on a 0x402 read.
 
-Two 84-pin devices are sufficient: U1 58 and U2 46, with 6 and 18 spare.
+Two 84-pin devices are sufficient: U1 58 and U2 48, with 6 and 16 spare.
 
 
 ### 6.6 Register decode
@@ -844,8 +882,9 @@ the local page and enable the 74AHCT138 low-address decode.
 The map RAM outputs are the S-100 address.  No address bit passes
 through a CPLD, and the map lookup is one 10 ns RAM access plus the
 74ABT driver.  At 10 MHz (a 100 ns cycle), 10 ns RAM plus 7.5 ns CPLD
-is 17.5 ns, leaving ample margin; the S-100 cycle is wait-stated
-anyway.
+is 17.5 ns, leaving ample margin; even at the 33 MHz part limit (30 ns)
+the map path fits.  The S-100 bus, not the CPU, sets system throughput;
+the bus cycle is wait-stated.
 
 There is **no A12–A23 output mux**.  The 74ABT parts are line drivers
 (buffers) that meet the S-100 drive requirement; U1 controls only their
@@ -954,7 +993,8 @@ U2 owns these bus-side functions:
 - NMI passes to `/NMI`.
 - `pHOLD` -> Z180 `/BUSRQ`; `/BUSAK` -> `pHLDA`; U2 disables all S-100
   buffer enables while the bus is granted.
-- 10.000 MHz input; divide by five for the 2.000 MHz S-100 clock.
+- socketed 4-pin can input; `CLKDIV` strap selects /4, /5, /6 or /8
+  for a nominal 2 MHz S-100 clock.
 - `pRESET`/`pPOC` and the reset button drive the Z180 `/RESET` and the
   CPLD reset; reset clears the task register, mask, trap window, and
   ROM-half latch.
@@ -1125,8 +1165,9 @@ not contain the PIC.  The mask and trap behavior are in section 3.8.
 
 ### 7.8 Clock and reset
 
-U2 divides the 10.000 MHz oscillator to a 2.000 MHz S-100 clock and
-drives the bus clock buffer.  Reset comes from S-100 pRESET/pPOC and
+U2 divides the socketed can oscillator and drives the bus clock
+buffer.  The `CLKDIV` strap selects /4, /5, /6 or /8; an 8, 10, 12 or
+16 MHz can therefore yields a nominal 2 MHz S-100 clock.  Reset comes from S-100 pRESET/pPOC and
 the on-board button; it clears the CPLDs and holds the Z180 in reset
 until the CPLDs are configured.
 
@@ -1199,9 +1240,9 @@ window and enters the monitor.
 
 `reset0` calls `z180init` before `uartst`.  It sets the Z180 wait-state
 control for local memory and leaves the internal MMU in pass-through.
-It ignores the Z180's on-board ASCI/UARTs, PRT, CSI/O and DMA.  The
-internal block is
-already at 0x80–0xbf from the reset window.
+It leaves the Z180's ASCI/UARTs uninitialized (the two headers are for
+firmware or an alternate OS) and ignores the PRT, CSI/O and DMA.  The
+internal I/O block is already at 0x80–0xbf from the reset window.
 
 ### 8.5 Selector boot rewrite
 
@@ -1279,21 +1320,24 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 
 | qty | part | use |
 |---|---|---|
-| 1 | Z8S18010PSG (DIP-64) or Z8S18010VSC (PLCC-68 socket) | CPU, 10 MHz |
+| 1 | Z8S18033VSC in PLCC-68 socket | CPU, 33 MHz-rated, can-clocked |
 | 2 | ATF1508AS-10JI84 in PLCC-84 socket | sequencer+translation, bus |
 | 2 | IS61C256AH-10 or AS7C256-10 (32K×8, 5 V, 10 ns) | map RAM A/B |
 | 1 | AS6C6264-55 or IS61C256AH-10 | local SRAM |
 | 1 | SST39SF080 (1M×8, 5 V) or equivalent | monitor flash |
-| 1 | 10.000 MHz 5 V oscillator | CPU/bus clock |
+| 1 | 4-pin can oscillator socket + 10.000 MHz 5 V can | CPU/bus clock, tunable |
+| 2 | MAX232A (5 V, 0.1 µF) | ASCI0/1 RS-232 level shifters |
+| 2 | 2×5 0.1-inch header | ASCI0/1 serial ports |
 | 1 | 5 V regulator | +8 V -> +5 V |
 | — | 74ABT245/541/244 | S-100 high-drive output buffers |
 | — | 74AHCT244/245/541/138/157/161/163, 74AHCT30/688 | S-100 inputs, local decode/counter, flash-region compare |
-| — | PLCC-84 sockets, DIP-64 socket, JTAG header, reset button, 8-way DIP | assembly |
-| — | 0.1 µF, 10 µF, pull-ups, series resistors | decoupling/termination |
+| — | PLCC-84 sockets, PLCC-68 socket, 4-pin can socket, JTAG header, reset button, 8-way DIP | assembly |
+| — | 0.1 µF (including 8× MAX232A charge-pump), 10 µF, pull-ups, series resistors | decoupling/termination |
 
-There are no on-board UART/ASCI parts in the BOM.  The console and
-serial lines are on the S-100 MultIO or SS1 board; the Z180's on-board
-ASCIs are ignored.
+The console and serial lines are on the S-100 MultIO or SS1 board.  The
+two ASCI channels are brought out as RS-232 headers through MAX232As;
+Micronix has no ASCI driver, so the headers are for firmware, debug or
+an alternate OS.
 
 Part availability and exact speed grades must be checked before the
 board is ordered.
@@ -1304,9 +1348,12 @@ Standard 254 × 127 mm S-100 outline, 100-pin edge tongue along the
 bottom.  Place the Z180 and the two CPLDs in the center, the two map
 RAMs immediately beside the A12–A23 address drivers, the flash and
 local SRAM beside U1, and the bus buffers along the edge.  Put the JTAG header, reset button,
-image-select DIP and stop/aux/NMI header at the top.  There is no
-on-board UART/ASCI header; the console is an S-100 MultIO or SS1 card.  Use through-hole PLCC sockets for the CPLDs and a DIP socket
-for the Z180 if the DIP part is used.
+image-select DIP and stop/aux/NMI header at the top.  Place the two
+MAX232As and the two 2×5 ASCI headers on the right edge, near the
+Z8S180 ASCI pins.  The console is still an S-100 MultIO or SS1 card.
+Use through-hole PLCC sockets for the CPLDs and the Z8S180 (PLCC-68),
+and a 4-pin can socket beside it so the CPU clock can be changed
+without resoldering.
 
 The front-panel display/keyboard, the STOP and AUX inputs, and their
 inter-CPLD signals are optional.  If pin pruning is needed later,
@@ -1352,6 +1399,7 @@ display.
 | selector boot | task-register bank + RAM trampoline | direct PTE map, no trampoline |
 | Z180 MMU | n/a | transparent, A16–A19 unconnected |
 | Z180 internal I/O | n/a | relocated to 0x80–0xbf |
+| on-board serial | n/a | two MAX232 ASCI headers; Micronix uses the S-100 console |
 | FPU/front panel | fitted | optional/omitted |
 | memory fault status | manual values | emulator-compatible 0xf7 by default |
 | task switch delay | 7 instruction fetches (manual) | 8 M1 cycles (emulator/kernel) |
@@ -1367,14 +1415,16 @@ identical.
 - Z180 internal-I/O trap leak: accept and document, or relocate the
   internal block again.
 - Manual-accurate vs emulator-accurate permission/status details.
-- Two 84-pin CPLDs: U1 is 58 and U2 is 46, with 6 and 18 spare.  The
+- Two 84-pin CPLDs: U1 is 58 and U2 is 48, with 6 and 16 spare.  The
   merge of the old sequencer and translation devices is what makes the
   two-device build possible.
 - Flash size is fixed at 1M×8; the image-select DIP chooses the 2K alias
   image, while the F00000–FFFFFF region exposes all images.
-- Optional FPU and front-panel display/keyboard; the Z180 on-board
-  UARTs are ignored and have no header or driver.
-- DIP-64 vs PLCC-68 Z180 (through-hole preference).
+- Optional FPU and front-panel display/keyboard.  ASCI0/1 are brought
+  out as MAX232 RS-232 headers; Micronix's console remains the S-100
+  MultIO/SS1 and there is no ASCI driver yet.
+- CPU is fixed at Z8S18033VSC (PLCC-68); the socketed 4-pin can sets
+  the actual speed (10 MHz default, 8/12/16 MHz cans).
 - 10 ns 5 V map SRAM vs 8 ns 3.3 V with level shifting.
 
 ### 10.3 Verification checklist
