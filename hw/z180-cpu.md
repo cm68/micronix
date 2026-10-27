@@ -33,7 +33,7 @@ own page and never reaches the S-100 bus:
 | `0x403` | **trap status register** | **mask register** |
 | `0x600–0x7ff` | open bus | **map RAM**, write-only |
 | `0x800–0xbff` | monitor ROM (one 1K half) | ignored |
-| `0xc00–0xfff` | optional FPU | optional FPU |
+| `0xc00–0xfff` | optional FPU, or a second 1K local-RAM window | same |
 | `≥ 0x1000` | mapped memory | mapped memory |
 
 Tasks 1–15 see the same numeric low addresses as ordinary mapped user
@@ -845,7 +845,7 @@ on-board device:
 0x400-0x403  -> registers
 0x600-0x7ff  -> map RAM write; map address mux selects CPU A8-A1
 0x800-0xbff  -> flash monitor window
-0xc00-0xfff  -> optional FPU, otherwise open bus
+0xc00-0xfff  -> optional FPU, or a second 1K local-RAM window
 ```
 
 Within the register block:
@@ -1189,7 +1189,7 @@ before the edge connector is committed.
 | local SRAM | 2K×8 (1K used) | 0x000–0x3ff | MPZ80 low page |
 | map RAM A/B | 2× 32K×8 (512 B used) | 0x600–0x7ff | A12–A19 / A20–A23 + perms |
 | monitor flash | 1M×8 | F00000–FFFFFF; 0x800–0xbff alias | flash region + monitor alias |
-| optional FPU | — | 0xc00–0xfff | not fitted |
+| optional FPU / second RAM | — | 0xc00–0xfff | not fitted; may be decoded as a second 1K local RAM |
 
 The local SRAM needs only 1 KB; a 2K×8 or 8K×8 5 V SRAM is fine.  The
 map is two CY7C199-15PC 32K×8 parts; their address outputs drive the A12–A23
@@ -1305,9 +1305,52 @@ No kernel change is required for the current 1 MB kernel:
 - the monitor's selector boot is the only structural rewrite; the reset
   window also needs the 15-byte ICR patch of section 8.3.
 
-A future kernel that wants more than 1 MB must widen `struct mem.seg`
-(or add a bank byte) and write the PTE high nibble; the hardware already
-supports it.
+The high space does **not** have to enter the kernel's segment
+allocator or swapper.  A ramdisk driver can own high physical pages
+privately, keep its own block-to-page map, and map a high page into a
+window by writing the PTE high nibble.  The kernel sees a block device
+and does not learn whether the CPU is a Z80 or a Z180; the driver's
+`init` probes the high memory and simply does not attach on a machine
+that lacks it.  A driver-side window helper or direct map-register
+access is enough; `struct mem.seg`, `MAXSEG` and the swapper stay 1 MB
+and unchanged.
+
+Only if the kernel itself wants high pages for user memory or the
+buffer cache would `struct mem.seg` (or a bank byte), `MAXSEG` and the
+swapper need widening.  The hardware supports both paths.
+
+Direct-mapped S-100 video RAM is a middle case: the process's page is
+kernel-managed, but the high page is fixed and driver-provided, so the
+allocator and `segmap` can stay at 1 MB.  Keep `mem[].seg` as the low
+eight bits, put the high bank in the high nibble of `mem[].per`, and
+use `per` bit 3 — the hardware's unused PTE bit — as a
+shared/non-swappable flag.  Permission checks mask the low bits;
+fork/exec/swap skip shared pages.  A **`phys()`-style system call** —
+the old Unix physical-mapping call — installs the page and the kernel
+reloads the task map.  The call maps only a physical window registered
+by the video driver, not arbitrary physical memory, and is a
+privileged/video-group operation.  The mapping lasts until an explicit
+unmap, exec, or exit; the high physical page belongs to the video
+driver, so the kernel must not free it.  Kernel `copyin`/`copyout`
+through the scratch window would need the same high-bank treatment if a
+process passes a video pointer to another syscall; direct process
+access does not.
+
+The kernel stays CPU-agnostic; the video driver probes the S-100 board
+and supplies the high segment.  The board should place such video RAM
+outside the F00000–FFFFFF flash region.
+
+None of the `phys()`/video path requires a board change: the PTE high
+nibble, the unused PTE bit 3, and the high S-100 address lines are
+already present.  The work is kernel-side.
+
+The intended use of the space above 1 MB is driver-private storage such
+as a ramdisk, and optionally kernel-managed buffer cache or shared
+images if a future kernel is widened.  It is **not** intended for
+larger per-process working sets: a machine with 4 MB or more still has
+64K tasks and a Z180 whose CPU-to-memory ratio makes large user working
+sets unproductive.  The memory is better spent absorbing disk I/O, and
+the ramdisk path costs no additional task slots.
 
 ## 9. Power, BOM, physical layout, bring-up
 
@@ -1422,9 +1465,12 @@ identical.
   two-device build possible.
 - Flash size is fixed at 1M×8; the image-select DIP chooses the 2K alias
   image, while the F00000–FFFFFF region exposes all images.
-- Optional FPU and front-panel display/keyboard.  ASCI0/1 are brought
-  out as MAX232 RS-232 headers; Micronix's console remains the S-100
-  MultIO/SS1 and there is no ASCI driver yet.
+- Optional FPU and front-panel display/keyboard.  The 0xC00–0xFFF
+  FPU window can instead be decoded as a second 1K local-RAM bank if a
+  future monitor/kernel wants more on-board RAM; FPU and RAM are
+  mutually exclusive.  ASCI0/1 are brought out as MAX232 RS-232
+  headers; Micronix's console remains the S-100 MultIO/SS1 and there is
+  no ASCI driver yet.
 - CPU is fixed at Z8S18033VSC (PLCC-68); the socketed 4-pin can sets
   the actual speed (10 MHz default, 8/12/16 MHz cans).
 - Map RAM is CY7C199-15PC; 15 ns parts are the practical grade, while
