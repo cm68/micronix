@@ -361,6 +361,7 @@ src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
 src/micronix/cmd/edit/edit
 src/micronix/cmd/entab/entab
+src/micronix/cmd/env/env
 src/micronix/cmd/expand/expand
 src/micronix/cmd/expr/expr
 src/micronix/cmd/false/false
