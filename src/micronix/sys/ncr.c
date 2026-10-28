@@ -154,6 +154,7 @@
 #include <sys/dlabel.h>
 #include <sys/ioctl.h>
 #include <sys/ncr.h>
+#include <sys/ovl.h>
 #include <errno.h>
 
 /*
@@ -1199,6 +1200,14 @@ struct biovec ncrbvec = { &ncropen, &ncrclose, &ncrstrat, &ncrioctl };
  * discover which line the card is on.  It must not acknowledge - reading
  * RPI would take the request back down and leave the line unwired.
  *
+ * CLEAR is the other half of that contract and the card has to obey it
+ * too: intr_attach quiets every card before it takes the pending-register
+ * baseline, and a probe that raised the line on CLEAR as well would put
+ * its own request in that baseline - the tickle would then be invisible,
+ * the card would never be wired, and the stale request would mask the
+ * card's line for every probe after it.  Reading RPI is the chip's
+ * acknowledgement (ncrint's first act), so that is what CLEAR does.
+ *
  * The interrupt comes from ASSERT RST: "After this bit is set (1), IRQ
  * (pin 23) goes active and all internal logic and control registers are
  * reset (except for the interrupt latch and the ASSERT RST bit)."  So
@@ -1208,11 +1217,17 @@ struct biovec ncrbvec = { &ncropen, &ncrclose, &ncrstrat, &ncrioctl };
  * This runs from the module's page, which is the only place with room:
  * the init region is full.
  */
-ncrprobe()
+ncrprobe(mode)
+    int mode;
 {
     register struct scsiif *ip;
 
     ip = &boards[0];
+
+    if (mode == PROBE_CLEAR) {
+        (*ip->rd) (RPI);        /* the acknowledgement: drop the latch */
+        return (0);
+    }
 
     /*
      * The datasheet's IRQ-strap test, and nothing else: writing ones to

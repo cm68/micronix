@@ -13,3 +13,12 @@
 #include <types.h>
 
 int netchan;
+
+/*
+ * The card's interrupt line, for select(2).  The driver finds the line
+ * at attach time and normally keeps it in its own page; a selector has
+ * to reopen the line after the handler masks it, and select is resident.
+ * 0xffff is "not attached yet": line 0 is a real line, so zero will not
+ * do.
+ */
+UINT netline = 0xffff;

@@ -33,6 +33,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <poll.h>
 #include <ctype.h>
 #include <signal.h>
 #define trace xxtrace
@@ -4988,6 +4989,56 @@ SystemCall()
         ret = 0;
         carry_clear();
         break;
+
+    case 58:                   /* select <mask in hl> */
+        {
+            struct pollfd pfd[NOPEN];
+            int gmap[NOPEN];
+            unsigned short mask;
+            int n, j, g, ready;
+
+            /*
+             * The guest's mask is one bit per descriptor, NOPEN bits,
+             * and the answer is the readable subset.  The host's own
+             * poll() is the wait; each guest bit names a host
+             * descriptor through fdmap[], and only those that are
+             * open are offered to the host.  A mask of only dead
+             * descriptors would make poll(nfds = 0) a hang, so it
+             * answers nothing instead.
+             */
+            mask = z80_get_reg16(hl_reg);
+            n = 0;
+            for (g = 0; g < NOPEN; g++) {
+                if (!(mask & (1 << g)))
+                    continue;
+                j = hostfd(g);
+                if (j < 0)
+                    continue;
+                pfd[n].fd = j;
+                pfd[n].events = POLLIN;
+                pfd[n].revents = 0;
+                gmap[n] = g;
+                n++;
+            }
+            if (n == 0) {
+                ret = 0;
+                carry_clear();
+                break;
+            }
+            j = poll(pfd, n, -1);
+            if (j < 0) {
+                ret = -1;
+                carry_set();
+                break;
+            }
+            ready = 0;
+            for (j = 0; j < n; j++)
+                if (pfd[j].revents)
+                    ready |= 1 << gmap[j];
+            ret = ready;
+            carry_clear();
+            break;
+        }
 
     case 12:                   /* chdir <ptr to name> */
         {

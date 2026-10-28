@@ -37,9 +37,9 @@ TARGET	= libunix.a
 # They are the 1.3 originals off the distribution floppy.
 #
 MAN	= Intro.2 access.2 break.2 chdir.2 chmod.2 chown.2 \
-	close.2 creat.2 csw.2 dup.2 dup2.2 exec.2 exit.2 fork.2 \
-	fstat.2 ftruncate.2 getpid.2 getuid.2 gtty.2 indir.2 kill.2 link.2 \
-	mknod.2 mount.2 nice.2 open.2 pipe.2 read.2 seek.2 \
+	close.2 creat.2 dup.2 dup2.2 exec.2 execve.2 exit.2 fork.2 \
+	fstat.2 ftruncate.2 getpid.2 getuid.2 gtty.2 indir.2 ioctl.2 jobctl.2 kill.2 link.2 \
+	mknod.2 mount.2 nice.2 open.2 pipe.2 read.2 seek.2 select.2 \
 	setuid.2 signal.2 sleep.2 stat.2 stime.2 stty.2 sync.2 \
 	time.2 times.2 umount.2 unlink.2 wait.2 write.2
 MANDIR	= /usr/man/man2
@@ -53,7 +53,7 @@ AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	exit.o _exit.o fork.o fstat.o getpid.o getuid.o \
 	gtty.o kill.o link.o mknod.o mount.o nice.o
 
-AOBJS2	= sysopen.o pause.o perror.o pipe.o read.o reboot.o seekraw.o \
+AOBJS2	= sysopen.o pause.o perror.o pipe.o read.o reboot.o seekraw.o select.o \
 	setuid.o _signal.o sleep.o stat.o stime.o sbrk.o \
 	stty.o sync.o time.o times.o umount.o unlink.o wait.o \
 	write.o ioctl.o fputc.o fgetc.o ftruncate.o
@@ -144,10 +144,10 @@ verify: $(TARGET) $(CRT0)
 	cmp chown.2 $(MANDIR)/chown.2
 	cmp close.2 $(MANDIR)/close.2
 	cmp creat.2 $(MANDIR)/creat.2
-	cmp csw.2 $(MANDIR)/csw.2
 	cmp dup.2 $(MANDIR)/dup.2
 	cmp dup2.2 $(MANDIR)/dup2.2
 	cmp exec.2 $(MANDIR)/exec.2
+	cmp execve.2 $(MANDIR)/execve.2
 	cmp exit.2 $(MANDIR)/exit.2
 	cmp fork.2 $(MANDIR)/fork.2
 	cmp fstat.2 $(MANDIR)/fstat.2
@@ -156,6 +156,8 @@ verify: $(TARGET) $(CRT0)
 	cmp getuid.2 $(MANDIR)/getuid.2
 	cmp gtty.2 $(MANDIR)/gtty.2
 	cmp indir.2 $(MANDIR)/indir.2
+	cmp ioctl.2 $(MANDIR)/ioctl.2
+	cmp jobctl.2 $(MANDIR)/jobctl.2
 	cmp kill.2 $(MANDIR)/kill.2
 	cmp link.2 $(MANDIR)/link.2
 	cmp mknod.2 $(MANDIR)/mknod.2
@@ -165,6 +167,7 @@ verify: $(TARGET) $(CRT0)
 	cmp pipe.2 $(MANDIR)/pipe.2
 	cmp read.2 $(MANDIR)/read.2
 	cmp seek.2 $(MANDIR)/seek.2
+	cmp select.2 $(MANDIR)/select.2
 	cmp setuid.2 $(MANDIR)/setuid.2
 	cmp signal.2 $(MANDIR)/signal.2
 	cmp sleep.2 $(MANDIR)/sleep.2

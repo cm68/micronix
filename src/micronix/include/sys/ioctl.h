@@ -84,6 +84,10 @@ struct cdb {
 #define CDBDATA 4096            /* the most data one command may move */
 #define CDBCMD  0               /* ioctl(fd, ...): run a command block */
 #define CDB_IN  1               /* the data phase reads rather than writes */
+#define CDB_ASYNC 2             /* do not wait for the reply (sys/net.c):
+                                 * the answer arrives as a pushed frame, so
+                                 * a caller that owns the frame stream can
+                                 * read it in order with everything else */
 
 /*
  * hole is the caller's, not the kernel's, and the kernel only carries it:

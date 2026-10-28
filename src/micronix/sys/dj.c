@@ -242,7 +242,7 @@ sio(d, addr, xaddr, op, sec, dev)
 {
 	static struct dlgeom *g;
 	static unsigned track, within;
-	static UINT32 phys;
+	UINT32 phys;
 
 	g = &d->g;
 
@@ -255,9 +255,9 @@ sio(d, addr, xaddr, op, sec, dev)
 	phys = ((UINT32) xaddr << 12) | ((unsigned) addr & 0xfff);
 
 	D[0] = SETDMA;              /* set DMA command */
-	D[1] = phys;                /* D[1], D[2], D[3]: */
-	D[2] = phys >> 8;           /* low, mid and the */
-	D[3] = phys >> 16;          /* extended page */
+	D[1] = (UINT8) phys;        /* D[1], D[2], D[3]: */
+	D[2] = (UINT8) (phys >> 8); /* low, mid and the */
+	D[3] = (UINT8) (phys >> 16);/* extended page */
 
 	D[4] = op;                  /* I/O command */
 
@@ -315,14 +315,14 @@ fmio(d, addr, xaddr, op, n, dev)
 	unsigned addr, xaddr;
 	unsigned op, n, dev;
 {
-	static UINT32 phys;
+	UINT32 phys;
 
 	phys = ((UINT32) xaddr << 12) | (addr & 0xfff);
 
 	D[0] = SETDMA;
-	D[1] = phys;
-	D[2] = phys >> 8;
-	D[3] = phys >> 16;
+	D[1] = (UINT8) phys;
+	D[2] = (UINT8) (phys >> 8);
+	D[3] = (UINT8) (phys >> 16);
 
 	D[4] = op;
 	D[5] = 0;                   /* cylinder 0 */
@@ -635,9 +635,9 @@ getstat(a)
 	 * struct status.
 	 */
 	D[0] = SETDMA;
-	D[1] = ((UINT32) kseg << 12) & 0xff;    /* the page as a flat */
-	D[2] = ((UINT32) kseg << 12) >> 8;      /* address: its low twelve */
-	D[3] = kseg >> 4;                       /* bits are zero already */
+	D[1] = 0;                       /* the page as a flat address: */
+	D[2] = (UINT8) (kseg << 4);     /* its low twelve bits are zero */
+	D[3] = (UINT8) (kseg >> 4);     /* already, and kseg is 12 bits */
 
 	D[4] = SREAD;               /* move to cyl 3 */
 	D[5] = 3;
@@ -764,7 +764,7 @@ djioctl(dev, cmd, r, b)
 	struct buf *b;
 {
 	static char *p;             /* the staging, as the kernel reaches it */
-	static UINT32 phys;         /* ... and as the board is told it */
+	UINT32 phys;                /* ... and as the board is told it */
 	static UINT8 save;
 	static int i, len, count, hole, flags, st;
 
@@ -815,8 +815,8 @@ djioctl(dev, cmd, r, b)
 	 */
 	if (hole >= 0) {
 		D[hole] = phys;
-		D[hole + 1] = phys >> 8;
-		D[hole + 2] = phys >> 16;
+		D[hole + 1] = (UINT8) (phys >> 8);
+		D[hole + 2] = (UINT8) (phys >> 16);
 	}
 
 	busplease();

@@ -314,6 +314,23 @@ static void push_event(uint8_t sock, uint8_t code)
     push_frame(P_EVENT, sock, &code, 1);
 }
 
+/*
+ * A connected event carries the peer's ip[4] in network order after the
+ * code (NET.md section 5).  rshd's .rhosts check needs it; the guest has
+ * no other way to learn who connected.  Closed and reset stay one byte.
+ */
+static void push_event_ip(uint8_t sock, uint8_t code, IPAddress ip)
+{
+    uint8_t p[5];
+
+    p[0] = code;
+    p[1] = ip[0];
+    p[2] = ip[1];
+    p[3] = ip[2];
+    p[4] = ip[3];
+    push_frame(P_EVENT, sock, p, 5);
+}
+
 /* ------------------------------------------------------------------ */
 /* The socket state machine                                            */
 /* ------------------------------------------------------------------ */
@@ -467,7 +484,7 @@ static void do_connect(uint8_t i, const uint8_t *p)
     s.client.stop();
     if (s.client.connect(ip, port, 5000)) {
         s.state = S_TCP_OPEN;
-        push_event(i, EV_CONNECTED);
+        push_event_ip(i, EV_CONNECTED, s.client.remoteIP());
     } else {
         s.client.stop();
         s.state = S_CLOSED;
@@ -780,7 +797,7 @@ static void poll_socket(uint8_t i)
                 delete s.server;
                 s.server = nullptr;
                 s.state = S_TCP_OPEN;
-                push_event(i, EV_CONNECTED);
+                push_event_ip(i, EV_CONNECTED, c.remoteIP());
             }
         }
         return;

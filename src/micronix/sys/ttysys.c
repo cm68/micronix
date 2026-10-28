@@ -6,15 +6,16 @@
  * The parts of the tty driver a process reaches through a system call -
  * open, close, read, write, sgtty and the output drain that waits on a
  * writer - as opposed to the interrupt half (ttyin/ttyout/cstart and the
- * line discipline) that stays in sys/tty.c.  No interrupt reaches any of
- * this, and none of it holds a buffer window, so it belongs in the
- * window-page cluster (WIN_C, sys/GNUmakefile), where its bytes stop
- * competing with the resident kernel for the space below.
+ * line discipline) in sys/tty.c.  The two are linked together into each
+ * tty page: tty.mod (the console and its boards) and pty.mod (its own
+ * copy, so a pty never calls into another module).  Both copies are page
+ * images, so what is shared between them - the helpers and state in
+ * sys/ttyres.c - is resident instead.
  *
  * It sleeps: ttyread waits for a line in cookin()/cwait(), and
- * ttywrite's outwait() waits for the transmitter.  The window page can
- * hold that - sys/rdwri.c sleeps there too - because holds cannot span
- * a sleep (sleep() panics on bholdn) and no hold site is in this code.
+ * ttywrite's outwait() waits for the transmitter.  A tty page can hold
+ * that - the driver page is mapped for the whole call, sleeping included,
+ * and ovlremap() puts it back at a switch because u.drv names it.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -24,7 +25,8 @@
 #include <sys/signal.h>
 
 extern int fillque(), cstart(), cookin(), sendque(), killfg(), drain(),
-    iomove(), sleep();
+    iomove(), sleep(), wakeup();
+extern int selectchan;          /* select(2)'s event, sys/select.c */
 
 /*
  * Open a tty. Called by the device open routine.
@@ -118,6 +120,7 @@ ttyread(tty)
     if (cok->count != 0) {
         killfg(tty, SIGTINT);   /* term input available */
     }
+    wakeup(&selectchan);        /* select(2): cooked input is here */
 }
 
 /*

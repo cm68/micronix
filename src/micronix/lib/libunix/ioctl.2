@@ -1,0 +1,154 @@
+.he "ioctl (2)                    10/28/26                     ioctl (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ioctl
+- run a raw command block on a block device
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+ioctl(fd, cmd, req)
+.br
+.bd
+int fd, cmd;
+.br
+.bd
+struct cdb *req;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Ioctl
+hands the command block described by
+.bd
+req
+to the driver of the block device named by
+.bd
+fd,
+and lets it run.
+.bd
+cmd
+says what to do with the block; today the only request
+is
+.bd
+CDBCMD.
+The block is the bus's own - a SCSI command descriptor
+block, the seven task-file registers of an ATA command,
+or the HD-DMA board's block - and the kernel never looks
+inside it.  A terminal is not reached here: its
+requests are
+.bd
+stty
+and
+.bd
+gtty ,
+and a driver with no command block answers ENOTTY.
+
+.bd
+req
+is a
+.bd
+struct cdb
+(see <sys/ioctl.h>).
+.bd
+cmd
+holds up to sixteen bytes of command, and
+.bd
+len
+says how many of those bytes are the command.
+.bd
+count
+is the number of bytes in the data phase, or zero if
+there is none.
+.bd
+flags
+says which way the data goes: CDB_IN means the device
+fills the buffer, and without it the buffer is sent.
+CDB_ASYNC, for the network card only, says the caller
+will read the answer from the card's frame stream
+rather than have the call wait for it.
+.bd
+buf
+is the caller's buffer for the data, and
+.bd
+hole
+is where in
+.bd
+cmd
+the address of that buffer is to be written, for a bus
+whose command block carries one, or -1 for a bus that
+does not.
+
+A data phase of one disk block (512 bytes) or less is
+moved by the kernel, and the caller's buffer is filled
+from it or sent from it.  A larger one, up to CDBDATA
+(one page), is moved by the driver itself.  The command
+block is copied back to the caller when the driver
+returns, including anything the driver wrote into it,
+so a bus that answers a command inside its block leaves
+its answer there.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 if the command ran, or -1 if it did not.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+EINVAL
+if cmd is not CDBCMD, or len is not between 1 and
+CDBMAX, or count is negative or greater than CDBDATA.
+.br
+.bd
+EBADF
+if fd is not an open file.
+.br
+.bd
+ENOTTY
+if the descriptor is not a block device, or its driver
+has no command block to run.
+.br
+.bd
+EIO
+if the command failed and the driver gave no other
+reason.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(ioctl = 54)
+.br
+.bd
+(fd in hl, cmd and req on the stack)
+.br
+.bd
+sys; ioctl; cmd; req
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 is returned on success.  The carry flag is set on
+failure, and the error number is then in hl.

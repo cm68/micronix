@@ -1,18 +1,21 @@
 /*
- * the part of the pty driver that lives in the u page
+ * the part of the pty driver that is linked into its own page
  *
  * sys/pty_leaf.c
  *
  * These are the helpers that hold no storage and are called from more
- * than one place: the pair/side decode, the four back-end calls the tty
- * layer makes, and the pair's own init and hangup.  The u page is where
- * stateless code that every process may run lives (LEAF_C, see
- * sys/GNUmakefile), and it has room where the resident text does not.
+ * than one place: the pair/side decode and the four back-end calls the
+ * tty layer makes.  pty.mod links this object beside the driver and its
+ * own copy of the line discipline (sys/GNUmakefile), so the tty layer's
+ * calls to start/stop/put/set and the back ends' calls to
+ * ttyin/ttyout are all calls within one page rather than returns into
+ * the kernel.
  *
  * The state - struct ptyinfo and the two struct tty of each pair -
- * stays in the resident kernel (sys/pty.c).  The u page is cloned per
- * process, so state in it would be a copy per process, and the queue
- * sleepers and p->tty pointer have to see one object.
+ * stays in the resident kernel (sys/pty.c).  The driver window is one
+ * page for the whole system, mapped only while its driver is running,
+ * so state there would vanish between calls, and the queue sleepers and
+ * p->tty pointer have to see one object that is always there.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -22,9 +25,7 @@
 #include <sys/pty.h>
 #include <errno.h>
 
-extern int ttyout(), ttyin(), ttyread(), ttywrite(), ttymode(),
-    ttyopen(), ttyclose();
-extern int qinit(), drainques(), cstart();
+extern int ttyout(), ttyin(), ttymode();
 
 /*
  * Pair and side of a device number; -1 for a minor that is not one of
@@ -49,6 +50,10 @@ ptyidx(dev)
  * character and calls put(); drain until the peer's input queue is
  * nearly full, which is what makes a writer wait instead of running the
  * pool dry.
+ *
+ * LOSTOP is not tested here: every caller of t->start is cstart() or
+ * ustart(), and cstart() tests it and ustart() clears it (sys/ttyres.c).
+ * t->start is reached no other way.
  */
 int
 pty_start(t)
@@ -57,8 +62,7 @@ pty_start(t)
     register struct tty *peer;
 
     peer = PEER(t);
-    while (!(t->state & LOSTOP) && (t->outque.count || t->nextc) &&
-        peer->rawque.count < HIWATER)
+    while ((t->outque.count || t->nextc) && peer->rawque.count < HIWATER)
         ttyout(t);
 }
 

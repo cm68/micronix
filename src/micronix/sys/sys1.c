@@ -230,26 +230,5 @@ nice()
 }
 
 /*
- * Make up for the Decision's lack of console switches
- */
-unsigned switches = 0;
-
-/*
- * Set the switches
- */
-ssw()
-{
-    switches = u.hl;
-}
-
-/*
- * Read the switches
- */
-csw()
-{
-    return (switches);
-}
-
-/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

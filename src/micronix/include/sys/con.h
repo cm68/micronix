@@ -46,7 +46,7 @@ struct ciovec {
  * Macros for accessing the major and minor device numbers.
  */
 #define minor(dev)	((dev) & 0377)
-#define major(dev)	((UINT16)(dev) >> 8)
+#define major(dev)	((UINT8)((dev) >> 8))
 
 /*
  * The minor number of a disk, cut into the two things its driver wants

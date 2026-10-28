@@ -92,15 +92,21 @@ signon()
     pr("%d processes\n", NPROC);
     pr("disks: ");
     for (i = 1; i < nbdev; i++)
-        if (biosw[i].strat != &nodev) {
-            ovlmap(i);
+        if (biosw[i].strat != &nodev && bdevseg[i]) {
+            ovlbmap(i);
             pr("%s ", devname);
         }
-    ovlmap(major(rootdev));
-    pr("\nroot dev: %s/%d\n", devname, minor(rootdev));
+    pr("\nroot dev: ");
+    if (ovlbmap(major(rootdev)))
+        pr("%s/%d\n", devname, minor(rootdev));
+    else
+        pr("nodev/%d\n", minor(rootdev));
     if (swapdev) {
-        ovlmap(major(swapdev));
-        pr("swap dev: %s/%d\n", devname, minor(swapdev));
+        pr("swap dev: ");
+        if (ovlbmap(major(swapdev)))
+            pr("%s/%d\n", devname, minor(swapdev));
+        else
+            pr("nodev/%d\n", minor(swapdev));
     } else
         pr("swap dev: nodev/0\n");
     pr("%dK memory\n", totmem);

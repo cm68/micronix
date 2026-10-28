@@ -33,6 +33,13 @@ which drains the FIFO and opens the line again for its next wait; the
 handler never reads data.  The line is open-collector, so the card pulls it
 through an open-collector driver (7406), not a push-pull pin.
 
+The driver uses the line when the attach loop finds it, and polls
+`NETSTAT` when it does not: a machine may have the card without a working
+interrupt route, and frames and command replies are the same either way.
+A polled driver has no wakeup to give `select(2)`, so a selector bounds
+its wait with an alarm and re-checks `RXRDY` when the signal returns;
+with a line attached the handler wakes it at once.
+
 ## 2. Framing
 
 Both directions carry frames over the channel:
@@ -117,6 +124,15 @@ carries the netconf payload.  `ACK` payload, for `STATUS`:
 
     code[1]:  1 connected, 2 closed, 3 reset
 
+`connected` also carries the peer's address, so a server can authenticate
+the caller without a second command:
+
+    code[1] ip[4]          connected; ip in network order
+    code[1]                closed, reset
+
+The address is the one the connection was accepted from (the card's
+`accept`), not a name; a `.rhosts` line matches the dotted quad.
+
 Error codes (the `ACK` status):
 
     1 no-socket   2 bad-state   3 no-memory
@@ -170,6 +186,12 @@ reads the reply before returning: `cdb.cmd[0..2]` carry the reply type,
 socket and first payload byte, and `cdb.count` the payload copied back.
 The operation list and field layout are in `include/sys/net.h`; a reply
 payload needs `CDB_IN` and `count` set to the buffer's size.
+
+A caller that owns the whole pushed-frame stream may set `CDB_ASYNC` on a
+`SEND`.  The driver then does not read the reply: the ACK is pushed in
+order with the DATA frames and the caller reads it like any other, which
+is what lets rshd move bytes both ways from one process.  A caller that
+waits for each ACK inline (rcp) leaves the flag clear.
 
 ## 9. The three implementations
 

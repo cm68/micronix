@@ -30,8 +30,12 @@
  *	N_STATUS    reply payload: state, rx[2], tx[2]
  *	N_JOIN      reply payload: ip[4]
  *	N_GETCONF   reply payload: netconf
- *	N_SETCONF   buf/count payload; flags clear
+ * N_SETCONF  buf/count payload; flags clear
  *	NET_OP_RECV send nothing; return the next frame
+ *
+ * An EVENT's cmd[2] is its code.  A connected EVENT (1) carries the
+ * peer's ip[4] in network order behind it, so a server sets CDB_IN and
+ * count to get code+ip; closed (2) and reset (3) are one byte.
  *
  * A command's reply is read before the ioctl returns, so its ACK is
  * already there; a command with a reply payload needs CDB_IN and count

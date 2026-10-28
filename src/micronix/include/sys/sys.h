@@ -14,6 +14,18 @@
 #define NFILE	60
 
 /*
+ * The device switch tables are two namespaces: a block major and a char
+ * major with the same number are unrelated.  Each has its own table and
+ * its own major-to-segment map, so a module may be block 5 and another
+ * char 5 without either knowing about the other.
+ */
+#define NBDEV	10
+#define NCDEV	13
+
+extern UINT bdevseg[NBDEV];	/* block major -> module segment, 0 = none */
+extern UINT cdevseg[NCDEV];	/* char major -> module segment, 0 = none */
+
+/*
  * Where the low page publishes its sizes (uhdr.s): a byte at each fixed
  * address, in the freed low memory.  nmtab is NMOUNT at boot and nbufs
  * is the buffer cache's header count, so a program reading /dev/mem -

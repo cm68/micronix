@@ -1,0 +1,99 @@
+.he "select (2)                    10/28/26                    select (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+select
+- wait for input on a set of file descriptors
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+select(mask)
+.br
+.bd
+unsigned int mask;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Select
+waits until at least one of the descriptors named in
+mask can be read, and returns the ones that can.
+Bit n of mask is descriptor n; there are 16 descriptors,
+so one word is the whole set.  Bits for descriptors that
+are not open are ignored.
+
+A terminal descriptor is readable when a read would not
+block: a byte in the raw queue in raw or cbreak mode,
+a line in the cooked queue in cooked mode, or, in any
+mode, a hangup, in which case the read returns end of
+file.  A descriptor on /dev/net is readable when the
+network card holds a frame; the card keeps the frame
+until the driver reads it, so select looks without
+consuming it.  No other device is waited on: a regular
+file, a pipe, or a device with no queue of its own is
+not selectable.
+
+There is no timeout and no set of descriptors to write.
+This is not the BSD select.  A program that wants a
+deadline sets an alarm: install a handler for the alarm
+signal, arm
+.bd
+alarm
+(see alarm (2)), and treat a -1 return as "nothing
+yet".  The handler must re-arm itself, since this
+system resets a caught signal to its default when the
+signal is delivered.
+
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The subset of mask that can be read, in the same bit
+numbering, or -1 if a signal arrived first.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+EINTR
+if a caught signal arrived before any descriptor became
+readable.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(select = 58)
+.br
+.bd
+(mask in hl)
+.br
+.bd
+sys; select
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+The readable subset of the mask is returned in hl.
+The carry flag is cleared on success, or set on failure;
+the error number is then in hl.

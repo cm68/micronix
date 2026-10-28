@@ -379,6 +379,18 @@ install-host:
 	$(SUDO) chmod -R a+rX $(MXROOT)
 
 #
+# A top-level "make install" updates the host page tree as well, so the
+# pages mxman reads are never older than the ones the system installs.
+# It is a prerequisite and not a line in the recipe: inc's install
+# recipe is canned and shared with every directory, where
+# install-man-host means that directory's own pages, or nothing.
+#
+# It still honours MXROOT - /usr/local/micronix by default, or point it
+# at the tree mxman is given in $MXMAN.
+#
+install: install-man-host
+
+#
 # The top of the source tree the simulator sees.  The recursion fills
 # in /usr/src/lib, /usr/src/cmd and the rest; this ships the makefile
 # that drives them, which nothing did - /usr/src/makefile was a 2023

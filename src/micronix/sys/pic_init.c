@@ -219,10 +219,6 @@ pic_init()
         clockinit = ss1_clockinit;
         rtcinit = ss1_rtcinit;
         rtcwrite = ss1_rtcwrite;
-        console_putc = ss1_putc;
-        console_start = ss1_start;
-        console_stop = ss1_stop;
-        console_set = ss1_set;
         console_minit = ss1_uart_init;
         console_minor = TTY_SS1;        /* /dev/console is the 2651 */
         out(SS1MPIC1, 0x7f);            /* mask IR0-6, open IR7 (the cascade) */

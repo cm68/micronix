@@ -42,7 +42,7 @@
 /* card -> guest, NET.md section 5 */
 #define P_ACK           0x80
 #define P_DATA          0x81
-#define P_EVENT         0x82
+#define P_EVENT         0x82            /* EV_CONNECTED also carries ip[4] */
 
 /* socket states, NET.md section 3 */
 #define S_CLOSED        0

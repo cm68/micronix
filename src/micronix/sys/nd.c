@@ -56,16 +56,23 @@ ndout(b)
 /*
  * Point the card at the block number and write it - four bytes, most
  * significant first, the way the HDCA's header is four bytes.
+ *
+ * The block number is a UINT (struct buf's blk), so the top two bytes
+ * are always zero.  The two that are not written through a UINT8 cast:
+ * that is the shape lower.c's byte-extraction pattern matches (a NARROW
+ * over a shift), and it loads the byte straight out of the word instead
+ * of emitting a shift (and the `& 0xff` that does not make it a NARROW
+ * at all) - which is ~200 bytes of unrolled srl/rr otherwise.
  */
 static void
 ndblk(blk)
 	UINT blk;
 {
 	out(ND_CMD, ND_BLOCK);
-	ndout((blk >> 24) & 0xff);
-	ndout((blk >> 16) & 0xff);
-	ndout((blk >> 8) & 0xff);
-	ndout(blk & 0xff);
+	ndout(0);
+	ndout(0);
+	ndout((UINT8) (blk >> 8));
+	ndout((UINT8) blk);
 }
 
 /*

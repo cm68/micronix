@@ -98,6 +98,10 @@ int ttinit();
 extern int ace_start(), ace_stop(), ace_putc(), ace_set();
 extern int ss1_start(), ss1_stop(), ss1_putc(), ss1_set();
 extern int ss1_uart_open();
+extern int ttypub();            /* publish the page's doors (sys/ttyres.c) */
+extern int ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
+extern int ttyin(), ttyout();   /* the line discipline, same page (sys/tty.c) */
+int mumint();                   /* below, and an entry point the resident half calls */
 
 /*
  * Tty structures for the four ports: the SS1's 2651 and the three
@@ -112,7 +116,7 @@ extern int ss1_uart_open();
  *   minor  TTY_ACE1    -> mttys[2]
  *   minor  TTY_ACE2    -> mttys[3]
  */
-struct tty mttys[NMIO] = { 0 };
+extern struct tty mttys[];
 
 /*
  * Select a tty structure from a device number.  A NULL return means the
@@ -473,6 +477,29 @@ muenable(dev, mode)
     out(MBASE + MUSELECT, ((t->dev & 15) - (TTY_ACE0 - 1)) | PENABLE);
     out(MBASE + INTENABLE, mode);
     ei();
+}
+
+/*
+ * The character entries the kernel copies into ovlcvec[1] when this
+ * module is placed (sys/ovl.c).  They are the resident interrupt stubs'
+ * counterparts: a process reaches them through the ovlc trampolines,
+ * the stubs through ttyin/ttyout/mumint in sys/ttyres.c.
+ */
+struct ciovec ttycvec = {
+    &muopen, &muclose, &muread, &muwrite, &mustty
+};
+
+/*
+ * The module's init, run once by ovlplace before the page is reachable.
+ * It tells the resident half where the page is and which of its
+ * addresses the interrupt stubs should call; the state it points at
+ * (mttys, sys/ttyres.c) is resident and needs nothing from this page.
+ */
+ttyinit(seg)
+    UINT seg;
+{
+    ttypub(seg, ttyin, ttyout, mumint);
+    return (0);
 }
 
 /*

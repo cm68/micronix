@@ -35,8 +35,11 @@ extern int in(), out();
 extern int copy();              /* mem.s: kernel-to-kernel */
 extern int copyin(), copyout(); /* mem.s: the user side */
 extern int sleep(), wakeup();
+extern UINT netline;            /* resident: select(2) reopens the line */
+extern int selectchan;          /* resident: select(2)'s event */
 
 static UINT netseg;             /* this module's segment, from netstart() */
+static UINT8 netpresent;        /* the card answered its probe */
 static UINT8 netbuf[N_MAXPAY];  /* one frame's payload */
 
 /*
@@ -90,6 +93,7 @@ netprobe(mode)
 
     if (!netcard())
         return (0);
+    netpresent = 1;
 
     if (mode == PROBE_CLEAR) {
         for (n = 0; n < NETRING && (in(NETSTAT_PORT) & NETSTAT_RXRDY); n++)
@@ -115,11 +119,15 @@ int
 netint()
 {
     register int l;
+    register UINT n;
 
     l = intrline(netint, netseg);
-    if (l >= 0)
+    if (l >= 0) {
+        netline = l;            /* select(): the line to reopen */
         pic_mask(l);
+    }
     wakeup(&netchan);
+    wakeup(&selectchan);
     return (0);
 }
 
@@ -132,11 +140,23 @@ int
 netwait()
 {
     register int l;
+    register UINT n;
 
+    l = intrline(netint, netseg);
+    if (l < 0) {
+        /*
+         * No line to sleep on.  A command's reply is pushed inside the
+         * write that sent it, and a pushed frame waits in the card, so
+         * this is a look, not a wait: the callers that block (RECV with
+         * nothing to take) are driven by select() and its alarm.
+         */
+        for (n = 0; n < NETPROBEWAIT; n++)
+            if (in(NETSTAT_PORT) & NETSTAT_RXRDY)
+                return (0);
+        return (-1);
+    }
     for (;;) {
-        l = intrline(netint, netseg);
-        if (l < 0)
-            return (-1);
+        netline = l;
         inton(l);
         di();
         if (in(NETSTAT_PORT) & NETSTAT_RXRDY) {
@@ -147,10 +167,16 @@ netwait()
     }
 }
 
+/*
+ * Is the card there?  Not "is its line wired": a machine can have the
+ * card without a working interrupt route, and the driver moves frames
+ * perfectly well by polling NETSTAT.  The line is the wakeup; netwait
+ * below uses it when it exists and looks at the port when it does not.
+ */
 int
 netattached()
 {
-    return (intrline(netint, netseg) >= 0);
+    return (netpresent);
 }
 
 /*
@@ -169,7 +195,7 @@ netrecv(hdr, lenp)
         return (-1);
     for (i = 0; i < 4; i++)
         hdr[i] = in(NETDATA_PORT);
-    len = hdr[2] | (hdr[3] << 8);
+    len = *(UINT *) &hdr[2];    /* the card's little-endian length word */
     if (len > N_MAXPAY) {       /* the card never pushes more */
         for (i = 0; i < N_MAXPAY; i++)
             in(NETDATA_PORT);
@@ -274,10 +300,25 @@ netioctl(dev, cmd, r, b)
         }
         netput(op);
         netput(sock);
-        netput(len & 0xff);
-        netput((len >> 8) & 0xff);
+        netput((UINT8) len);
+        netput((UINT8) (len >> 8));
         for (i = 0; i < len; i++)
             netput(netbuf[i]);
+    }
+
+    /*
+     * A caller that owns the pushed-frame stream reads its answer in
+     * order with the data; waiting here would take the next frame -
+     * possibly the peer's DATA - out of that stream and hand it to the
+     * wrong reader.  The card still answers; the answer is a frame like
+     * any other.
+     */
+    if (op != NET_OP_RECV && (r->flags & CDB_ASYNC)) {
+        r->cmd[0] = 0;
+        r->cmd[1] = sock;
+        r->cmd[2] = 0;
+        r->count = 0;
+        return (0);
     }
 
     if (netrecv(hdr, &len) < 0) {

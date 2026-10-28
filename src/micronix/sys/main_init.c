@@ -104,7 +104,6 @@ main()
     zero(lowbss, 416);          /* clear the freed low-memory bss */
     nmtab = NMOUNT;             /* publish the mount table's size, 0x3ea */
     enable();                   /* enable interrupts */
-    coninit();
     plogo();
     pinit();                    /* plist, see below */
     meminit();                  /* memory */
@@ -127,6 +126,7 @@ main()
     irelse(rootdir);
     u.p->tty = 0;               /* not tied to any tty */
     ovlplaceall();              /* the driver modules riding in our own file */
+    coninit();                  /* the console tty, now that its page exists */
     intr_attach();              /* tickle each card, wire its interrupt line */
 
     /*
@@ -142,8 +142,8 @@ main()
         char nm[12];
 
         for (i = 1; i < nbdev; i++)
-            if (biosw[i].strat != &nodev) {
-                h = ovlmap(i);
+            if (biosw[i].strat != &nodev && bdevseg[i]) {
+                h = ovlbmap(i);
                 if (h && h->ndrv) {
                     for (j = 0; j < 12; j++)
                         nm[j] = h->name[j];
@@ -159,7 +159,7 @@ main()
      * there costs the machine its swap over a drive that is not fitted.
      */
     u.error = 0;
-    ovlmap(major(rootdev));
+    ovlbmap(major(rootdev));
 
     /*
      * The swap map, last, and here rather than in the swapper.
@@ -235,7 +235,7 @@ ovlplaceall()
     struct obj hdr;
     struct inode *ip;
     long modbase;
-    UINT nmod, n, i, seg, maj, ra, bn;
+    UINT nmod, n, i, seg, bmaj, cmaj, ra, bn;
     int bad;
     struct buf *bp;
     char *s;
@@ -269,8 +269,8 @@ ovlplaceall()
 
     for (n = 0; n < nmod; n++) {
         /*
-         * The page's first block is the module's header, and the major in
-         * it settles whether the page is worth placing.  The driver the
+         * The page's first block is the module's header, and the majors
+         * in it settle whether the page is worth placing.  The driver the
          * kernel was booted from is already running out of the slot
          * setdev stamped into, so its appended page is a second copy of a
          * driver that is already here - and placing it again is not the
@@ -282,11 +282,9 @@ ovlplaceall()
          * the copy the kernel is running from stays where it was.
          *
          * So the header is read before the segment is spent, and a page
-         * whose major is placed is skipped.  ovlmap answers for a driver
-         * the kernel still holds as well as one in a segment, which is
-         * what makes this the same test for either; its mapping of the
-         * frame is the answer to a question about a driver already
-         * mapped, and the next putblk saves and restores around it.
+         * whose binding is already placed is skipped.  Each namespace
+         * answers for itself: a char major does not hide a block major
+         * with the same number, or the reverse.
          */
         bn = imap(ip, (UINT) (modbase >> 9) + n * 8, &ra, IREAD);
         if (bn == 0 || (bp = bread(bn, rootdev)) == 0) {
@@ -294,9 +292,11 @@ ovlplaceall()
             continue;
         }
         s = bhold(bp);
-        maj = ((struct ovlhdr *) s)->major;
+        bmaj = ((struct ovlhdr *) s)->major;
+        cmaj = ((struct ovlhdr *) s)->cmajor;
         brel();
-        if (ovlmap(maj) != 0) {
+        if ((bmaj && bmaj < NBDEV && bdevseg[bmaj]) ||
+            (cmaj && cmaj < NCDEV && cdevseg[cmaj])) {
             brelse(bp);
             continue;
         }
@@ -324,7 +324,7 @@ ovlplaceall()
          */
         ra = ovlattach(seg);
         if (ra)
-            pr("ovl: %d not placed\n", maj);
+            pr("ovl: %d/%d not placed\n", bmaj, cmaj);
     }
     irelse(ip);
 }

@@ -18,8 +18,8 @@
 
 extern struct ciovec ptycvec;
 
-struct ovlhdr ptyhdr = { 12, 0, 0, 0, 0, &ptycvec, 0, 0,
-	{ 'p', 't', 'y' } };
+struct ovlhdr ptyhdr = { 0, 0, 0, 0, 0, &ptycvec, 0, 0,
+	{ 'p', 't', 'y' }, 0, 5 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

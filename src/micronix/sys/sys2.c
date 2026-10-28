@@ -74,7 +74,17 @@ stime()
     if (!super())
         return;
     di();
-    seconds = ((long) u.hl << 16) | u.de;
+    /*
+     * The long's low word is u.de, its high word u.hl.  Packing it with
+     * `u.hl << 16` is a qshl loop of sixteen shifts for a word move.
+     */
+    {
+        union { long l; UINT w[2]; } t;
+
+        t.w[0] = u.hl;
+        t.w[1] = u.de;
+        seconds = t.l;
+    }
     ei();
     (*rtcwrite)(seconds);
 }

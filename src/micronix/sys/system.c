@@ -48,7 +48,7 @@ struct syscall
 extern int indir(), unimp(), badcall();
 
 extern int brake(), chdir(), chmod(), chown(), sync(),
-    dup(), dup2(), getuid(), setuid(), nice(), ssw();      /* sys1.c */
+    dup(), dup2(), getuid(), setuid(), nice();            /* sys1.c */
 extern int pause(), stat(), alarm(), getpid(), stime(),
     fstat(), snooze();                                      /* sys2.c */
 extern int permission();                                    /* access.c */
@@ -62,7 +62,7 @@ extern int exit(), wait();                                  /* fork.c */
 extern int kill(), signal();                                /* sig.c */
 extern int stty(), gtty();                                  /* cio.c */
 
-extern int r_close(), r_csw(), r_fork(), r_ioctl();         /* reg.c */
+extern int r_close(), r_fork(), r_ioctl();         /* reg.c */
 extern int r_pipe(), r_seek(), r_ftruncate(), r_time();
 
 /*

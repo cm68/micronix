@@ -379,7 +379,7 @@ all: $(TARGET) $(TARGETS)
 # rather than linking it against an old struct.  Depend on them too.
 #
 SYSHDRS	= $(patsubst %,$(DEPTH)/include/%,8080.h alloc.h bios.h cpm.h crypt.h dirent.h dtab.h dump.h errno.h fio.h fslib.h grp.h hitech.h mtab.h obj.h pascal.h pwd.h setjmp.h std.h stdio.h time.h types.h utmp.h)\
-	  $(patsubst %,$(DEPTH)/include/sys/%,access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h ncr.h ovl.h proc.h reboot.h reg.h sgtty.h signal.h stat.h sys.h times.h tty.h)
+	  $(patsubst %,$(DEPTH)/include/sys/%,access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h ncr.h nd.h net.h ovl.h proc.h pty.h reboot.h reg.h sgtty.h signal.h stat.h sys.h times.h tty.h)
 
 $(OBJS): $(HSRCS) $(SYSHDRS)
 

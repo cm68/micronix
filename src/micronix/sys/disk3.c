@@ -359,7 +359,7 @@ newdrv()
  */
 newrw()
 {
-    static UINT32 abs, dma;
+    UINT32 abs, dma;
     UINT spc;
 
     spc = d3info->spc;
@@ -426,7 +426,7 @@ static int
 d3specify(drive)
     UINT drive;
 {
-    static UINT32 a;
+    UINT32 a;
 
     d3spec.steprate = d3info->step;
     d3spec.settle = d3info->seek;
@@ -488,7 +488,7 @@ d3addr(p)
 static void
 d3link()
 {
-    static UINT32 a;
+    UINT32 a;
 
     a = d3addr((char *) &iopb);
     iopb.link = (UINT8) a;
@@ -506,7 +506,7 @@ d3link()
 reset()
 {
     extern char map0[];
-    static UINT32 a;
+    UINT32 a;
     int *ichan;
 
     d3link();
@@ -515,7 +515,7 @@ reset()
     di();
     map0[2] = 0;
     ichan[0] = (UINT) a;        /* the low two bytes */
-    ichan[1] = (UINT) (a >> 16);/* and the high byte */
+    ichan[1] = ((UINT *) &a)[0];/* the high word */
     map0[2] = 1;
     inton(DISK3INT);
     ei();
@@ -554,7 +554,7 @@ issue()
  */
 d3wait()
 {
-    static UINT32 i;
+    UINT32 i;
 
     attn();
     for (i = 0; iopb.status == D3_BUSY && i < D3SPIN; i++)
@@ -620,7 +620,7 @@ struct biovec disk3bvec = { &disk3open, &disk3close, &disk3strat, 0 };
 disk3probe(mode)
 	int mode;
 {
-    static UINT32 i;
+    UINT32 i;
 
     if (mode == PROBE_CLEAR) {
         out(D3_ATTN, D3_RESET);     /* hold the 8085 in reset: the line goes quiet */

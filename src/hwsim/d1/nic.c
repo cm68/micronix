@@ -141,6 +141,27 @@ push_event(unsigned char sock, unsigned char code)
     push_frame(P_EVENT, sock, p, 1);
 }
 
+/*
+ * A connected event carries the peer's address: code, then ip[4] in
+ * network order.  rshd needs it for .rhosts, and the guest has no other
+ * way to ask who called.  Closed and reset stay one byte.
+ */
+static void
+push_event_ip(unsigned char sock, unsigned char code, int fd)
+{
+    struct sockaddr_in a;
+    socklen_t al;
+    unsigned char p[5];
+
+    p[0] = code;
+    al = sizeof a;
+    if (getpeername(fd, (struct sockaddr *) &a, &al) == 0)
+        memcpy(p + 1, &a.sin_addr.s_addr, 4);
+    else
+        memset(p + 1, 0, 4);
+    push_frame(P_EVENT, sock, p, 5);
+}
+
 /* ---- the commands (guest -> card) ---- */
 
 static void
@@ -156,6 +177,12 @@ nic_open(unsigned char s, unsigned char mode)
     if (fd < 0) {
         push_ack(s, E_NO_MEMORY);
         return;
+    }
+    if (mode) {
+        int on = 1;
+
+        /* a server that closes and re-listens must be able to rebind */
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof on);
     }
     fcntl(fd, F_SETFL, O_NONBLOCK);
     socks[s].fd = fd;
@@ -514,7 +541,7 @@ nic_poll(void)
             getsockopt(socks[s].fd, SOL_SOCKET, SO_ERROR, &err, &el);
             if (err == 0) {
                 socks[s].state = S_TCP_OPEN;
-                push_event(s, EV_CONNECTED);
+                push_event_ip(s, EV_CONNECTED, socks[s].fd);
             } else {
                 close(socks[s].fd);
                 socks[s].fd = -1;
@@ -529,7 +556,7 @@ nic_poll(void)
                 socks[s].fd = c;
                 fcntl(c, F_SETFL, O_NONBLOCK);
                 socks[s].state = S_TCP_OPEN;
-                push_event(s, EV_CONNECTED);
+                push_event_ip(s, EV_CONNECTED, socks[s].fd);
             }
         } else if (socks[s].state == S_TCP_OPEN || socks[s].state == S_UDP) {
             if (rev & POLLOUT && socks[s].txlen > 0) {
