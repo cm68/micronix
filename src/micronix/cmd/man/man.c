@@ -113,7 +113,7 @@ static char sectbuf[2];
 static char *sectp;
 
 #ifdef linux
-static char *root = "/usr/local/micronix";      /* the /usr of the man tree; $MXMAN overrides */
+static char *root = "/usr/local/micronix";      /* the /usr of the man tree; $MXMAN or argv[0] */
 static char *formprog = "mxform";               /* the host formatter */
 static char found_name[64];     /* find()'s result, good until the next call */
 #else
@@ -197,6 +197,63 @@ char *path;
 	return stat(path, buf) >= 0;
 #endif
 }
+
+#ifdef linux
+/*
+ * Where the page tree is, for a host build, when $MXMAN does not say.
+ *
+ * The compiled-in root is the installed one, /usr/local/micronix, and
+ * that is the right answer for a binary that lives under that prefix.
+ * It is the wrong answer for the build tree, which keeps its host tools
+ * in bin/ and mirrors the pages into man/ beside them - the arrangement
+ * the rest of the tree uses, where a tool works out libexec/ and ccc/lib
+ * from its own argv[0] rather than from a fixed path.
+ *
+ * So when argv[0] names a directory, the parent of that directory is
+ * offered as the root, the same one step up that bin/mxman needs.  A
+ * bare "mxman" found on $PATH has no directory in argv[0] - the shell
+ * execs it by the name that was typed - so /proc/self/exe is asked
+ * where the program really is, and the same one step up is taken from
+ * that.  Either way the candidate is taken only if it has a man/man1
+ * below it, which is what a mirror looks like and what /usr/local does
+ * not; anything else keeps the compiled-in root, including a host with
+ * no /proc to ask.
+ */
+char *
+homeroot(a0)
+char *a0;
+{
+	static char rootbuf[520];
+	static char probebuf[sizeof rootbuf + 16];
+	char *slash;
+	char *p;
+	ssize_t n;
+
+	if (a0 == 0)
+		return root;
+	slash = strrchr(a0, '/');
+	if (slash == 0) {
+		n = readlink("/proc/self/exe", rootbuf, sizeof rootbuf - 1);
+		if (n <= 0)
+			return root;
+		rootbuf[n] = 0;
+		slash = strrchr(rootbuf, '/');
+		if (slash == 0)
+			return root;
+		a0 = rootbuf;
+	}
+	if (slash - a0 + 4 > (int)sizeof rootbuf)
+		return root;
+	p = rootbuf;
+	while (a0 < slash)
+		*p++ = *a0++;
+	concat(p, "/..", 0);
+	concat(probebuf, rootbuf, "/man/man1", 0);
+	if (!exists(probebuf))
+		return root;
+	return rootbuf;
+}
+#endif
 
 /*
  * "No documentation for x".  Goes to descriptor 2, unbuffered, one write
@@ -542,9 +599,12 @@ char **argv;
  * whether $PAGER is used - a page going into a file or a pipeline is not
  * something to page.
  *
- * The exit status is 1 whatever happened, and 0 from the usage - which is
- * the wrong way round and is what the binary does.  Nothing in the system
- * looks at it.
+ * The binary exits 1 whatever happened, and 0 from the usage - which is
+ * the wrong way round.  Nothing in the system looks at it.  This exits 0
+ * instead, a DELIBERATE DEPARTURE from the binary, so that a script
+ * running man or mxman is not told the page failed.  That says nothing
+ * about whether a page was found; the "No documentation" message on
+ * descriptor 2 is still the only report of a miss.
  */
 main(argc, argv)
 int argc;
@@ -563,6 +623,8 @@ char **argv;
 	r = getenv("MXMAN");
 	if (r && r[0])
 		root = r;
+	else
+		root = homeroot(argv[0]);
 	istty = isatty(1);
 #else
 	istty = gtty(1, &sg) >= 0;
@@ -579,7 +641,7 @@ char **argv;
 		while (wait(&status) >= 0)
 			;
 	}
-	exit(1);
+	exit(0);
 }
 
 /*

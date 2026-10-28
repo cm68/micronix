@@ -74,9 +74,10 @@ Reproduced in man.c, both of them, because they are what it does.
      falls through instead of returning.  The search then fails and says
      so a second time.
 
-And one that is only odd: the exit status is 1 when man has shown
+And one that is only odd: the binary's exit status is 1 when man has shown
 something and 0 from the usage, which is the wrong way round.  Nothing in
-the system looks at it.
+the system looks at it.  This tree does not reproduce it: man and mxman
+both exit 0, a deliberate departure - see main() in man.c.
 
 
 What the pages do not say
