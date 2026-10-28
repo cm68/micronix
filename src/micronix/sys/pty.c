@@ -46,7 +46,7 @@
 #include <errno.h>
 
 extern int ttyread(), ttywrite(), ttymode(), ttyopen(), ttyclose();
-extern int cstart(), drainques(), qinit(), sendque();
+extern int cstart(), ustart(), drainques(), qinit(), sendque();
 extern int pty_start(), pty_stop(), pty_put();
 extern int ptymode();
 extern int ptyhang();            /* the process-table walk, resident */
@@ -195,6 +195,7 @@ ptyclose(dev, mode)
          */
         s->mstate |= TTYHUP;
         m->mstate |= TTYHUP;
+        wakeup(&m->rawque);         /* a master read sleeping for output */
         wakeup(&selectchan);
     }
 }
@@ -209,6 +210,7 @@ ptyread(dev)
     int dev;
 {
     register int i;
+    register UINT want;
     register struct ptyinfo *p;
     register struct tty *s, *m;
 
@@ -226,16 +228,32 @@ ptyread(dev)
         return;
     }
 
-    if (!p->sopen || p->hung)
-        return;			/* end of file */
-    while (u.count && m->rawque.count == 0) {
-        if (p->hung)
-            break;
-        sleep(&m->rawque, PRITTI);
+    /*
+     * The slave's output sits in its own outque until its start routine
+     * moves it to the master's raw queue, and a shell that writes and
+     * exits leaves it there.  Move it, take it, and only then decide
+     * end of file: checking the hangup first stranded the last output
+     * of every quick command.  ustart, not cstart, because the peer
+     * queue having been full is exactly the stopped state a read is
+     * here to clear.
+     */
+    want = u.count;
+    for (;;) {
+        ustart(s);
+        if (u.count && m->rawque.count)
+            sendque(&m->rawque);
+        if (u.count == 0 || u.count != want)
+            break;                  /* full, or something to return */
+        if (!p->sopen || p->hung) {
+            if (m->rawque.count == 0 && s->outque.count == 0 &&
+                s->nextc == 0)
+                return;         /* end of file, and nothing left */
+            continue;
+        }
+        if (m->rawque.count == 0 && s->outque.count == 0 && s->nextc == 0)
+            sleep(&m->rawque, PRITTI);
     }
-    if (u.count && m->rawque.count)
-        sendque(&m->rawque);
-    cstart(s);
+    ustart(s);
 }
 
 /*

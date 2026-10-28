@@ -197,6 +197,36 @@ nic_close(unsigned char s)
     if (s >= NSOCK)
         return;
     if (socks[s].fd >= 0) {
+        /*
+         * A SEND is acknowledged when it is queued here, not when it is
+         * on the wire: nic_poll writes the backlog out.  A close that
+         * arrives between the two must not drop the last output of a
+         * session, so give the backlog a short bounded drain first.
+         */
+        int tries;
+
+        for (tries = 0; socks[s].txlen > 0 && tries < 20; tries++) {
+            struct pollfd pf;
+            int r;
+
+            r = send(socks[s].fd, socks[s].txbuf, socks[s].txlen,
+                     MSG_DONTWAIT);
+            if (r > 0) {
+                if (r == socks[s].txlen)
+                    socks[s].txlen = 0;
+                else {
+                    memmove(socks[s].txbuf, socks[s].txbuf + r,
+                            socks[s].txlen - r);
+                    socks[s].txlen -= r;
+                }
+                continue;
+            }
+            if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+                break;
+            pf.fd = socks[s].fd;
+            pf.events = POLLOUT;
+            (void) poll(&pf, 1, 5);     /* 5 ms; the loop bounds the wait */
+        }
         close(socks[s].fd);
         socks[s].fd = -1;
     }
