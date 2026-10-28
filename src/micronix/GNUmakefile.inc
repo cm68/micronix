@@ -155,6 +155,7 @@ NOWARN	= --warning=no-ignore-newer
 # target as a user who can write there:
 #
 #	PREFIX=/usr/local MXROOT=/usr/local/micronix make ...
+#	DESTDIR=/tmp/stage PREFIX=/usr/local MXROOT=/usr/local/micronix make ...
 #
 # The checkout is the default MXROOT, so "make install-man-host"
 # mirrors the pages where the tree's own build keeps its host output,
@@ -162,7 +163,7 @@ NOWARN	= --warning=no-ignore-newer
 #
 PREFIX	?= /usr/local
 MXROOT	?= $(HOSTROOT)
-MXMAN	 = $(MXROOT)/man
+MXMAN	 = $(DESTDIR)$(MXROOT)/man
 
 #
 # Where the binary goes in the filesystem.  Everything this tree
@@ -455,12 +456,9 @@ install-man:
 # The same pages for mxman, under $(MXMAN).  Every directory is
 # entered and installs its own MANSRCS; one with no page does nothing.
 # The top level writes this rule itself because it also enters man/,
-# the archive pages no command owns - hence the test.  The chmod is
-# there and not in the canned recipe because it has to run once, at
-# the end, over the page tree: sudo's umask leaves every copy 0600 in
-# a 0700 directory, which mxman cannot read.  It is $(MXMAN) and not
-# $(MXROOT) so that a mirror rooted in the checkout - the top level's
-# "make man" - fixes the pages without chmod'ing the whole tree.
+# the archive pages no command owns - hence the test.  It copies as
+# the invoking user, so there is no root umask to repair afterwards:
+# the files are readable when they land.
 #
 ifneq ($(DEPTH),.)
 install-man-host:

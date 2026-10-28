@@ -56,16 +56,15 @@ src/hwsim/d1/d1:
 # the host side of what "make install" does for the system below: the
 # same MANSRCS, put where mxman can read them without booting anything.
 #
-# MXROOT anchors the mirror at this checkout and SUDO= leaves it
-# writable.  The default, /usr/local/micronix, is for an installed
-# tree and is not ours - the same reason bin/ receives the cross tools
-# rather than /usr/local/bin.
+# MXROOT is the checkout by default, so this needs no privilege.  A
+# copy under /usr/local is a separate, deliberate run of the same
+# target with MXROOT set; see GNUmakefile.inc.
 #
 .PHONY: man
 man:
 	$(MAKE) -C src/micronix/cmd/man host
 	$(MAKE) -C src/micronix/cmd/form host
-	$(MAKE) -C src/micronix install-man-host MXROOT=$(CURDIR) SUDO=
+	$(MAKE) -C src/micronix install-man-host
 
 test: filesystem  src/usersim/sim
 	src/usersim/sim

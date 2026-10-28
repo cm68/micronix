@@ -362,8 +362,9 @@ sysinstall:
 
 #
 # Every man page in the tree, mirrored under $(MXMAN) so mxman can read
-# it without booting anything.  The mx* tools are in $(PREFIX)/bin and
-# this is their page tree, one directory per section like /usr/man.
+# it without booting anything.  MXROOT is this checkout by default, and
+# the mx tools are built into bin/ beside it; set MXROOT to a prefix to
+# mirror a system copy instead, as a user who can write there.
 #
 # These are NOT the pages the system installs.  What installs is one
 # page per command beside its source, plus libunix's section 2 and libc's
@@ -383,31 +384,29 @@ sysinstall:
 install-man-host:
 	$(RECURSE)
 	$(MAKE) -C man install-man-host
-	$(SUDO) chmod -R a+rX $(MXMAN)
 
 #
-# The cross man and formatter, built for the host and installed beside
-# the man pages: mxman reads $(MXMAN) and execs mxform by name, so the
-# two live in the same $(MXROOT)/bin directory.
+# The cross man and formatter, built for the host and installed into
+# $(PREFIX)/bin, where the other mx tools go.  mxman reads $(MXMAN) and
+# execs mxform by name, so the formatter has to be on the path.
+#
+# Opt-in and unprivileged, like sysinstall and sysrt: DESTDIR stages
+# it, and /usr/local is for a user who can write there.
 #
 install-host:
 	$(MAKE) -C cmd/man host
 	$(MAKE) -C cmd/form host
-	$(SUDO) mkdir -p $(MXROOT)/bin
-	$(SUDO) install -m 755 $(BIN)/mxman $(BIN)/mxform $(MXROOT)/bin/
-	$(SUDO) chmod -R a+rX $(MXROOT)
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	install -m 755 $(BIN)/mxman $(BIN)/mxform $(DESTDIR)$(PREFIX)/bin/
 
 #
-# A top-level "make install" updates the host page tree as well, so the
-# pages mxman reads are never older than the ones the system installs.
-# It is a prerequisite and not a line in the recipe: inc's install
-# recipe is canned and shared with every directory, where
-# install-man-host means that directory's own pages, or nothing.
+# There is deliberately no host-page install on "make install" any
+# more.  It used to be a prerequisite here, which meant every cross
+# install - and every bootstrap - mirrored the pages under a prefix
+# that was not the builder's and reached for sudo to do it.  The tree's
+# own build refreshes man/ ("make man" at the top), and a prefix copy
+# is asked for by naming MXROOT and running install-man-host.
 #
-# It still honours MXROOT - /usr/local/micronix by default, or point it
-# at the tree mxman is given in $MXMAN.
-#
-install: install-man-host
 
 #
 # The top of the source tree the simulator sees.  The recursion fills
