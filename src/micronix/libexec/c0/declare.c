@@ -509,6 +509,30 @@ fnParams(struct type *prefix)
  * parameters are not wanted either way, which is the leak the skip
  * exists to avoid; only the type of the thing pointed at is.
  */
+/*
+ * Does this name need a fresh function suffix built for it?  Split out
+ * of skipParams() for the same reason as suffixApplies() below: as one
+ * expression it is the second-largest AST c1 builds for this file.
+ */
+static int
+needsFuncSfx(struct name *nm)
+{
+    struct type *nt;
+
+    if (!nm->type)
+        return 0;
+    nt = nm->type;
+    if ((nt->flags & TF_POINTER) && !nt->sub)
+        return 1;
+    if ((nt->flags & TF_ARRAY) && nt->sub &&
+        (nt->sub->flags & TF_POINTER) && !nt->sub->sub)
+        return 1;
+    if ((lexlevel > 1 || idOnce(nm->id)) &&
+        !(nt->flags & (TF_FUNC | TF_ARRAY)))
+        return 1;
+    return 0;
+}
+
 struct type *
 skipParams(struct name *nm, struct type *prefix)
 {
@@ -562,12 +586,7 @@ skipParams(struct name *nm, struct type *prefix)
      * fine - it keeps its phase 1 type - so this only bit locals, and
      * it bit them silently.
      */
-    if (nm->type &&
-        (((nm->type->flags & TF_POINTER) && !nm->type->sub) ||
-         ((nm->type->flags & TF_ARRAY) && nm->type->sub &&
-          (nm->type->sub->flags & TF_POINTER) && !nm->type->sub->sub) ||
-         ((lexlevel > 1 || idOnce(nm->id)) &&
-          !(nm->type->flags & (TF_FUNC | TF_ARRAY))))) {
+    if (needsFuncSfx(nm)) {
         suffix = (struct type *)permalloc(sizeof(*suffix));
         suffix->flags = TF_FUNC;
         suffix->sub = prefix ? prefix : inttype;
@@ -650,6 +669,88 @@ skipParams(struct name *nm, struct type *prefix)
  *   - Creates name entry (added to names[] unless struct_elem=1)
  *   - For functions: allocates parameter name entries
  */
+/*
+ * Does this declarator's suffix apply to the name?
+ *
+ * These alternatives began as one expression inside declare(), and
+ * that expression is the largest AST c1 ever builds for this file -
+ * 181 live nodes at the peak, rather than one clause.  Evaluated a
+ * clause at a time the high-water is the widest clause, and the
+ * special cases below keep the explanation they were written with.
+ *
+ * Order matters: the clauses are evaluated left to right, as the
+ * short-circuiting || was.
+ */
+static int
+suffixApplies(struct type *suffix, struct name *nm)
+{
+    struct type *nt;
+
+    if (!suffix)
+        return 0;
+    /* phase 1 always applies the suffix */
+    if (phase == 1)
+        return 1;
+
+    nt = nm->type;
+
+    /* an array suffix where the name does not already carry one */
+    if ((suffix->flags & TF_ARRAY) &&
+        !(nt && (nt->flags & TF_ARRAY)))
+        return 1;
+
+    /* a function suffix onto a bare pointer: int (*p)() */
+    if ((suffix->flags & TF_FUNC) && nt &&
+        (nt->flags & TF_POINTER) && !nt->sub)
+        return 1;
+
+    /* and the same behind a dimension: int (*tab[2])() */
+    if ((suffix->flags & TF_FUNC) && nt &&
+        (nt->flags & TF_ARRAY) && nt->sub &&
+        (nt->sub->flags & TF_POINTER) && !nt->sub->sub)
+        return 1;
+
+    /*
+     * A function DECLARED inside a body - "extern short _pnum(),
+     * _fnum();", K&R's way of saying a routine does not return
+     * int.  Locals are freed after phase 1 and re-created in
+     * phase 2 from the base type alone, so the "()" was dropped
+     * and the name came back as a plain short.  A short does not
+     * decay, so the reference became DEREF(SYM) and the call
+     * loaded the first two bytes of the routine's own code and
+     * jumped through them.  Same shape as the array case above,
+     * and the same fix; only where the name carries no
+     * function-ness of its own, which is what the phase 2
+     * caution below is about.
+     *
+     * ...but NOT a name that is already a pointer to a function.
+     * That carries no TF_FUNC of its own either - the func-ness is
+     * one level down, in the sub - so it answered this test and
+     * fell through to the plain "nm->type = suffix" below, which
+     * replaced pointer-to-function with the bare function type.
+     *
+     * A file-scope declarator is walked twice, and the two walks
+     * see different things: the first meets the anonymous pointer
+     * left by "(*fp)" and wraps the "()" suffix into it correctly,
+     * the second meets the finished pointer-to-function and
+     * flattened it.  Then the redeclaration check compared the two
+     * and said so, which is why
+     *
+     *	int (*fp)();
+     *
+     * on a line by itself - no second declaration anywhere - was
+     * "redecl disagrees".  extern, a local, a parameter and an
+     * array of them all took other paths and were fine.
+     */
+    if ((suffix->flags & TF_FUNC) && nt &&
+        !(nt->flags & (TF_FUNC | TF_ARRAY)) &&
+        !((nt->flags & TF_POINTER) && nt->sub &&
+          (nt->sub->flags & TF_FUNC)))
+        return 1;
+
+    return 0;
+}
+
 struct name *
 declare(struct type **btp, unsigned char struct_elem)
 {
@@ -794,52 +895,7 @@ declare(struct type **btp, unsigned char struct_elem)
      *   - suffix is function type
      *   - Need: nm->type = suffix (function type, with sub=return type)
      */
-    if (suffix && (phase == 1 ||
-        ((suffix->flags & TF_ARRAY) &&
-         !(nm->type && (nm->type->flags & TF_ARRAY))) ||
-        ((suffix->flags & TF_FUNC) && nm->type &&
-         (nm->type->flags & TF_POINTER) && !nm->type->sub) ||
-        /* and the same behind a dimension: int (*tab[2])() */
-        ((suffix->flags & TF_FUNC) && nm->type &&
-         (nm->type->flags & TF_ARRAY) && nm->type->sub &&
-         (nm->type->sub->flags & TF_POINTER) && !nm->type->sub->sub) ||
-        /*
-         * A function DECLARED inside a body - "extern short _pnum(),
-         * _fnum();", K&R's way of saying a routine does not return
-         * int.  Locals are freed after phase 1 and re-created in
-         * phase 2 from the base type alone, so the "()" was dropped
-         * and the name came back as a plain short.  A short does not
-         * decay, so the reference became DEREF(SYM) and the call
-         * loaded the first two bytes of the routine's own code and
-         * jumped through them.  Same shape as the array case above,
-         * and the same fix; only where the name carries no
-         * function-ness of its own, which is what the phase 2
-         * caution below is about.
-         */
-        /*
-         * ...but NOT a name that is already a pointer to a function.
-         * That carries no TF_FUNC of its own either - the func-ness is
-         * one level down, in the sub - so it answered this test and
-         * fell through to the plain "nm->type = suffix" below, which
-         * replaced pointer-to-function with the bare function type.
-         *
-         * A file-scope declarator is walked twice, and the two walks
-         * see different things: the first meets the anonymous pointer
-         * left by "(*fp)" and wraps the "()" suffix into it correctly,
-         * the second meets the finished pointer-to-function and
-         * flattened it.  Then the redeclaration check compared the two
-         * and said so, which is why
-         *
-         *	int (*fp)();
-         *
-         * on a line by itself - no second declaration anywhere - was
-         * "redecl disagrees".  extern, a local, a parameter and an
-         * array of them all took other paths and were fine.
-         */
-        ((suffix->flags & TF_FUNC) && nm->type &&
-         !(nm->type->flags & (TF_FUNC | TF_ARRAY)) &&
-         !((nm->type->flags & TF_POINTER) && nm->type->sub &&
-           (nm->type->sub->flags & TF_FUNC))))) {
+    if (suffixApplies(suffix, nm)) {
         /*
          * Function suffixes are only applied in phase 1: in phase 2 a
          * reused nm already has its type correctly set, and re-applying

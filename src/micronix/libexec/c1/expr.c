@@ -294,11 +294,11 @@ mkincdec(int op, char width, Expr *child, int amt)
 }
 
 Expr *
-mkbfext(char off, char wid, Expr *addr)
+mkbfext(char off, char wid, char wtype, Expr *addr)
 {
 	Expr *e = alloc();
 	e->op = BFEXTRACT;
-	e->width = 's';
+	e->width = wtype;	/* the member's own type, so the parent agrees */
 	e->u.bf.off = off;
 	e->u.bf.wid = wid;
 	e->left = addr;
@@ -306,11 +306,11 @@ mkbfext(char off, char wid, Expr *addr)
 }
 
 Expr *
-mkbfass(char off, char wid, Expr *addr, Expr *val)
+mkbfass(char off, char wid, char wtype, Expr *addr, Expr *val)
 {
 	Expr *e = alloc();
 	e->op = BFASSIGN;
-	e->width = 's';
+	e->width = wtype;
 	e->u.bf.off = off;
 	e->u.bf.wid = wid;
 	e->left = addr;
@@ -416,7 +416,7 @@ isbinary(int op)
 Expr *
 readexpr(void)
 {
-	unsigned char op, t, n, i;
+	unsigned char op, t, n, i, wc;
 	unsigned long v;
 	Expr *e, *args, *arg;
 
@@ -507,22 +507,26 @@ readexpr(void)
 	case BFEXTRACT:
 		t = read1();
 		n = read1();
+		wc = read1();
 #ifdef DEBUG
 		if (VERBOSE(V_EXPR))
-			fprintf(stderr, "  BFEXTRACT off=%d wid=%d\n", t, n);
+			fprintf(stderr, "  BFEXTRACT off=%d wid=%d type=%c\n",
+				t, n, wc);
 #endif
 		e = readexpr();
-		return mkbfext(t, n, e);
+		return mkbfext(t, n, wc, e);
 
 	case BFASSIGN:
 		t = read1();
 		n = read1();
+		wc = read1();
 #ifdef DEBUG
 		if (VERBOSE(V_EXPR))
-			fprintf(stderr, "  BFASSIGN off=%d wid=%d\n", t, n);
+			fprintf(stderr, "  BFASSIGN off=%d wid=%d type=%c\n",
+				t, n, wc);
 #endif
 		e = readexpr();
-		return mkbfass(t, n, e, readexpr());
+		return mkbfass(t, n, wc, e, readexpr());
 
 	case QUES:
 		t = read1();

@@ -133,10 +133,18 @@ static void parseExpr(void) {
         advance();
         int off = read1();
         int wid = read1();
+        int wt = read1();
         exprApp("(BFEXT ");
         exprAppNum(off);
         exprApp(":");
         exprAppNum(wid);
+        exprApp(":");
+        {
+            char tb[2];
+            tb[0] = (char)wt;
+            tb[1] = 0;
+            exprApp(tb);
+        }
         exprApp(" ");
         parseExpr();
         exprApp(")");
@@ -148,10 +156,18 @@ static void parseExpr(void) {
         advance();
         int off = read1();
         int wid = read1();
+        int wt = read1();
         exprApp("(BFSET ");
         exprAppNum(off);
         exprApp(":");
         exprAppNum(wid);
+        exprApp(":");
+        {
+            char tb[2];
+            tb[0] = (char)wt;
+            tb[1] = 0;
+            exprApp(tb);
+        }
         exprApp(" ");
         parseExpr();
         exprApp(" ");

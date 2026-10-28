@@ -37,6 +37,7 @@ Expr *rewrite1(Expr *e);
 char *idxregname(unsigned char reg);
 #ifdef DEBUG
 #include "debug.h"
+
 extern short verbose;
 #endif
 
@@ -884,6 +885,115 @@ docompound(Expr *e)
 	n->dest = e->dest;
 	freeexpr(e);
 	return n;
+}
+
+/*
+ * Bitfield extract and insert: unsigned fields packed into a 16-bit
+ * word.  The work is done by the libc workers bfext and bfins
+ * (bitfield.s), which take the width and offset in a byte after the
+ * call - the call site is the address, the call, and that byte.
+ *
+ * bfaddr() and bfresult() are the two shapes both halves want.  Kept
+ * here rather than inline twice, they are what lets the feature fit
+ * beside the compiler at all: lower.c is already c1's largest module,
+ * and the arena that this compiler has to fit in is measured against
+ * it every self-host.
+ */
+static char bfetpl[] = "\tcall bfext\n\t.db $B\n";
+static char bfitpl[] = "\tcall bfins\n\t.db $B\n";
+
+/* Reduce the address to HL, or put it back and say no. */
+static int
+bfaddr(Expr *e)
+{
+	Expr *addr;
+
+	setdest(e->left, DEST_VALUE);
+	addr = rewrite1(e->left);
+	e->left = 0;
+	addr = valtohl(addr);
+	if (!addr || (addr->op != INHL &&
+	    !(addr->op == CODE && addr->u.var.reg == R_HL))) {
+		e->left = addr;
+		return 0;
+	}
+	freeexpr(addr);
+	return 1;
+}
+
+/* The field's value ends in HL; a byte-typed field also goes to A. */
+static Expr *
+bfresult(Expr *e, unsigned char w)
+{
+	Expr *n;
+
+	if (ISBYTE(w)) {
+		out("\tld a,l\n");
+		n = mkcode(w, R_A);
+		n->op = INA;
+	} else {
+		n = mkcode(w, R_HL);
+		n->op = INHL;
+	}
+	n->dest = e->dest;
+	freeexpr(e);
+	return n;
+}
+
+static Expr *
+dobfext(Expr *e)
+{
+	if (!bfaddr(e))
+		return 0;
+	emitasm(bfetpl, e);
+	return bfresult(e, e->width);
+}
+
+static Expr *
+dobfins(Expr *e)
+{
+	Expr *val, *n;
+	unsigned char w = e->width;
+
+	if (!bfaddr(e))
+		return 0;
+	out("\tpush hl\n");
+
+	setdest(e->right, DEST_VALUE);
+	val = rewrite(e->right);
+	e->right = 0;
+	if (val && val->op == INA) {
+		out("\tld l,a\n\tld h,0\n");
+		freeexpr(val);
+		val = mkcode(w, R_HL);
+		val->op = INHL;
+	} else {
+		val = valtohl(val);
+		if (val && val->op == INE) {
+			out("\tld l,e\n\tld h,0\n");
+			freeexpr(val);
+			val = mkcode(w, R_HL);
+			val->op = INHL;
+		}
+	}
+	if (!val || (val->op != INHL &&
+	    !(val->op == CODE && val->u.var.reg == R_HL))) {
+		freeexpr(val);
+		out("\tpop de\n");
+		nincomplete++;
+		out("; XXXXXX incomplete: bitfield value\n");
+		n = mkcode(w, R_HL);
+		n->op = INHL;
+		n->dest = e->dest;
+		freeexpr(e);
+		return n;
+	}
+	freeexpr(val);
+
+	/* bfins wants the address in HL and the value in DE */
+	out("\tpop de\n\tex de,hl\n");
+	emitasm(bfitpl, e);
+	return bfresult(e, w);
 }
 
 /*
@@ -1804,6 +1914,61 @@ spiltstore(Expr *e, Expr *oldleft)
 	return 0;
 }
 
+/*
+ * Is this a byte store through a post-stepped register pointer -
+ * "*p++ = <byte>" with p homed in BC or DE?
+ *
+ * Accepted:
+ *   - an ASSIGN whose result is a byte;
+ *   - the target a post-increment or post-decrement;
+ *   - the stepped operand a REGVAR in BC or DE (both callee-saved, so
+ *     reducing the value cannot clobber the pointer);
+ *   - and a right operand that is not long.
+ */
+/*
+ * A byte masked with a constant and wanted as a condition: (b & n),
+ * (b | n) or (b ^ n) in flag context.  The integer promotions make it
+ * int arithmetic, so the byte is widened, masked sixteen bits wide and
+ * tested with ld a,l / or h - where "and n" already sets Z on the
+ * answer.  Only the flags are wanted, and the bits the mask keeps all
+ * live in the low byte.
+ *
+ * Accepted:
+ *   - AND, OR or XOR, wanted in the flags;
+ *   - the left a WIDEN or SEXT of a byte;
+ *   - the right a constant that fits in a byte.
+ */
+static int
+flagbitop(Expr *e)
+{
+	if (e->op != AND && e->op != OR && e->op != XOR)
+		return 0;		/* not a bit operator */
+	if (e->dest != DEST_FLAGS)
+		return 0;		/* the value is wanted, not the flags */
+	if (!e->left || (e->left->op != WIDEN && e->left->op != SEXT))
+		return 0;		/* not a widened byte */
+	if (!e->left->left || !ISBYTE(e->left->left->width))
+		return 0;		/* not a byte under it */
+	if (!e->right || e->right->op != NUMBER)
+		return 0;		/* the other side is not a constant */
+	return (e->right->u.val & 0xffL) == e->right->u.val;
+}
+
+static int
+bystepassign(Expr *e)
+{
+	if (e->op != ASSIGN || !e->left || !ISBYTE(e->width))
+		return 0;		/* not a byte assignment */
+	if (e->left->op != POSTINC && e->left->op != POSTDEC)
+		return 0;		/* the target is not a step */
+	if (!e->left->left || e->left->left->op != REGVAR)
+		return 0;		/* the operand is not a register variable */
+	if (e->left->left->u.var.reg != R_BC &&
+	    e->left->left->u.var.reg != R_DE)
+		return 0;		/* not in a callee-saved pair */
+	return e->right && !ISLONG(e->right->width);
+}
+
 Expr *
 rewrite1(Expr *e)
 {
@@ -1835,6 +2000,18 @@ rewrite1(Expr *e)
 		e->left = e->right = 0;
 		freeexpr(e);
 		return rewrite1(val);
+	}
+
+	/* Bitfields go through the libc workers bfext and bfins. */
+	if (e->op == BFEXTRACT) {
+		n = dobfext(e);
+		if (n)
+			return n;
+	}
+	if (e->op == BFASSIGN) {
+		n = dobfins(e);
+		if (n)
+			return n;
 	}
 
 	/* CALL: args have to be pushed one at a time, not rewritten as a
@@ -2477,12 +2654,7 @@ spilled:	;
 	} else {
 		/* Rewrite children first (depth-first) */
 		/* Skip children marked nored (preserve for parent rules) */
-		if (e->op == ASSIGN && e->left && ISBYTE(e->width) &&
-		    (e->left->op == POSTINC || e->left->op == POSTDEC) &&
-		    e->left->left && e->left->left->op == REGVAR &&
-		    (e->left->left->u.var.reg == R_BC ||
-		     e->left->left->u.var.reg == R_DE) &&
-		    e->right && !ISLONG(e->right->width)) {
+		if (bystepassign(e)) {
 			/*
 			 * *p++ = <byte> with p homed in BC or DE.  The step rules
 			 * stage the old pointer into HL and step it there; a byte
@@ -2632,12 +2804,7 @@ spilled:	;
 					return w;
 			}
 			goto children_end;
-		} else if ((e->op == AND || e->op == OR || e->op == XOR) &&
-			   e->dest == DEST_FLAGS && e->left &&
-			   (e->left->op == WIDEN || e->left->op == SEXT) &&
-			   e->left->left && ISBYTE(e->left->left->width) &&
-			   e->right->op == NUMBER &&
-			   (e->right->u.val & 0xffL) == e->right->u.val) {
+		} else if (flagbitop(e)) {
 			/*
 			 * A byte masked with a constant and asked for as a
 			 * condition.  The integer promotions make it int

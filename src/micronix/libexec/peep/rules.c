@@ -46,6 +46,7 @@ int n_frame = 0;
 int n_invjp = 0;
 int n_outi = 0;
 int n_exx = 0;
+int n_reload = 0;
 int n_constdup = 0;
 int n_orclr = 0;
 int n_reuse = 0;
@@ -1462,6 +1463,76 @@ r_orclr(void)
  * a third of all lines by itself and splits again on the register it
  * loads, which leaves 66,492.
  */
+/*
+ * ld (M),r / ld r,(M) - the load reads back what the store just wrote,
+ * into the register that wrote it.  Nothing in between, and ld does
+ * not touch the flags, so the load is dead.
+ *
+ * c1 has no store-to-load forwarding: "w = e->width" stores the local
+ * and the next use of w loads it again even though the value is still
+ * in the register.  The peephole tracks register values, not memory,
+ * so the load survives.  119 sites over the corpus: 53 ld (M),hl /
+ * ld hl,(M), 49 a, 17 l.
+ *
+ * The two instructions have to be adjacent - a label between them
+ * could make the load somebody else's jump target - and the operands
+ * identical text.
+ */
+int
+r_reload(void)
+{
+	char *s = win[0].key;
+	char *m, *p, *r, *q;
+	char expect[KLEN];
+	int n, len, nxt;
+
+	/*
+	 * Skipping comments, not labels: c1 puts its expression dumps
+	 * between statements, and they are not instructions; a label
+	 * would make the load a possible jump target.
+	 */
+	nxt = nextinsn(0);
+	if (nxt < 0)
+		return 0;
+	if (s[0] != 'l' || s[1] != 'd' || s[2] != ' ' || s[3] != '(')
+		return 0;
+	m = s + 4;
+	p = strchr(m, ')');
+	if (!p || p[1] != ',' || p[2] == 0)
+		return 0;
+	r = p + 2;
+	for (n = 0; r[n]; n++)
+		;
+	if (n > 2)
+		return 0;		/* one- or two-character register */
+	/* build "ld reg,(M)" */
+	n = 0;
+	expect[n++] = 'l';
+	expect[n++] = 'd';
+	expect[n++] = ' ';
+	for (q = r; *q; q++)
+		expect[n++] = *q;
+	expect[n++] = ',';
+	expect[n++] = '(';
+	for (q = m; q < p; q++)
+		expect[n++] = *q;
+	expect[n++] = ')';
+	expect[n] = 0;
+	if (!is(nxt, expect))
+		return 0;
+	/*
+	 * The load's length: (hl), (bc) and (de) are one byte; a frame
+	 * slot or an absolute operand is three.
+	 */
+	len = 3;
+	if (p - m == 2 && (m[0] == 'h' || m[0] == 'b' || m[0] == 'd'))
+		len = 1;
+	delline(nxt, 1);
+	n_reload++;
+	saved += len;
+	return 1;
+}
+
 int
 applyrules(void)
 {
@@ -1501,6 +1572,8 @@ applyrules(void)
 	case 'l':
 		if (k[1] != 'd' || k[2] != ' ')
 			return 0;
+		if (k[3] == '(' && r_reload())
+			return 1;		/* ld (M),r ; ld r,(M) */
 		if (k[3] == 's')
 			return r_fexit();	/* ld sp,iy */
 		if (k[3] == 'h' && r_outi())	/* ld hl,n -> oarg */
@@ -1556,9 +1629,9 @@ report(void)
 		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
 		n_autozero, n_xordup);
 	fprintf(stderr, "peep: exde %d  ldazero %d  bitset %d  pushswap %d"
-		"  pushsave %d  bytestore %d  astore %d\n",
+		"  pushsave %d  bytestore %d  astore %d  reload %d\n",
 		n_exde, n_ldazero, n_bitset, n_pushswap, n_pushsave,
-		n_bytestore, n_astore);
+		n_bytestore, n_astore, n_reload);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

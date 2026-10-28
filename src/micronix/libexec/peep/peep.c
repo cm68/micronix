@@ -8,9 +8,11 @@
  *
  * It is a window and not the whole file because this has to run on the
  * Z80 eventually, and the largest thing the compiler compiles produces
- * a .s of over two hundred kilobytes.  Nothing here needs more than a
- * dozen lines of context: the longest pattern is a run of eight inc sp
- * and the pop that follows it.
+ * a .s of over two hundred kilobytes.  Sixty-four lines of lookahead
+ * cover the longest runs worth collapsing - stack cleanup, repeated
+ * shifts, and the pairs a rewrite itself exposes - at the cost of
+ * holding more line text at once; the footprint guard measures what
+ * that leaves on the target.
  */
 #include <stdio.h>
 #include <string.h>

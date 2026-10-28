@@ -166,6 +166,11 @@ label(Expr *e)
 		e->regs = 1;
 		return;
 
+	/* BFEXTRACT: the address, then the same shape as a deref */
+	case BFEXTRACT:
+		e->regs = l > 1 ? l : 1;
+		return;
+
 	/* DEREF: depends on address complexity */
 	case DEREF:
 		e->regs = l > 1 ? l : 1;
@@ -211,6 +216,7 @@ label(Expr *e)
 	 * labeled its address has often reduced to INHL already - which
 	 * honestly costs nothing, the work having been done.
 	 */
+	case BFASSIGN:
 	case ASSIGN:
 		e->regs = r ? r : 1;
 		if (l > e->regs)
@@ -398,6 +404,11 @@ assign(Expr *e, unsigned char tgt)
 	case REGVAR:
 		return;
 
+	/* BFEXTRACT: the address goes to HL, the value comes back in HL/A */
+	case BFEXTRACT:
+		assign(e->left, R_HL);
+		return;
+
 	/* Unary: child inherits target */
 	case DEREF:
 	case BANG:
@@ -408,6 +419,12 @@ assign(Expr *e, unsigned char tgt)
 	case PREDEC:
 	case POSTDEC:
 		assign(e->left, tgt);
+		return;
+
+	/* BFASSIGN: the address has to be in HL, the value goes to tgt */
+	case BFASSIGN:
+		assign(e->left, R_HL);
+		assign(e->right, tgt);
 		return;
 
 	/* ASSIGN: lvalue doesn't need target, rvalue→tgt */
@@ -534,6 +551,7 @@ assign(Expr *e, unsigned char tgt)
 #ifdef DEBUG
 #include "debug.h"
 #include <stdio.h>
+
 #endif
 
 
@@ -789,6 +807,22 @@ emitasm(char *tpl, Expr *e)
 			 * the current instruction */
 			if (*p == '$') {
 				outc('$');
+				p++;
+				continue;
+			}
+			/*
+			 * $B is a bitfield's width and offset, packed the
+			 * way bfext and bfins want them: offset in the
+			 * high nibble, width in the low.  The values are
+			 * fixed at the site, so they ride in the text -
+			 * .db $B - instead of being marshalled into a
+			 * register.
+			 */
+			if (*p == 'B') {
+				int info;
+				info = e->u.bf.off;
+				info = (info << 4) | e->u.bf.wid;
+				outf("%d", info);
 				p++;
 				continue;
 			}

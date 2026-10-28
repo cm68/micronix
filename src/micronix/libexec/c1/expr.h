@@ -34,7 +34,7 @@
 /* expression node */
 typedef struct Expr {
 	unsigned char	op;	/* operator (lexeme token) */
-	unsigned char	width;	/* type: b/B/s/S/l/L/p/v */
+	unsigned char	width;	/* type: b/B/s/S/l/L/p/v - ASCII, not packable */
 	unsigned char	dest;	/* destination */
 	unsigned char	regs;	/* Sethi-Ullman label: regs needed */
 	unsigned char	tgt;	/* target register (R_HL, R_DE, 0=any) */
@@ -76,8 +76,8 @@ Expr	*mkbinary(int op, char width, Expr *left, Expr *right);
 Expr	*mkcall(char width, int argc, Expr *func, Expr *args);
 Expr	*mkarg(Expr *expr);
 Expr	*mkincdec(int op, char width, Expr *e, int amt);
-Expr	*mkbfext(char off, char wid, Expr *addr);
-Expr	*mkbfass(char off, char wid, Expr *addr, Expr *val);
+Expr	*mkbfext(char off, char wid, char wtype, Expr *addr);
+Expr	*mkbfass(char off, char wid, char wtype, Expr *addr, Expr *val);
 Expr	*mksymref(int kind, char *name, short off);
 Expr	*mkcode(char width, char reg);
 
@@ -93,6 +93,7 @@ void	assign(Expr *e, unsigned char tgt);	/* register assignment */
 Expr	*dupexpr(Expr *e);
 void	freeexpr(Expr *e);
 Expr	*rewrite(Expr *e);
+void	emitasm(char *tpl, Expr *e);
 /* the condition that branches when a reduced condition is false,
  * emitting the zero test first if the answer came back as a value.
  * Declared here rather than in pass2.h because it needs Expr, and

@@ -379,6 +379,7 @@ emitExpr(struct expr *e)
 		emit1(BFEXTRACT);
 		emit1(np ? np->w.m.bitoff : 0);
 		emit1(np ? np->w.m.width : 0);
+		emit1(np ? typeSfx(np->type) : 's');
 		emitChild(left);
 		break;
 
@@ -388,6 +389,7 @@ emitExpr(struct expr *e)
 		emit1(BFASSIGN);
 		emit1(np ? np->w.m.bitoff : 0);
 		emit1(np ? np->w.m.width : 0);
+		emit1(np ? typeSfx(np->type) : 's');
 		emitChild(left);
 		emitChild(right);
 		break;
