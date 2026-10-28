@@ -435,7 +435,6 @@ src/micronix/cmd/rshd/rshd
 src/micronix/cmd/s/s
 src/micronix/cmd/scsiformat/scsiformat
 src/micronix/cmd/sed/sed
-src/micronix/cmd/seltest/seltest
 src/micronix/cmd/setdev/setdev
 src/micronix/cmd/sh/sh
 src/micronix/cmd/sh/sh.mx
@@ -567,6 +566,11 @@ src/hwsim/resources/cold_boot_loader.bin
 .@__thumb/
 benchmem.log
 benchmem.tsv
+
+#
+# Guest test harnesses, built on demand where a run needs them.
+#
+src/micronix/test/seltest/seltest
 
 # Local KiCad preference files never belong in the tree.
 *.kicad_prl
