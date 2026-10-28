@@ -36,7 +36,7 @@ DIRS = include etc lib libexec cmd sys stand cpm
 # comes from there - the compiler and librarian, the install/clean/
 # update rules, and install-hwsim/install-usersim for the simulators.
 # What stays below is only what is top-specific: the host tools built
-# here rather than in a DIR, and the header install that needs sudo.
+# here rather than in a DIR, and the opt-in installs into a prefix.
 #
 DEPTH = .
 
@@ -50,8 +50,9 @@ DEPTH = .
 # system's, and the system is this tree.  Until they are installed,
 # every command that stats a file has to be told where to look.
 #
-# sudo, because $(PREFIX) is not ours.  SUDO= runs it without, for a
-# DESTDIR you already own.
+# Nothing here escalates.  $(PREFIX) is usually not ours, so this is an
+# install you ask for and run as a user who can write there, or stage
+# with DESTDIR and copy the result into place outside make.
 #
 SYSINC	 = $(DESTDIR)$(PREFIX)/ccc/include
 
@@ -100,6 +101,16 @@ ARMX	 = $(BIN)/mxar
 ARSRC	 = cmd/ar/ar.c
 NMX	 = $(BIN)/mxnm
 NMSRC	 = cmd/nm/nm.c lib/libutil/wsobj.c
+#
+# size is the same shape, and the same kind of program: cmd/size builds
+# the z80 command that reports an object's segment sizes, and this
+# builds mxsize from that one source, because the object it reads is
+# micronix's and the host's size cannot.  Like mxnm it needs nothing
+# but itself and obj.h, so it is built here rather than fetched from
+# the directory's own rule.
+#
+MXSIZE	 = $(BIN)/mxsize
+MXSIZESRC = cmd/size/size.c
 SETDEVX	 = $(BIN)/setdev
 SETDEVSRC = cmd/setdev/setdev.c
 #
@@ -160,7 +171,7 @@ HOSTCFLAGS ?= -w -std=gnu89 -Dlinux -idirafter $(DEPTH)/include
 # They are listed once because toolchain wants the same set, and a
 # second listing would drift.
 #
-HOSTTOOLS = $(ARMX) $(NMX) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
+HOSTTOOLS = $(ARMX) $(NMX) $(MXSIZE) $(SETDEVX) $(MXLZ4) $(MXUNLZ4) $(MXPAKSRC) $(MXTAR)
 
 all: $(HOSTTOOLS)
 
@@ -199,6 +210,15 @@ $(ARMX): $(ARSRC)
 $(NMX): $(NMSRC)
 	mkdir -p $(BIN)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(NMSRC)
+
+#
+# The object sizer, built beside the lister and for the same reason:
+# cmd/size's program is the one that knows the micronix header, and
+# obj.h comes from include/ through the -idirafter in HOSTCFLAGS.
+#
+$(MXSIZE): $(MXSIZESRC)
+	mkdir -p $(BIN)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(MXSIZESRC)
 
 $(SETDEVX): $(SETDEVSRC)
 	mkdir -p $(BIN)
@@ -287,31 +307,30 @@ hostrt:
 	@echo "runtime in $(HOSTROOT)/ccc/lib"
 
 #
-# The same runtime, for the installed host compiler: under $(PREFIX)/ccc
-# rather than the tree, with sudo because $(PREFIX) is not ours.  The
-# layout is hostrt's, only the root differs; the driver reads it out of
-# /usr/local/ccc when run from /usr/local/bin (LIBSUF in ccc.c), which
-# keeps this tree's runtime out of the /usr/local/lib and
-# /usr/local/usr/include an installed cc looks in.
+# The same runtime, for an installed host compiler: under $(PREFIX)/ccc
+# rather than the tree.  The layout is hostrt's, only the root differs;
+# the driver reads it out of /usr/local/ccc when run from /usr/local/bin
+# (LIBSUF in ccc.c), which keeps this tree's runtime out of the
+# /usr/local/lib and /usr/local/usr/include an installed cc looks in.
+#
+# Opt-in, and unprivileged.  DESTDIR stages the whole tree under a root
+# the builder owns; to install into /usr/local, run it as a user who
+# can write there.
 #
 sysrt:
-	$(SUDO) mkdir -p $(PREFIX)/ccc/include/sys $(PREFIX)/ccc/include/cpm
-	$(SUDO) cp lib/libc/libc.a lib/libunix/libunix.a lib/libunix/crt0.o \
-	   lib/libccc/libccc.a $(PREFIX)/ccc/lib
-	$(SUDO) cp include/*.h $(PREFIX)/ccc/include
-	$(SUDO) cp include/sys/*.h $(PREFIX)/ccc/include/sys
-	$(SUDO) cp lib/include/*.h $(PREFIX)/ccc/include
-	$(SUDO) cp lib/include/sys/*.h $(PREFIX)/ccc/include/sys
-	$(SUDO) cp lib/include/*.h $(PREFIX)/ccc/include/cpm
-	$(SUDO) cp lib/include/sys/*.h $(PREFIX)/ccc/include/cpm
-	$(SUDO) cp cpm/include/*.h $(PREFIX)/ccc/include/cpm
-	#
-	# sudo runs under the root umask (0077 on this machine), so the cp
-	# above left every file 0600 and unreadable by whoever runs the
-	# compiler.  Make the installed tree readable.
-	#
-	$(SUDO) chmod -R a+rX $(PREFIX)/ccc
-	@echo "runtime in $(PREFIX)/ccc/lib"
+	mkdir -p $(DESTDIR)$(PREFIX)/ccc/lib \
+		  $(DESTDIR)$(PREFIX)/ccc/include/sys \
+		  $(DESTDIR)$(PREFIX)/ccc/include/cpm
+	cp lib/libc/libc.a lib/libunix/libunix.a lib/libunix/crt0.o \
+	   lib/libccc/libccc.a $(DESTDIR)$(PREFIX)/ccc/lib
+	cp include/*.h $(DESTDIR)$(PREFIX)/ccc/include
+	cp include/sys/*.h $(DESTDIR)$(PREFIX)/ccc/include/sys
+	cp lib/include/*.h $(DESTDIR)$(PREFIX)/ccc/include
+	cp lib/include/sys/*.h $(DESTDIR)$(PREFIX)/ccc/include/sys
+	cp lib/include/*.h $(DESTDIR)$(PREFIX)/ccc/include/cpm
+	cp lib/include/sys/*.h $(DESTDIR)$(PREFIX)/ccc/include/cpm
+	cp cpm/include/*.h $(DESTDIR)$(PREFIX)/ccc/include/cpm
+	@echo "runtime in $(DESTDIR)$(PREFIX)/ccc/lib"
 
 # The bootstrap: build the cross compiler, the host tools and the boot
 # images the build runs (setdev stamps the kernel, mxnm lists symbols,
@@ -335,9 +354,9 @@ bootstrap: toolchain
 	$(MAKE) install
 
 sysinstall:
-	$(SUDO) mkdir -p $(SYSINC)/sys
-	$(SUDO) install -m 644 include/sys/*.h $(SYSINC)/sys
-	(cd include && $(SUDO) install -m 644 $(SYSHDRS) $(SYSINC))
+	mkdir -p $(SYSINC)/sys
+	install -m 644 include/sys/*.h $(SYSINC)/sys
+	(cd include && install -m 644 $(SYSHDRS) $(SYSINC))
 	@echo "installed: $(SYSINC)/sys, and $(words $(SYSHDRS)) headers beside it"
 	@echo "not installed, the C library owns them: $(CCCOWNED)"
 
@@ -364,7 +383,7 @@ sysinstall:
 install-man-host:
 	$(RECURSE)
 	$(MAKE) -C man install-man-host
-	$(SUDO) chmod -R a+rX $(MXROOT)
+	$(SUDO) chmod -R a+rX $(MXMAN)
 
 #
 # The cross man and formatter, built for the host and installed beside

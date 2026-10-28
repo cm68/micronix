@@ -8,7 +8,7 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim d1 filesystem toolchain
+all: sim d1 filesystem toolchain man
 	cd src ; make
 
 #
@@ -48,6 +48,24 @@ src/usersim/sim src/tools/readall:
 src/hwsim/d1/d1:
 	cd src ; make
 	cd src/hwsim/d1 ; make
+
+#
+# The host manual tree, man/.  Every page in the tree is mirrored there
+# by install-man-host, and the two mx tools that read it - mxman and
+# mxform - are built into bin/ beside the other mx binaries.  This is
+# the host side of what "make install" does for the system below: the
+# same MANSRCS, put where mxman can read them without booting anything.
+#
+# MXROOT anchors the mirror at this checkout and SUDO= leaves it
+# writable.  The default, /usr/local/micronix, is for an installed
+# tree and is not ours - the same reason bin/ receives the cross tools
+# rather than /usr/local/bin.
+#
+.PHONY: man
+man:
+	$(MAKE) -C src/micronix/cmd/man host
+	$(MAKE) -C src/micronix/cmd/form host
+	$(MAKE) -C src/micronix install-man-host MXROOT=$(CURDIR) SUDO=
 
 test: filesystem  src/usersim/sim
 	src/usersim/sim
@@ -128,7 +146,7 @@ clobber:
 	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clobber) \
 	done
-	rm -rf filesystem bin libexec ccc lib usr sim
+	rm -rf filesystem bin libexec ccc lib usr sim man
 
 rebuildfs:
 	rm -rf filesystem

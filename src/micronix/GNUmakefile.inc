@@ -147,14 +147,21 @@ DEST	= $(ROOT)$(SRCDIR)
 NOWARN	= --warning=no-ignore-newer
 
 #
-# The host trees.  $(PREFIX)/bin holds the mx* tools and
-# $(PREFIX)/micronix is the man page tree mxman reads, installed by
-# install-man-host.  sudo is here because $(PREFIX) is not ours; SUDO=
-# runs it without, for a DESTDIR you already own.
+# Host-side install roots.  Nothing here escalates: an install runs as
+# whoever invoked make, and DESTDIR stages it under a root that user
+# can write - the ordinary "make install DESTDIR=/somewhere"
+# arrangement.  A copy under /usr/local is the exception, asked for by
+# naming the prefix (and MXROOT for the page tree) and running the
+# target as a user who can write there:
+#
+#	PREFIX=/usr/local MXROOT=/usr/local/micronix make ...
+#
+# The checkout is the default MXROOT, so "make install-man-host"
+# mirrors the pages where the tree's own build keeps its host output,
+# and the mx tools are built into bin/ beside them.
 #
 PREFIX	?= /usr/local
-SUDO	?= sudo
-MXROOT	?= $(DESTDIR)$(PREFIX)/micronix
+MXROOT	?= $(HOSTROOT)
 MXMAN	 = $(MXROOT)/man
 
 #
@@ -242,8 +249,8 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 # source.
 #
 INSTALLMANHOST = @if [ -n "$(strip $(MANSRCS))" ] ; then \
-		$(SUDO) mkdir -p $(MXMAN)/man$(MANSEC) ; \
-		$(SUDO) cp $(MANSRCS) $(MXMAN)/man$(MANSEC) ; \
+		mkdir -p $(MXMAN)/man$(MANSEC) ; \
+		cp $(MANSRCS) $(MXMAN)/man$(MANSEC) ; \
 	fi
 
 #
@@ -450,8 +457,10 @@ install-man:
 # The top level writes this rule itself because it also enters man/,
 # the archive pages no command owns - hence the test.  The chmod is
 # there and not in the canned recipe because it has to run once, at
-# the end, over the root: sudo's umask leaves every copy 0600 in a
-# 0700 directory, which mxman cannot read.
+# the end, over the page tree: sudo's umask leaves every copy 0600 in
+# a 0700 directory, which mxman cannot read.  It is $(MXMAN) and not
+# $(MXROOT) so that a mirror rooted in the checkout - the top level's
+# "make man" - fixes the pages without chmod'ing the whole tree.
 #
 ifneq ($(DEPTH),.)
 install-man-host:

@@ -66,13 +66,14 @@ HOSTINSTDIR	= $(HOSTDIR)/$(HOSTBIN)
 #
 # Where hostinstall puts them: under the install prefix, /usr/local by
 # default, so the assembler and linker land in /usr/local/bin beside
-# the driver and the passes in /usr/local/libexec.  PREFIX and SUDO are
-# the ones the top GNUmakefile uses for the header install; SUDO= runs
-# without sudo for a prefix you already own.
+# the driver and the passes in /usr/local/libexec.  PREFIX is the one
+# the top GNUmakefile uses for the header install, and DESTDIR stages
+# it under a root the builder can write.  Nothing here escalates: if
+# the prefix is not writable, stage it and copy the tree in as root
+# outside make.
 #
 PREFIX		?= /usr/local
-SUDO		?= sudo
-HOSTSYSDIR	= $(PREFIX)/$(HOSTBIN)
+HOSTSYSDIR	= $(DESTDIR)$(PREFIX)/$(HOSTBIN)
 
 HOSTSRCS	?= $(CSRCS)
 HOSTOBJS	= $(HOSTSRCS:.c=.ho)
@@ -130,8 +131,8 @@ $(HOSTLIBCCC):
 	$(MAKE) -C $(DEPTH)/lib/libccc libccc-host.a
 
 hostinstall: host
-	$(SUDO) mkdir -p $(HOSTSYSDIR)
-	$(SUDO) install -m 755 $(HOSTINSTDIR)/$(HOSTPROG) $(HOSTSYSDIR)/$(HOSTPROG)
+	mkdir -p $(HOSTSYSDIR)
+	install -m 755 $(HOSTINSTDIR)/$(HOSTPROG) $(HOSTSYSDIR)/$(HOSTPROG)
 
 hostclean:
 	rm -f $(HOSTOBJS) $(DBGFILES) $(HOSTINSTDIR)/$(HOSTPROG)
