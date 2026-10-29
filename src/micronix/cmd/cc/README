@@ -3,9 +3,8 @@
 There is no source for the distribution's cc.  cc.c in this directory
 is the tree's own v7-cc port, swizzled onto the Whitesmiths toolchain;
 it is a different program and builds a different binary.  This
-directory now also carries the distribution binary and its
-disassembly, following the method used for cmd/td, cmd/newuser and
-cmd/print.
+directory also carries the distribution binary and its disassembly,
+following the method used for cmd/td, cmd/newuser and cmd/print.
 
 cc.dist is the binary off inode 29 of disks/dist/1014-8_c_1.IMD, 13706
 bytes, mode 0711, root, 7 August 1982.  It is identical to the one in
@@ -36,24 +35,36 @@ and disassembles "/include/" as instructions.
 
 cc.ctl is the control file.  It marks every string run embedded in the
 text as `bytes`; without those marks the text/string mix in this
-binary makes the listing useless.  It also names the runtime entry and
-exit (c.ent 32e2, c.ret 32e9) and main (014a).
+binary makes the listing useless.  It also names the two runtime pairs
+and the program's functions.
 
 What the listing shows
 ----------------------
 	0100	jump over the startup
 	010b	crt startup; calls main at 014a, then exit at 223f
-	014a	main: saves argc at 414a and argv at 4148, calls 01ec and 05a7,
-		then 1ae1(1) and c.ret
-	01ec	setup: c.ent; two calls to 2cf0 with the handler 1ae1,
-		which is the signal/cleanup setup
-	05a7	the argument loop: walks argc/argv (DE+4/DE+6), calls
-		string and option helpers, ends at 0626
-	1ae1	the handler passed to 2cf0; called with 1
-	32e2	c.ent, the Whitesmiths function prologue
-	32e9	c.ret, the function epilogue
+	014a	main: saves argc at 414a and argv at 4148, calls setup
+		and opts, then 1ae1(1) and c.ret
+	01ec	setup: starts by walking signals 1..15: signal(sig,1) to
+		ignore, and 1ae1 installed where the old handler was not
+		ignore; continues with the option/setup work; ends 0595
+	05a7	opts: walks argc/argv (DE+4/DE+6), classifies arguments
+		against the suffix strings at 0598 (.s .8 .c .p .c),
+		calls 1a16 (suffix/string test), 2482 and 2bba (string
+		helpers), and stores the results in the data globals;
+		early return at 0626, end 08d5
+	08df	process: uses the c.ent2/c.ret2 runtime pair; ends 0972;
+		the next function starts at 098d
+	1ae1	the signal handler installed by setup; called with 1
+	32e2	c.ent, the first runtime prologue
+	32e9	c.ret, its epilogue
+	32ed	c.ent2, the register-variable prologue
+	3303	c.ret2, its epilogue
+	4337	r2, 4339 r3, 433b r4, the register-variable cells
 	4000	data: the program's globals, including 4148 (argv) and
 		414a (argc) from the direct stores in main
+
+The suffix pointers pushed by opts are 05a1 (".p") and 05a4 (".c"),
+not functions: opts compares an argument against those strings.
 
 The program's own code is interleaved with its string literals from
 0100 to about 1e00; the library follows, and the errno message table is
