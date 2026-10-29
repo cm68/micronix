@@ -1,4 +1,4 @@
-.he "sh (1)                       8/13/26                       sh (1)"
+.he "osh (1)                      10/28/26                      osh (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -7,8 +7,8 @@ NAME
 .in +5
 .br
 .bd
-sh
-- the micronix shell
+osh
+- the older micronix shell
 .sp 2
 .in -5
 .bd
@@ -16,7 +16,7 @@ SYNTAX
 .in +5
 .br
 .bd
-sh [ -v ] [ -c string ] [ file ]
+osh [ -v ] [ -c string ] [ file ]
 .sp 2
 .in -5
 .bd
@@ -233,11 +233,11 @@ and substitution above are all its own, most of it settled by running
 the image beside this one.  Where the
 two can be told apart, cmd/sh/NOTES says so.
 .sp
-It installs as /bin/sh.  It did not for a while - the reconstruction
-was too unfinished to be the shell a system comes up under, and it
-went in as nsh so that a machine that would not start under it still
-started.  The operators, the search path and the builtins all work
-now, so it is the shell.
+It installs as osh.  It was /bin/sh until the Bourne shell in cmd/bsh
+took that name; this one is a csh in the micronix style, and scripts
+written for it are not all Bourne scripts, so it stays under a name of
+its own.  While the reconstruction was too unfinished to be the shell a
+system comes up under it went in as nsh.
 .sp
 The one it replaces is a Whitesmiths binary with no source.  Keep a
 copy of it: this is read back out of that binary and is not finished,

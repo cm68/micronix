@@ -19,13 +19,20 @@ DEPTH	= ../..
 DIR	= bsh
 CLASS	= cmd
 
-CSRCS	= args.c blok.c builtin.c cmd.c ctype.c error.c expand.c fault.c \
-	  globals.c io.c macro.c main.c msg.c name.c print.c service.c \
-	  setbrk.c shim.c stak.c string.c word.c xec.c
+CSRCS	= args.c blok.c builtin.c cmd.c ctype.c edit.c error.c expand.c \
+	  fault.c globals.c history.c io.c macro.c main.c msg.c name.c \
+	  print.c service.c setbrk.c shim.c stak.c string.c word.c xec.c
 
 HSRCS	= brkincr.h ctype.h defs.h dup.h mac.h mode.h name.h stak.h \
 	  sym.h timeout.h
 
-MANSRCS	= bsh.1
+#
+# sh is this same program under the system's name.  bsh is the
+# directory and the name it is built under; install copies it to sh
+# beside it.
+#
+ALIAS	= sh
+
+MANSRCS	= bsh.1 sh.1
 
 include $(DEPTH)/GNUmakefile.inc

@@ -2048,6 +2048,21 @@ do_exec(char *name, char *guest, char **argv, char **envp, int report)
             message("Can't open file %s!\n", name);
         return (errno);
     }
+    /*
+     * A directory opens here - fopen on a host directory succeeds -
+     * but it is not an image.  The kernel's exec says EACCES for a
+     * directory (ENOEXEC is for a text file, which the shell runs as
+     * a script); say the same instead of loading the directory's
+     * bytes as a program, which is an endless loop.
+     */
+    {
+        struct stat st;
+
+        if (fstat(fileno(file), &st) == 0 && S_ISDIR(st.st_mode)) {
+            fclose(file);
+            return (EACCES);
+        }
+    }
     fseek(file, 0, SEEK_SET);
     if (fread(&header, 1, sizeof(header), file) != sizeof(header)) {
         memset(&header, 0, sizeof(header));     /* too short to be an object */
@@ -6069,6 +6084,54 @@ SystemCall()
         unsigned char row[16];
         char cmdbuf[16];
         char secbuf[512];
+
+        /*
+         * The terminal's two requests, which is what gtty and stty
+         * send now that the library moved them onto ioctl.  The
+         * kernel answers them in cioctl(); without them here the
+         * guest sees ENOTTY and an interactive shell stops being
+         * interactive.
+         */
+        if (arg1 == 0x7401) {           /* TIOCGETA */
+            if (tcgetattr(fd, &ti)) {
+                ret = ENOTTY;
+                carry_set();
+                break;
+            }
+            i = 0;
+            if (!(ti.c_iflag & ISTRIP))
+                i |= 040000;
+            if (ti.c_iflag & ICRNL)
+                i |= 020;
+            if (ti.c_lflag & ECHO)
+                i |= 010;
+            if (!(ti.c_lflag & ICANON))
+                i |= 040;
+            if (ti.c_oflag & TABDLY)
+                i |= 002;
+            put_byte(arg2, ti.c_ispeed);
+            put_byte(arg2 + 1, ti.c_ospeed);
+            put_byte(arg2 + 2, ti.c_cc[VERASE]);
+            put_byte(arg2 + 3, ti.c_cc[VKILL]);
+            put_word(arg2 + 4, i);
+            ret = 0;
+            carry_clear();
+            break;
+        }
+        if (arg1 == 0x7402) {           /* TIOCSETA */
+            if (tcgetattr(fd, &ti)) {
+                ret = ENOTTY;
+                carry_set();
+                break;
+            }
+            settimode(get_word(arg2 + 4));
+            ti.c_cc[VERASE] = get_byte(arg2 + 2);
+            ti.c_cc[VKILL] = get_byte(arg2 + 3);
+            tcsetattr(fd, TCSANOW, &ti);
+            ret = 0;
+            carry_clear();
+            break;
+        }
 
         if (arg1 != 0) {        /* CDBCMD is the only request */
             ret = ENOTTY;

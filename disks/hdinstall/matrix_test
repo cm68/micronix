@@ -1,8 +1,7 @@
 #!/bin/sh
 #
 # The controller matrix: for each hard disk controller, install from the
-# distribution floppies, boot the installed disk, and rebuild the system
-# natively twice.
+# distribution media and rebuild the system natively, from scratch.
 #
 #	./matrix_test [-n] [-x] [-s] [-d <dir>] [-c "<controllers>"]
 #
@@ -18,19 +17,19 @@
 #	<dir>/<controller>/usr.img	the disk /usr/src is on
 #	<dir>/<controller>/<stage>.log	what the console said
 #
-# The stages, per controller:
+# A pass is two boots, and the volumes are made blank for it each time:
 #
-#   1. install passes   the 8 inch distribution diskettes, four at a
-#			time (fla..fld), cptree'd onto the root volume
-#			and its /usr/src.  One boot per pass; the marker is
-#			"=== PASS-DONE".
-#   2. hard disk boot   the installed system, no floppies, no card but
-#			the one under test.  "=== HDBOOT-DONE".
-#   3. build            mount /usr/src; "make", "make install",
-#			"make clobber", "make", "make verify", with a
-#			marker after each and "=== TEST-DONE" at the end.
+#   1. install          one boot from the distribution media: the media
+#			changer loads each diskette onto the floppy drive
+#			in turn and it is cptree'd onto the root volume
+#			and its /usr/src.  "=== PASS-DONE".
+#   2. build            the same volumes, the installed system only,
+#			no floppies: mount /usr/src; "make", "make
+#			install", "make clobber", "make", "make verify",
+#			with a marker after each and "=== TEST-DONE" at
+#			the end.  This boot is the whole hard disk test.
 #
-# The volumes are made from scratch on the host, before the first pass:
+# The volumes are made from scratch on the host, before the pass:
 # a minimal root (sh, mount, cptree and friends) carrying the
 # controller's level 2 boot image and a kernel pointed at that
 # controller, and an empty /usr/src volume.  The distribution brings the
@@ -170,7 +169,7 @@ build_volumes() {
 	tar -C "$filesystem" -c -f "$tmp" \
 		bin/sh bin/login bin/ls bin/cp bin/mv bin/rm bin/cat \
 		bin/mkdir bin/mount bin/umount bin/chmod bin/cptree \
-		bin/mknod bin/ln bin/sync bin/echo bin/tar || return 1
+		bin/mknod bin/ln bin/sync bin/echo bin/tar bin/chg || return 1
 	"$mnix" -f "$rootvol" tar x "$tmp" || return 1
 
 	tar -C "$srcdir" -c -f "$tmp" etc || return 1
@@ -228,15 +227,15 @@ buildlogin() {
 	cat <<EOF
 mount $devusr /usr/src
 cd /usr/src
-make
+make 2>&1
 echo === COMPILE-DONE
-make install
+make install 2>&1
 echo === INSTALL-DONE
-make clobber
+make clobber 2>&1
 echo === CLOBBER-DONE
-make
+make 2>&1
 echo === GEN2-DONE
-make verify
+make verify 2>&1
 echo === VERIFY-DONE
 sync
 echo === TEST-DONE
@@ -253,7 +252,7 @@ boot_stage() {
 	stage=$1; marker=$2; limit=$3; shift 3
 	log="$w/$stage.log"
 	rm -f "$log" "$rootvol.lock" "$usrvol.lock"
-	cmd="./d1 -F -H -w multio,$wire -L $log $*"
+	cmd="./d1 -F -H -w multio,$wire $bootflags -L $log $*"
 	( cd "$d1dir" && exec setsid script -qec "$cmd" /dev/null ) \
 		</dev/null >/dev/null 2>&1 &
 	pid=$!
@@ -354,64 +353,49 @@ run_controller() {
 		return 0
 	fi
 
-	# 1. the install passes, four diskettes at a time
-	pass=0
+	# 1. install: one boot from the distribution media.  Every
+	#    diskette is loaded onto the floppy drive by the media
+	#    changer, so this boot reads the whole set; the pass starts
+	#    from the blank volumes build_volumes just made.
 	set -- `dist_media`
-	while [ $# -gt 0 ]; do
-		pass=`expr $pass + 1`
-		stage=install-$pass
-		n=0
-		fl=""
-		login=$(mktemp) || return 1
-		{
-			echo "mount $devusr /usr/src"
-			while [ $# -gt 0 ] && [ $n -lt 4 ]; do
-				case $n in
-				0) d=fla ;; 1) d=flb ;;
-				2) d=flc ;; 3) d=fld ;;
-				esac
-				echo "mount /dev/$d /f -r ; cptree -v /f / ; umount /dev/$d"
-				fl="$fl djdma$n:$1"
-				n=`expr $n + 1`
-				shift
-			done
-			echo "sync"
-			echo "echo === PASS-DONE"
-		} > "$login" || return 1
-		write_login "$login" || { rm -f "$login"; return 1; }
-		rm -f "$login"
-		echo "  pass $pass: $n diskette(s)"
-		boot_stage "$stage" "=== PASS-DONE" 7200 \
-			"$drive"0:"$rootvol" "$drive"1:"$usrvol" $fl
-		rc=$?
-		case $rc in
-		0)	say "$name: $stage ok" ;;
-		1)	say "$name: $stage FAILED (simulator exited)"; return 1 ;;
-		2)	say "$name: $stage FAILED (panic)"; return 1 ;;
-		3)	say "$name: $stage FAILED (timeout)"; return 1 ;;
-		esac
-		if ! stage_errors "$stage" "not a file system" \
-			"No more space" "No such device" "out of memory"; then
-			say "$name: $stage FAILED (console errors)"
-			return 1
-		fi
-	done
-
-	# 2. the installed system on its own
+	ndisk=$#
+	mf="$w/distsets.mf"
+	bootflags=""
+	"$dist"/distsets > "$mf" || return 1
 	login=$(mktemp) || return 1
-	hdlogin > "$login" || return 1
+	{
+		echo "mount $devusr /usr/src"
+		i=0
+		while [ $# -gt 0 ]; do
+			echo "chg load dist8:$i onto djdma:0"
+			echo "mount /dev/fla /f -r ; cptree -v /f / ; umount /dev/fla"
+			i=`expr $i + 1`
+			shift
+		done
+		echo "sync"
+		echo "echo === PASS-DONE"
+	} > "$login" || return 1
 	write_login "$login" || { rm -f "$login"; return 1; }
 	rm -f "$login"
-	boot_stage "hdboot" "=== HDBOOT-DONE" 1800 \
+	echo "  install: $ndisk diskette(s) through the media changer"
+	bootflags="-e $mf"
+	boot_stage "install" "=== PASS-DONE" 14400 \
 		"$drive"0:"$rootvol" "$drive"1:"$usrvol"
 	rc=$?
-	if [ $rc -ne 0 ]; then
-		say "$name: hdboot FAILED ($rc)"
+	bootflags=""
+	case $rc in
+	0)	say "$name: install ok" ;;
+	1)	say "$name: install FAILED (simulator exited)"; return 1 ;;
+	2)	say "$name: install FAILED (panic)"; return 1 ;;
+	3)	say "$name: install FAILED (timeout)"; return 1 ;;
+	esac
+	if ! stage_errors install "not a file system" \
+		"No more space" "No such device" "out of memory"; then
+		say "$name: install FAILED (console errors)"
 		return 1
 	fi
-	say "$name: hdboot ok"
 
-	# 3. build, install, clobber, build, verify
+	# 2. build, install, clobber, build, verify
 	login=$(mktemp) || return 1
 	buildlogin > "$login" || return 1
 	write_login "$login" || { rm -f "$login"; return 1; }

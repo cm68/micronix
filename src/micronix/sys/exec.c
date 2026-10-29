@@ -160,6 +160,17 @@ xchk(name)
     char *name;
 {
     if ((ip = iname(name)) != 0) {
+        /*
+         * A directory is not a program.  It is not ENOEXEC either:
+         * that is the answer for a text file, which exec's caller
+         * runs as a script.  A path search has to be able to tell the
+         * two apart and keep looking, or "make" in a directory that
+         * holds a directory named make runs the directory.
+         */
+        if ((ip->i_mode & IFMT) == IFDIR) {
+            u.error = EACCES;
+            return 0;
+        }
         if ((ip->i_mode & IFMT) != IFREG || ip->size == 0) {
             u.error = ENOEXEC;
             return 0;

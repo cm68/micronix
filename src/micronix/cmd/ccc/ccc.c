@@ -956,23 +956,41 @@ main(int argc, char **argv)
          * .s is the exception.  Under -s it is the OUTPUT, and goes
          * where the user expects to find it.
          */
+        /*
+         * Short names on purpose: a path component in a v6 directory is
+         * 14 characters, and the pid runs to five digits, so "ccc" plus
+         * ".s.ps" would not fit.  A name over 14 is truncated by the
+         * kernel, and two different temporaries then land on one name.
+         */
         tmpbase = malloc(64);
-        sprintf(tmpbase, "%s/ccc%d_%d", TMPDIR, (int)getpid(), i);
+        sprintf(tmpbase, "%s/c%d_%d", TMPDIR, (int)getpid(), i);
 
+        /*
+         * Clear the names before the passes write them.  A temporary
+         * left by an earlier ccc that was killed - or one of another
+         * user's, which /tmp protects - otherwise blocks creat(), and
+         * the failure is a "cannot create" naming a source that has
+         * nothing to do with it.
+         */
         lex_file = malloc(strlen(tmpbase) + 10);
         sprintf(lex_file, "%s.x", tmpbase);
+        unlink(lex_file);
         addtmp(lex_file);
         prep_file = malloc(strlen(tmpbase) + 10);
         sprintf(prep_file, "%s.tok", tmpbase);
+        unlink(prep_file);
         addtmp(prep_file);
         name_file = malloc(strlen(tmpbase) + 10);
         sprintf(name_file, "%s.nam", tmpbase);
+        unlink(name_file);
         addtmp(name_file);
         temp1_file = malloc(strlen(tmpbase) + 10);
         sprintf(temp1_file, "%s.ast", tmpbase);
+        unlink(temp1_file);
         addtmp(temp1_file);
         temp2_file = malloc(strlen(tmpbase) + 10);
         sprintf(temp2_file, "%s.dat", tmpbase);
+        unlink(temp2_file);
         addtmp(temp2_file);
 
         asm_file = malloc(strlen(base) + strlen(tmpbase) +
@@ -985,6 +1003,7 @@ main(int argc, char **argv)
         } else {
             /* a temporary only when it is not what was asked for */
             sprintf(asm_file, "%s.s", tmpbase);
+            unlink(asm_file);
             addtmp(asm_file);
         }
 
@@ -1124,6 +1143,8 @@ main(int argc, char **argv)
              */
             peep_file = malloc(strlen(asm_file) + 10);
             sprintf(peep_file, "%s.ps", asm_file);
+            unlink(peep_file);
+            addtmp(peep_file);
 
             peep_args[0] = peep_path;
             peep_args[1] = asm_file;

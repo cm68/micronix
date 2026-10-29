@@ -62,6 +62,12 @@ MSG	readmsg		= "> ";
 MSG	stdprompt	= "$ ";
 MSG	supprompt	= "# ";
 MSG	profile		= ".profile";
+/*
+ * The micronix login file.  The old shell reads ~/.sh and then
+ * ~/.login, and the install and build lives in .login, so a shell
+ * that is /bin/sh has to read it too.
+ */
+MSG	loginprof	= ".login";
 
 
 /* tables */

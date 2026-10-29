@@ -111,6 +111,12 @@ VOID		exname();
 VOID		printnam();
 VOID		printflg();
 VOID		prs();
+INT		histread();		/* history.c: read and expand one line */
+INT		histedit();		/* edit.c: edit one terminal line */
+INT		histcount();		/* history.c: the ring, for the editor */
+INT		histfirst();
+STRING		histevent();
+extern STRING	histsrc;		/* the line readc is to serve */
 VOID		prc();
 VOID		getenv();
 STRING		*setenv();
@@ -173,6 +179,7 @@ extern BOOL		reserv;
 extern MSG		stdprompt;
 extern MSG		supprompt;
 extern MSG		profile;
+extern MSG		loginprof;
 
 /* built in names */
 extern NAMNOD		fngnod;

@@ -20,9 +20,9 @@ CC	= ccc
 #
 CFLAGS	= -O
 BIN	= /bin
-MAN	= sh.1
+MAN	= osh.1
 MANDIR	= /usr/man/man1
-PROG	= sh
+PROG	= osh
 HDRS	= sh.h
 OBJS	= sh.o parse.o glob.o hist.o hash.o job.o
 

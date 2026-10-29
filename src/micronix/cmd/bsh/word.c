@@ -117,7 +117,10 @@ retry:
 	THEN	c=EOF; f->feof++;
 	ELIF (len=readb())<=0
 	THEN	close(f->fdes); f->fdes = -1; c=EOF; f->feof++;
-	ELSE	f->fend = (f->fnxt = f->fbuf)+len;
+	ELSE	IF histsrc
+		THEN	f->fnxt = histsrc; f->fend = histsrc + len; histsrc = 0;
+		ELSE	f->fend = (f->fnxt = f->fbuf)+len;
+		FI
 		goto retry;
 	FI
 	/*
@@ -146,6 +149,17 @@ LOCAL	readb()
 {
 	REG FILE	f=standin;
 	REG INT		len;
+
+	/*
+	 * A line typed at an interactive shell is read whole, so that
+	 * history can be expanded on it before the parser sees a
+	 * character.  A here document's body (iopend) and a pushed
+	 * source (command substitution) are not command lines.
+	 */
+	IF (flags&ttyflg) ANDF (flags&prompt) ANDF f->fstak==0
+	    ANDF f->fdes>=0 ANDF iopend==0
+	THEN	return(histread(f));
+	FI
 
 	REP	IF trapnote&SIGSET THEN newline(); sigchk() FI
 	PER (len=read(f->fdes,f->fbuf,f->fsiz))<0 ANDF trapnote DONE

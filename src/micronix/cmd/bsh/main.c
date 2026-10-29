@@ -68,10 +68,19 @@ main(c, v)
 	dfault(&ifsnod, sptbnl);
 
 	IF (beenhere++)==FALSE
-	THEN	/* ? profile */
+	THEN	/*
+		 * A login shell reads the system's .login, which is where
+		 * the micronix login setup has always lived, and then the
+		 * Bourne .profile.  The old shell also read .sh; that one
+		 * is csh in style and is not read here.
+		 */
 		IF *cmdadr=='-'
-		    ANDF (input=pathopen(nullstr, profile))>=0
-		THEN	exfile(0); flags &= ~ttyflg;
+		THEN	IF (input=pathopen(nullstr, loginprof))>=0
+			THEN	exfile(0); flags &= ~ttyflg;
+			FI
+			IF (input=pathopen(nullstr, profile))>=0
+			THEN	exfile(0); flags &= ~ttyflg;
+			FI
 		FI
 
 		/* open input file if specified */

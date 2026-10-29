@@ -50,7 +50,7 @@ MANDIR	= /usr/man/man2
 # one argument block.
 AOBJS1	= access.o alarm.o _break.o chdir.o chmod.o chown.o \
 	close.o creat.o dup.o dup2.o errno.o exec.o execve.o execv.o \
-	exit.o _exit.o fork.o fstat.o getpid.o getuid.o \
+	exit.o _exit.o fork.o fstat.o getpid.o getuid.o jobctl.o \
 	kill.o link.o mknod.o mount.o nice.o
 
 AOBJS2	= sysopen.o pause.o perror.o pipe.o read.o reboot.o seekraw.o select.o \

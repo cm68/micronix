@@ -17,9 +17,15 @@ DEPTH	= ../..
 DIR	= sh
 CLASS	= cmd
 
+#
+# The old shell is built and installed as osh.  The Bourne shell in
+# cmd/bsh is what /bin/sh is now; this directory keeps its own name
+# because that is where its sources are.
+#
+TARGET	= osh
 
 HSRCS	= sh.h
-MANSRCS	= sh.1
+MANSRCS	= osh.1
 
 CSRCS	= sh.c parse.c glob.c hist.c hash.c job.c
 

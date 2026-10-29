@@ -33,7 +33,14 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-cpy.o: yylex.c
+#
+# An explicit recipe, because make's built-in .y.o rule otherwise wins
+# for cpy.o when cpy.y is the newer file: it would run yacc and compile
+# y.tab.c.  cpy.c is the source (a hand-written parser, see the README);
+# cpy.y is the original grammar, kept for reference only.
+#
+cpy.o: cpy.c yylex.c
+	$(CC) $(CFLAGS) -c cpy.c
 
 install: $(PROG)
 	mkdir -p $(BIN)
