@@ -48,4 +48,11 @@ define r4 0x433b
 main code 0x014a
 setup code 0x01ec
 opts code 0x05a7
-process code 0x08df
+runptc code 0x08df
+runcpp code 0x098d
+runcp1 code 0x0ce5
+runcp2 code 0x0e65
+runp3 code 0x0fad
+runas code 0x1073
+runlink code 0x1274
+run code 0x17fd		; print when verbose, ignore signals, fork/exec/wait

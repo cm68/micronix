@@ -896,7 +896,7 @@ H06a6: 	POP	HL		; 06a6 .	  e1
 	INC	HL		; 06cc #	  23 
 	LD	B,(HL)		; 06cd F	  46 
 	PUSH	BC		; 06ce .	  c5 
-	CALL	H098d		; 06cf ...	  cd 8d 09 
+	CALL	runcpp		; 06cf ...	  cd 8d 09 
 	POP	AF		; 06d2 .	  f1 
 	POP	AF		; 06d3 .	  f1 
 	POP	AF		; 06d4 .	  f1 
@@ -906,7 +906,7 @@ H06a6: 	POP	HL		; 06a6 .	  e1
 	PUSH	HL		; 06dc .	  e5 
 	LD	HL,H40c6	; 06dd !.@	  21 c6 40 
 	PUSH	HL		; 06e0 .	  e5 
-	CALL	H0ce5		; 06e1 ...	  cd e5 0c 
+	CALL	runcp1		; 06e1 ...	  cd e5 0c 
 	POP	AF		; 06e4 .	  f1 
 	POP	AF		; 06e5 .	  f1 
 	POP	AF		; 06e6 .	  f1 
@@ -927,7 +927,7 @@ H06ea: 	LD	A,01H		; 06ea >.	  3e 01
 	INC	HL		; 0703 #	  23 
 	LD	B,(HL)		; 0704 F	  46 
 	PUSH	BC		; 0705 .	  c5 
-	CALL	process		; 0706 ...	  cd df 08 
+	CALL	runptc		; 0706 ...	  cd df 08 
 	POP	AF		; 0709 .	  f1 
 	POP	AF		; 070a .	  f1 
 	LD	HL,0063H	; 070b !c.	  21 63 00 
@@ -936,7 +936,7 @@ H06ea: 	LD	A,01H		; 06ea >.	  3e 01
 	PUSH	HL		; 0712 .	  e5 
 	LD	HL,H40a6	; 0713 !.@	  21 a6 40 
 	PUSH	HL		; 0716 .	  e5 
-	CALL	H098d		; 0717 ...	  cd 8d 09 
+	CALL	runcpp		; 0717 ...	  cd 8d 09 
 	POP	AF		; 071a .	  f1 
 	POP	AF		; 071b .	  f1 
 	POP	AF		; 071c .	  f1 
@@ -946,7 +946,7 @@ H06ea: 	LD	A,01H		; 06ea >.	  3e 01
 	PUSH	HL		; 0724 .	  e5 
 	LD	HL,H40c6	; 0725 !.@	  21 c6 40 
 	PUSH	HL		; 0728 .	  e5 
-	CALL	H0ce5		; 0729 ...	  cd e5 0c 
+	CALL	runcp1		; 0729 ...	  cd e5 0c 
 	POP	AF		; 072c .	  f1 
 	POP	AF		; 072d .	  f1 
 	POP	AF		; 072e .	  f1 
@@ -964,7 +964,7 @@ H072f: 	LD	HL,H400e	; 072f !.@	  21 0e 40
 	PUSH	HL		; 0744 .	  e5 
 	LD	HL,H40e6	; 0745 !.@	  21 e6 40 
 	PUSH	HL		; 0748 .	  e5 
-	CALL	H0e65		; 0749 .e.	  cd 65 0e 
+	CALL	runcp2		; 0749 .e.	  cd 65 0e 
 	POP	AF		; 074c .	  f1 
 	POP	AF		; 074d .	  f1 
 	LD	HL,FF76H	; 074e !v.	  21 76 ff 
@@ -972,7 +972,7 @@ H072f: 	LD	HL,H400e	; 072f !.@	  21 0e 40
 	PUSH	HL		; 0752 .	  e5 
 	LD	HL,H4106	; 0753 !.A	  21 06 41 
 	PUSH	HL		; 0756 .	  e5 
-	CALL	H0fad		; 0757 ...	  cd ad 0f 
+	CALL	runp3		; 0757 ...	  cd ad 0f 
 	POP	AF		; 075a .	  f1 
 	POP	AF		; 075b .	  f1 
 	JP	H07bf		; 075c ...	  c3 bf 07 
@@ -986,14 +986,14 @@ H075f: 	LD	HL,H4006	; 075f !.@	  21 06 40
 	PUSH	HL		; 076b .	  e5 
 	LD	HL,H40e6	; 076c !.@	  21 e6 40 
 	PUSH	HL		; 076f .	  e5 
-	CALL	H0e65		; 0770 .e.	  cd 65 0e 
+	CALL	runcp2		; 0770 .e.	  cd 65 0e 
 	POP	AF		; 0773 .	  f1 
 	POP	AF		; 0774 .	  f1 
 	LD	HL,H4126	; 0775 !&A	  21 26 41 
 	PUSH	HL		; 0778 .	  e5 
 	LD	HL,H4106	; 0779 !.A	  21 06 41 
 	PUSH	HL		; 077c .	  e5 
-	CALL	H0fad		; 077d ...	  cd ad 0f 
+	CALL	runp3		; 077d ...	  cd ad 0f 
 	POP	AF		; 0780 .	  f1 
 	POP	AF		; 0781 .	  f1 
 	LD	HL,FFB6H	; 0782 !..	  21 b6 ff 
@@ -1001,7 +1001,7 @@ H075f: 	LD	HL,H4006	; 075f !.@	  21 06 40
 	PUSH	HL		; 0786 .	  e5 
 	LD	HL,H4126	; 0787 !&A	  21 26 41 
 	PUSH	HL		; 078a .	  e5 
-	CALL	H1073		; 078b .s.	  cd 73 10 
+	CALL	runas		; 078b .s.	  cd 73 10 
 	POP	AF		; 078e .	  f1 
 	POP	AF		; 078f .	  f1 
 	JP	H07bf		; 0790 ...	  c3 bf 07 
@@ -1011,7 +1011,7 @@ H0793: 	LD	HL,FF76H	; 0793 !v.	  21 76 ff
 	PUSH	HL		; 0797 .	  e5 
 	LD	HL,H40e6	; 0798 !.@	  21 e6 40 
 	PUSH	HL		; 079b .	  e5 
-	CALL	H0e65		; 079c .e.	  cd 65 0e 
+	CALL	runcp2		; 079c .e.	  cd 65 0e 
 	POP	AF		; 079f .	  f1 
 	POP	AF		; 07a0 .	  f1 
 	JP	H07bf		; 07a1 ...	  c3 bf 07 
@@ -1020,7 +1020,7 @@ H07a4: 	LD	HL,H4106	; 07a4 !.A	  21 06 41
 	PUSH	HL		; 07a7 .	  e5 
 	LD	HL,H40e6	; 07a8 !.@	  21 e6 40 
 	PUSH	HL		; 07ab .	  e5 
-	CALL	H0e65		; 07ac .e.	  cd 65 0e 
+	CALL	runcp2		; 07ac .e.	  cd 65 0e 
 	POP	AF		; 07af .	  f1 
 	POP	AF		; 07b0 .	  f1 
 	LD	HL,FFB6H	; 07b1 !..	  21 b6 ff 
@@ -1028,7 +1028,7 @@ H07a4: 	LD	HL,H4106	; 07a4 !.A	  21 06 41
 	PUSH	HL		; 07b5 .	  e5 
 	LD	HL,H4106	; 07b6 !.A	  21 06 41 
 	PUSH	HL		; 07b9 .	  e5 
-	CALL	H1073		; 07ba .s.	  cd 73 10 
+	CALL	runas		; 07ba .s.	  cd 73 10 
 	POP	AF		; 07bd .	  f1 
 	POP	AF		; 07be .	  f1 
 H07bf: 	LD	HL,FFF6H	; 07bf !..	  21 f6 ff 
@@ -1137,7 +1137,7 @@ H083d: 	LD	HL,H4000	; 083d !.@	  21 00 40
 	INC	HL		; 0853 #	  23 
 	LD	B,(HL)		; 0854 F	  46 
 	PUSH	BC		; 0855 .	  c5 
-	CALL	H1274		; 0856 .t.	  cd 74 12 
+	CALL	runlink		; 0856 .t.	  cd 74 12 
 	POP	AF		; 0859 .	  f1 
 	POP	AF		; 085a .	  f1 
 	JP	H08d5		; 085b ...	  c3 d5 08 
@@ -1204,7 +1204,7 @@ H08ab: 	POP	HL		; 08ab .	  e1
 	INC	HL		; 08bb #	  23 
 	LD	B,(HL)		; 08bc F	  46 
 	PUSH	BC		; 08bd .	  c5 
-	CALL	H098d		; 08be ...	  cd 8d 09 
+	CALL	runcpp		; 08be ...	  cd 8d 09 
 	POP	AF		; 08c1 .	  f1 
 	POP	AF		; 08c2 .	  f1 
 	POP	AF		; 08c3 .	  f1 
@@ -1213,7 +1213,7 @@ H08ab: 	POP	HL		; 08ab .	  e1
 	PUSH	HL		; 08c8 .	  e5 
 	LD	HL,H40c6	; 08c9 !.@	  21 c6 40 
 	PUSH	HL		; 08cc .	  e5 
-	CALL	H1073		; 08cd .s.	  cd 73 10 
+	CALL	runas		; 08cd .s.	  cd 73 10 
 	POP	AF		; 08d0 .	  f1 
 	POP	AF		; 08d1 .	  f1 
 	JP	H085e		; 08d2 .^.	  c3 5e 08 
@@ -1222,7 +1222,7 @@ H08d5: 	JP	c.ret		; 08d5 ..2	  c3 e9 32
 
 H08d8: 	DB	2DH,6FH,00H
 H08db: 	DB	70H,74H,63H,00H
-process: CALL	c.ent2		; 08df ..2	  cd ed 32 
+runptc: CALL	c.ent2		; 08df ..2	  cd ed 32 
 	LD	HL,0004H	; 08e2 !..	  21 04 00 
 	ADD	HL,DE		; 08e5 .	  19 
 	LD	A,(HL)		; 08e6 ~	  7e 
@@ -1304,7 +1304,7 @@ process: CALL	c.ent2		; 08df ..2	  cd ed 32
 	PUSH	HL		; 0968 .	  e5 
 	LD	HL,boot		; 0969 !..	  21 00 00 
 	PUSH	HL		; 096c .	  e5 
-	CALL	H17fd		; 096d ...	  cd fd 17 
+	CALL	run		; 096d ...	  cd fd 17 
 	POP	AF		; 0970 .	  f1 
 	POP	AF		; 0971 .	  f1 
 	JP	c.ret2		; 0972 ..3	  c3 03 33 
@@ -1316,7 +1316,7 @@ H097e: 	DB	75H,6EH,69H,78H,00H
 H0983: 	DB	2DH,64H,00H
 H0986: 	DB	63H,70H,70H,00H
 H098a: 	DB	70H,70H,00H
-H098d: 	CALL	c.ent2		; 098d ..2	  cd ed 32 
+runcpp: CALL	c.ent2		; 098d ..2	  cd ed 32 
 	LD	HL,0004H	; 0990 !..	  21 04 00 
 	ADD	HL,DE		; 0993 .	  19 
 	LD	A,(HL)		; 0994 ~	  7e 
@@ -1490,7 +1490,7 @@ H0a5a: 	LD	HL,(H4150)	; 0a5a *PA	  2a 50 41
 	PUSH	HL		; 0aaf .	  e5 
 	LD	HL,boot		; 0ab0 !..	  21 00 00 
 	PUSH	HL		; 0ab3 .	  e5 
-	CALL	H17fd		; 0ab4 ...	  cd fd 17 
+	CALL	run		; 0ab4 ...	  cd fd 17 
 	POP	AF		; 0ab7 .	  f1 
 	DB	F1H,C3H,03H,33H,2DH,63H,00H,73H,68H,00H,7CH,20H
 	DB	2FH,62H,69H,6EH,2FH,70H,31H,20H,2DH,62H,30H,20H
@@ -1539,7 +1539,7 @@ H0cd5: 	DB	2DH,62H,30H,00H
 H0cd9: 	DB	2DH,63H,65H,6DH,00H
 H0cde: 	DB	63H,70H,31H,00H
 H0ce2: 	DB	70H,31H,00H
-H0ce5: 	CALL	c.ent		; 0ce5 ..2	  cd e2 32 
+runcp1: CALL	c.ent		; 0ce5 ..2	  cd e2 32 
 	PUSH	AF		; 0ce8 .	  f5 
 	PUSH	AF		; 0ce9 .	  f5 
 	PUSH	AF		; 0cea .	  f5 
@@ -1803,14 +1803,14 @@ H0dd2: 	LD	HL,FFF8H	; 0dd2 !..	  21 f8 ff
 	PUSH	HL		; 0e51 .	  e5 
 	LD	HL,boot		; 0e52 !..	  21 00 00 
 	PUSH	HL		; 0e55 .	  e5 
-	CALL	H17fd		; 0e56 ...	  cd fd 17 
+	CALL	run		; 0e56 ...	  cd fd 17 
 	POP	AF		; 0e59 .	  f1 
 	POP	AF		; 0e5a .	  f1 
 	JP	c.ret		; 0e5b ..2	  c3 e9 32 
 
 H0e5e: 	DB	63H,70H,32H,00H
 H0e62: 	DB	70H,32H,00H
-H0e65: 	CALL	c.ent		; 0e65 ..2	  cd e2 32 
+runcp2: CALL	c.ent		; 0e65 ..2	  cd e2 32 
 	LD	HL,FFF4H	; 0e68 !..	  21 f4 ff 
 	ADD	HL,SP		; 0e6b 9	  39 
 	LD	SP,HL		; 0e6c .	  f9 
@@ -2007,7 +2007,7 @@ H0f77: 	LD	HL,FFF4H	; 0f77 !..	  21 f4 ff
 	INC	HL		; 0f84 #	  23 
 	LD	B,(HL)		; 0f85 F	  46 
 	PUSH	BC		; 0f86 .	  c5 
-	CALL	H17fd		; 0f87 ...	  cd fd 17 
+	CALL	run		; 0f87 ...	  cd fd 17 
 	POP	AF		; 0f8a .	  f1 
 	POP	AF		; 0f8b .	  f1 
 	LD	HL,FFF6H	; 0f8c !..	  21 f6 ff 
@@ -2030,7 +2030,7 @@ H0f77: 	LD	HL,FFF4H	; 0f77 !..	  21 f4 ff
 
 H0fa7: 	DB	2DH,6FH,00H
 H0faa: 	DB	70H,33H,00H
-H0fad: 	CALL	c.ent		; 0fad ..2	  cd e2 32 
+runp3: 	CALL	c.ent		; 0fad ..2	  cd e2 32 
 	PUSH	AF		; 0fb0 .	  f5 
 	PUSH	AF		; 0fb1 .	  f5 
 	PUSH	AF		; 0fb2 .	  f5 
@@ -2163,7 +2163,7 @@ H0fad: 	CALL	c.ent		; 0fad ..2	  cd e2 32
 	PUSH	HL		; 105d .	  e5 
 	LD	HL,boot		; 105e !..	  21 00 00 
 	PUSH	HL		; 1061 .	  e5 
-	CALL	H17fd		; 1062 ...	  cd fd 17 
+	CALL	run		; 1062 ...	  cd fd 17 
 	POP	AF		; 1065 .	  f1 
 	POP	AF		; 1066 .	  f1 
 	JP	c.ret		; 1067 ..2	  c3 e9 32 
@@ -2171,7 +2171,7 @@ H0fad: 	CALL	c.ent		; 0fad ..2	  cd e2 32
 H106a: 	DB	2DH,6FH,00H
 H106d: 	DB	61H,73H,00H
 H1070: 	DB	61H,6EH,00H
-H1073: 	CALL	c.ent		; 1073 ..2	  cd e2 32 
+runas: 	CALL	c.ent		; 1073 ..2	  cd e2 32 
 	PUSH	AF		; 1076 .	  f5 
 	PUSH	AF		; 1077 .	  f5 
 	PUSH	AF		; 1078 .	  f5 
@@ -2333,7 +2333,7 @@ H10ce: 	LD	HL,FFF8H	; 10ce !..	  21 f8 ff
 	PUSH	HL		; 114d .	  e5 
 	LD	HL,boot		; 114e !..	  21 00 00 
 	PUSH	HL		; 1151 .	  e5 
-	CALL	H17fd		; 1152 ...	  cd fd 17 
+	CALL	run		; 1152 ...	  cd fd 17 
 	POP	AF		; 1155 .	  f1 
 	POP	AF		; 1156 .	  f1 
 	JP	c.ret		; 1157 ..2	  c3 e9 32 
@@ -2379,7 +2379,7 @@ H1258: 	DB	2DH,65H,62H,5FH,5FH,6DH,65H,6DH,6FH,72H,79H,00H
 H1264: 	DB	2DH,75H,5FH,6DH,61H,69H,6EH,00H
 H126c: 	DB	6CH,69H,6EH,6BH,00H
 H1271: 	DB	6CH,64H,00H
-H1274: 	CALL	c.ent		; 1274 ..2	  cd e2 32 
+runlink: CALL	c.ent		; 1274 ..2	  cd e2 32 
 	LD	HL,FDB4H	; 1277 !..	  21 b4 fd 
 	ADD	HL,SP		; 127a 9	  39 
 	LD	SP,HL		; 127b .	  f9 
@@ -3329,7 +3329,7 @@ H17bd: 	POP	HL		; 17bd .	  e1
 	PUSH	HL		; 17e0 .	  e5 
 	LD	HL,boot		; 17e1 !..	  21 00 00 
 	PUSH	HL		; 17e4 .	  e5 
-	CALL	H17fd		; 17e5 ...	  cd fd 17 
+	CALL	run		; 17e5 ...	  cd fd 17 
 	POP	AF		; 17e8 .	  f1 
 	POP	AF		; 17e9 .	  f1 
 	JP	c.ret		; 17ea ..2	  c3 e9 32 
@@ -3339,7 +3339,7 @@ H17f3: 	DB	63H,63H,00H
 H17f6: 	DB	63H,63H,00H
 H17f9: 	DB	0AH,00H
 H17fb: 	DB	20H,00H
-H17fd: 	CALL	c.ent		; 17fd ..2	  cd e2 32 
+run: 	CALL	c.ent		; 17fd ..2	  cd e2 32 
 	LD	HL,FFCCH	; 1800 !..	  21 cc ff 
 	ADD	HL,SP		; 1803 9	  39 
 	LD	SP,HL		; 1804 .	  f9 

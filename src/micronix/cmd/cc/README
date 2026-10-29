@@ -52,8 +52,17 @@ What the listing shows
 		calls 1a16 (suffix/string test), 2482 and 2bba (string
 		helpers), and stores the results in the data globals;
 		early return at 0626, end 08d5
-	08df	process: uses the c.ent2/c.ret2 runtime pair; ends 0972;
-		the next function starts at 098d
+	08df	runptc: builds the ptc command from "ptc" and "-o"; ends 0972
+	098d	runcpp: cpp/pp runner
+	0ce5	runcp1: cp1/p1 runner
+	0e65	runcp2: cp2/p2 runner
+	0fad	runp3: p3 runner
+	1073	runas: as/an runner
+	1274	runlink: link/ld runner
+	17fd	run: the common runner.  If the verbose flag (400c) is set,
+		print each argv word; ignore the signals; fork, exec and
+		wait.  The runners above build their argv from the string
+		block immediately before each one.
 	1ae1	the signal handler installed by setup; called with 1
 	32e2	c.ent, the first runtime prologue
 	32e9	c.ret, its epilogue
@@ -65,6 +74,11 @@ What the listing shows
 
 The suffix pointers pushed by opts are 05a1 (".p") and 05a4 (".c"),
 not functions: opts compares an argument against those strings.
+
+The runners are the vendor binary's split of the same idea as run() in
+the tree's cc.c: each tool has its own small function that lays out the
+argument vector (the strings just before it), and run at 17fd does the
+common verbose print, signal handling, fork/exec/wait.
 
 The program's own code is interleaved with its string literals from
 0100 to about 1e00; the library follows, and the errno message table is
