@@ -10,9 +10,12 @@
 #include <sys/file.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <sys/sgtty.h>
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
+
+extern struct file *falloc();   /* open.c */
 
 /*
  * Access ciosw to open a character device
@@ -53,50 +56,94 @@ cwrite(dev)
 }
 
 /*
- * Access ciosw to sgtty a character device
+ * The descriptor keeps its number and becomes the device the driver
+ * named: this is what ACCEPT does, giving the child the connection while
+ * the parent's descriptor is still the listener.
  */
-cmode(fd, addr, flag)
-    int fd;
-    UINT8 flag;
-    char *addr;
+static
+cioswap(fd, fp, dev)
+    int fd, dev;
+    register struct file *fp;
+{
+    register struct file *nf;
+
+    if ((nf = falloc()) == 0) {
+        u.error = ENFILE;
+        return (-1);
+    }
+    nf->inode = fp->inode;
+    nf->count = 1;
+    nf->mode = fp->mode;
+    nf->f_dev = dev;
+    u.olist[fd] = nf;
+    if (--fp->count <= 0)
+        cclose(fp->f_dev, fp->mode & IWRITE);
+    return (0);
+}
+
+/*
+ * One request to a character device.  A terminal's status is just two
+ * of them - TIOCGETA and TIOCSETA - so stty(3) and gtty(3) are library
+ * wrappers over ioctl(2), not system calls of their own.
+ *
+ * A driver that changes u.fdev is handing the descriptor a different
+ * device - a clone's accept - and cioswap()s this process's file to it.
+ */
+cioctl(fd, cmd, arg)
+    int fd, cmd;
+    char *arg;
 {
     struct file *fp;
     struct inode *ip;
     int dev;
 
     if ((fp = ofile(fd)) == 0)
-        return;
+        return (-1);            /* ofile set u.error */
     ip = fp->inode;
     if ((ip->i_mode & IFMT) != IFCHR) {
         u.error = ENOTTY;
-        return;
+        return (-1);
     }
-    if (!valid(addr, 6))        /* malloc.c */
-        return;
-    u.base = addr;
-    u.segflg = USEG;
-    dev = ip->i_addr[0];
-    (*ciosw[cmajor(dev)].mode) (dev, flag);
+    dev = fp->f_dev;
+    u.fdev = dev;
+    if (cmd == TIOCGETA || cmd == TIOCSETA) {
+        if (!valid(arg, 6))     /* malloc.c */
+            return (-1);
+        u.base = arg;
+        u.segflg = USEG;
+    }
+    (*ciosw[cmajor(dev)].ioctl) (dev, cmd, arg);
+    if (u.error)
+        return (-1);
+    if (u.fdev != dev)
+        return (cioswap(fd, fp, u.fdev));
+    return (0);
 }
 
 /*
- * Gtty system call. Notice that the calling conventions
- * for the devive sgtty routine are not unix standard.
+ * The old system calls, kept for binaries built before the library
+ * moved them onto ioctl.  They are the same two requests with the
+ * system call's register and carry convention; new programs use the
+ * library wrappers (lib/libc/gtty.c, stty.c).
  */
 gtty(addr)
     char *addr;
 {
-    cmode(u.hl, addr, READ);
+    if (u.error) {
+        u.af |= ERRBIT;
+        u.hl = u.error;
+    } else
+        u.af &= ~ERRBIT;
 }
 
-/*
- * Stty system call. Notice that the calling conventions
- * for the devive sgtty routine are not unix standard.
- */
 stty(addr)
     char *addr;
 {
-    cmode(u.hl, addr, WRITE);
+    if (u.error) {
+        u.af |= ERRBIT;
+        u.hl = u.error;
+    } else
+        u.af &= ~ERRBIT;
 }
 
 /*
@@ -123,6 +170,14 @@ nulldev()
 nodev()
 {
     u.error = ENXIO;
+}
+
+/*
+ * An ioctl the device does not have.
+ */
+noioctl()
+{
+    u.error = ENOTTY;
 }
 
 /*

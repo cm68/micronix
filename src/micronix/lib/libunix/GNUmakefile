@@ -73,9 +73,9 @@ CSRCS	= signal.c lseek.c seek.c rename.c buf.c cleanup.c fclose.c \
 	 fprintf.c scanf.c fscanf.c isatty.c open.c
 ASSRCS	= access.s alarm.s _break.s chdir.s chmod.s chown.s close.s select.s \
 	 creat.s dup.s dup2.s errno.s exec.s execve.s execv.s exit.s _exit.s fork.s fstat.s \
-	 getpid.s getuid.s gtty.s jobctl.s kill.s link.s mknod.s mount.s nice.s sysopen.s \
+	 getpid.s getuid.s jobctl.s kill.s link.s mknod.s mount.s nice.s sysopen.s \
 	 pause.s perror.s pipe.s read.s reboot.s seekraw.s setuid.s _signal.s \
-	 sleep.s stat.s stime.s sbrk.s stty.s sync.s time.s times.s umount.s \
+	 sleep.s stat.s stime.s sbrk.s sync.s time.s times.s umount.s \
 	 unlink.s wait.s write.s ioctl.s fputc.s fgetc.s ftruncate.s
 OBJS	= $(ASSRCS:.s=.o) $(CSRCS:.c=.o)
 

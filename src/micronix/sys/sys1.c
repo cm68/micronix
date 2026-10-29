@@ -114,7 +114,6 @@ dup()
         return;
     u.olist[fd] = fp;
     fp->count++;
-    u.hl = fd;
 }
 
 /*

@@ -51,6 +51,7 @@ rdwri(rw, fd, buf, count)
     register struct file *fp;
     static char mode;
     static int nbytes;
+    int dev;
 
     if (!valid(buf, count))     /* is user memory allocated? */
         return;
@@ -75,10 +76,19 @@ rdwri(rw, fd, buf, count)
     if (rw == IWRITE && (mode & IAPPEND) && (ip->i_mode & IFMT) == IFREG)
         u.offset = ip->size;
     u.segflg = USEG;
-    if (mode & PIPE)
-        nbytes = (rw == IREAD) ? pread(ip) : pwrite(ip);
+    /*
+     * A character device is named by the file's forwarded device - a
+     * clone open gives a minor the inode does not have.  Everything
+     * else is named by the inode, as it always was.
+     */
+    if ((ip->i_mode & IFMT) == IFCHR)
+        dev = fp->f_dev;
     else
-        nbytes = (rw == IREAD) ? iread(ip) : iwrite(ip);
+        dev = (ip->i_mode & IIO) ? ip->i_addr[0] : ip->i_dev;
+    if (mode & PIPE)
+        nbytes = (rw == IREAD) ? pread(ip, dev) : pwrite(ip, dev);
+    else
+        nbytes = (rw == IREAD) ? iread(ip, dev) : iwrite(ip, dev);
     fp->rwptr = u.offset;
     return (nbytes);
 }
@@ -87,8 +97,9 @@ rdwri(rw, fd, buf, count)
  * Write a pipe. Use the file size as the write pointer.
  * If there is no reader, signal and return error.
  */
-pwrite(ip)
+pwrite(ip, dev)
     register struct inode *ip;
+    int dev;
 {
     register int request, nleft;
 
@@ -110,7 +121,7 @@ pwrite(ip)
         }
         u.offset = ip->size;
         u.count = min(PIPSIZE - ip->size, nleft);
-        nleft -= iwrite(ip);
+        nleft -= iwrite(ip, dev);
         if (u.error)
             break;
     }
@@ -124,8 +135,9 @@ pwrite(ip)
  * If the pipe empties during the read, return without
  * waiting for more. This allows interactive pipes.
  */
-pread(ip)
+pread(ip, dev)
     register struct inode *ip;
+    int dev;
 {
     register int nbytes;
 
@@ -142,7 +154,7 @@ pread(ip)
         sleep(ip, PRIPIPE);     /* wait for a write */
         goto lock;
     }
-    nbytes = iread(ip);
+    nbytes = iread(ip, dev);
   done:
     irelse(ip);                 /* wakes writer */
     return (nbytes);

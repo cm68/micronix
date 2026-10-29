@@ -7,6 +7,7 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/tty.h>
+#include <sys/sgtty.h>
 #include <sys/proc.h>
 #include <sys/ovl.h>
 #include <errno.h>
@@ -283,11 +284,19 @@ muwrite(dev)
 }
 
 /*
- * Get/set a multiboard tty
+ * A request to a multiboard tty.  Getting and setting its status are
+ * the two the library's stty(3) and gtty(3) send.
  */
-mustty(dev, flag)
+muioctl(dev, cmd, arg)
+    int dev, cmd;
+    char *arg;
 {
-    ttymode(ttdev(dev), flag);
+    if (cmd == TIOCGETA)
+        ttymode(ttdev(dev), READ);
+    else if (cmd == TIOCSETA)
+        ttymode(ttdev(dev), WRITE);
+    else
+        u.error = ENOTTY;
 }
 
 /*
@@ -486,7 +495,7 @@ muenable(dev, mode)
  * the stubs through ttyin/ttyout/mumint in sys/ttyres.c.
  */
 struct ciovec ttycvec = {
-    &muopen, &muclose, &muread, &muwrite, &mustty
+    &muopen, &muclose, &muread, &muwrite, &muioctl
 };
 
 /*

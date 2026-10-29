@@ -22,11 +22,10 @@ struct tty ptyttys[2 * NPTY];
 /*
  * The ends of each pair, by index.  A load here replaces the multiply
  * by sizeof(struct tty) that the array form costs (sys/pty.h).  NPTY is
- * one, so the initialiser is complete; raising it extends these lists
- * beside the arrays.
+ * two, and raising it extends these lists beside the arrays.
  */
-struct tty *ptyslave[NPTY] = { &ptyttys[0] };
-struct tty *ptymaster[NPTY] = { &ptyttys[1] };
+struct tty *ptyslave[NPTY] = { &ptyttys[0], &ptyttys[2] };
+struct tty *ptymaster[NPTY] = { &ptyttys[1], &ptyttys[3] };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

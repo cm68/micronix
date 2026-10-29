@@ -30,7 +30,13 @@ c 5 9 ttyp1
 c 2 0 mem
 c 3 0 io
 c 3 210 mediachg
-b 6 1 net
+#
+# The network socket face.  Char major 6 is a different namespace from
+# block major 6 (the network disk): /dev/net0 is the clone node, and an
+# open asks the card for the next free socket.  The path a program gets
+# back is that socket, not this node, so there is exactly one name.
+#
+c 6 0 net0
 b 1 0 hda
 b 1 1 hdb
 b 1 2 hdc

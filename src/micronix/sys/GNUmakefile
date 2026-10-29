@@ -57,7 +57,7 @@ EXTRA	= BUILDING ARCHITECTURE.md FEATURES-2.md TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3 pty tty mem io
+MODS	= dj mw ide ncr hdca nd net disk1 disk2 disk3 pty tty mem io
 
 # Nothing is staged: every driver in the tree is linked into a module and
 # placed at boot.  A driver costs no address space when it is not placed -
@@ -157,9 +157,8 @@ pic.o: pic.c
 	$(MXLD) -r -Sdata -o pic.o pic.rel
 	rm -f pic.rel
 
-# net.o is not in the kernel: it is the network face of the ND module,
-# linked into nd.mod below.  It is compiled like a module object, not
-# folded.
+# net.o is the network card's socket face, char major 6, a module page of
+# its own (net.mod below).  It is compiled like a module object.
 net.o: net.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
@@ -546,10 +545,10 @@ tty.mod: ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
 		ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o
 
-# The ND module carries the network face too: net.o is its second
-# object, linked into the same page (sys/net.c, sys/nd.c).
-nd.mod: ndhdr.o nd.o net.o unix.link
-	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o net.o
+# The ND module is the network disk alone; the socket face that shares
+# its major number in the other namespace is net.mod.
+nd.mod: ndhdr.o nd.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o
 
 #
 # One module is one page.  What the link produced is a 16 byte object

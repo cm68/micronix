@@ -1,12 +1,14 @@
 /*
  * Host-side test of the network card (NET.md's socket face).
  *
- * Drives nic.c the way the guest driver will - writes framed commands
+ * Drives nic.c the way the guest driver does - writes framed commands
  * byte-by-byte, reads framed replies back, calls nic_poll() the way the
- * d1 wiring's recurring timer does - against an echo server this file
- * forks.  Not in the d1 link; a standalone host check.
+ * d1 wiring's recurring timer does - and checks the two things the guest
+ * now depends on: a listener is persistent and pauses while one
+ * connection is parked, ACCEPT moves that connection to a slot of its
+ * own, and a socket's data is pulled rather than pushed.
  *
- * Build and run:
+ * Not in the d1 link; a standalone host check.  Build and run:
  *     cc -o nic_test nic_test.c nic.c && ./nic_test
  */
 
@@ -14,7 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <signal.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -22,54 +25,39 @@
 
 #define TEST_PORT 23232
 
+/* guest -> card (sys/NET.md section 4) */
+#define C_OPEN    0x01
+#define C_CLOSE   0x02
+#define C_BIND    0x03
+#define C_LISTEN  0x05
+#define C_ACCEPT  0x0B
+#define C_RECV    0x00
+#define C_SOCKSTAT 0x0C
+#define C_JOIN    0x08
+
+/* card -> guest */
+#define P_ACK     0x80
+#define P_DATA    0x81
+#define P_EVENT   0x82
+
+#define E_AGAIN   7
+#define EV_CONNECTED 1
+#define EV_READY     4
+
 static int failures;
 
-/* ---- the echo server, in a child ---- */
-static void
-echo_server(void)
-{
-    int lfd, c, on = 1;
-    struct sockaddr_in a;
-    char buf[512];
-    int r;
-
-    lfd = socket(AF_INET, SOCK_STREAM, 0);
-    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof on);
-    memset(&a, 0, sizeof a);
-    a.sin_family = AF_INET;
-    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    a.sin_port = htons(TEST_PORT);
-    if (bind(lfd, (struct sockaddr *)&a, sizeof a) < 0 ||
-        listen(lfd, 1) < 0)
-        _exit(1);
-    c = accept(lfd, NULL, NULL);
-    if (c < 0)
-        _exit(1);
-    while ((r = read(c, buf, sizeof buf)) > 0)
-        write(c, buf, r);
-    close(c);
-    close(lfd);
-    _exit(0);
-}
-
 /* ---- the guest driver's framing, done inline ---- */
-static void
-tx_byte(unsigned char b)
-{
-    nic_data_out(b);
-}
-
 static void
 tx_frame(unsigned char type, unsigned char sock, const unsigned char *p, int len)
 {
     int i;
 
-    tx_byte(type);
-    tx_byte(sock);
-    tx_byte(len & 0xff);
-    tx_byte((len >> 8) & 0xff);
+    nic_data_out(type);
+    nic_data_out(sock);
+    nic_data_out(len & 0xff);
+    nic_data_out((len >> 8) & 0xff);
     for (i = 0; i < len; i++)
-        tx_byte(p[i]);
+        nic_data_out(p[i]);
 }
 
 static int
@@ -123,63 +111,144 @@ expect(int ok, const char *what)
     }
 }
 
+/* a client of the card's listener; -1 if the connect is refused */
+static int
+client(void)
+{
+    int fd, r, st = 0;
+    socklen_t sl = sizeof st;
+    struct sockaddr_in a;
+
+    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+        return -1;
+    fcntl(fd, F_SETFL, O_NONBLOCK);
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    a.sin_port = htons(TEST_PORT);
+    r = connect(fd, (struct sockaddr *) &a, sizeof a);
+    if (r < 0 && errno != EINPROGRESS) {
+        close(fd);
+        return -1;
+    }
+    usleep(200000);
+    getsockopt(fd, SOL_SOCKET, SO_ERROR, &st, &sl);
+    if (st != 0) {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+static void
+send_str(fd, s)
+    int fd;
+    char *s;
+{
+    write(fd, s, strlen(s));
+}
+
 int
 main(void)
 {
-    pid_t child;
     unsigned char type, sock, p[1200];
-    int len;
+    unsigned char mode = 1, port[2], cap[2];
+    int len, a, b;
 
-    child = fork();
-    if (child == 0)
-        echo_server();
-
-    sleep(1);                   /* let the server bind */
     nic_init();
 
     /* JOIN */
-    tx_frame(0x08, 0xff, 0, 0);
+    tx_frame(C_JOIN, 0xff, 0, 0);
     len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 4 && type == 0x80 && sock == 0xff, "JOIN acks the ip");
-    printf("       ip %d.%d.%d.%d\n", p[0], p[1], p[2], p[3]);
+    expect(len == 4 && type == P_ACK && sock == 0xff, "JOIN acks the ip");
 
-    /* OPEN tcp */
-    {
-        unsigned char mode = 1;
-        tx_frame(0x01, 0, &mode, 1);
+    /* open slot 0, bind, listen */
+    tx_frame(C_OPEN, 0, &mode, 1);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_ACK && p[0] == 0, "OPEN slot 0");
+    port[0] = TEST_PORT >> 8;
+    port[1] = TEST_PORT & 0xff;
+    tx_frame(C_BIND, 0, port, 2);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_ACK && p[0] == 0, "BIND");
+    tx_frame(C_LISTEN, 0, 0, 0);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_ACK && p[0] == 0, "LISTEN");
+
+    /* A connects; the card parks it and says who */
+    a = client();
+    expect(a >= 0, "client A connects");
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 7 && type == P_EVENT && sock == 0 && p[0] == EV_CONNECTED,
+        "EVENT connected A with its address and port");
+
+    /* while it is parked, B is refused */
+    b = client();
+    expect(b < 0, "B refused while A is pending");
+
+    /* ACCEPT gives A a slot and re-arms the listener */
+    tx_frame(C_ACCEPT, 0, 0, 0);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 2 && type == P_ACK && sock == 0 && p[0] == 0 && p[1] == 1,
+        "ACCEPT A -> slot 1");
+
+    b = client();
+    expect(b >= 0, "B connects after the listener re-arms");
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 7 && type == P_EVENT && sock == 0 && p[0] == EV_CONNECTED,
+        "EVENT connected B");
+
+    tx_frame(C_ACCEPT, 0, 0, 0);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 2 && type == P_ACK && sock == 0 && p[0] == 0 && p[1] == 2,
+        "ACCEPT B -> slot 2");
+
+    /* A's bytes are pulled from slot 1, B's from slot 2 */
+    send_str(a, "hello");
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_EVENT && sock == 1 && p[0] == EV_READY,
+        "EVENT ready slot 1");
+    cap[0] = 64;
+    cap[1] = 0;
+    tx_frame(C_RECV, 1, cap, 2);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 5 && type == P_DATA && sock == 1 && memcmp(p, "hello", 5) == 0,
+        "RECV slot 1 -> hello");
+
+    tx_frame(C_RECV, 1, cap, 2);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_ACK && sock == 1 && p[0] == E_AGAIN,
+        "RECV empty slot 1 -> E_AGAIN");
+
+    send_str(b, "world");
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 1 && type == P_EVENT && sock == 2 && p[0] == EV_READY,
+        "EVENT ready slot 2");
+    tx_frame(C_RECV, 2, cap, 2);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 5 && type == P_DATA && sock == 2 && memcmp(p, "world", 5) == 0,
+        "RECV slot 2 -> world");
+
+    /* the card's table: one listener and two connections */
+    tx_frame(C_SOCKSTAT, 0xff, 0, 0);
+    len = rx_frame(&type, &sock, p, sizeof p);
+    expect(len == 27 && type == P_ACK && sock == 0xff,
+        "SOCKSTAT reports three sockets");
+    if (len == 27) {
+        expect(p[0] == 3 && p[9] == 5 && p[18] == 5,
+            "SOCKSTAT states: LISTEN, two OPEN");
     }
+
+    /* close both connections; each pull then reports the close */
+    tx_frame(C_CLOSE, 1, 0, 0);
     len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 1 && type == 0x80 && p[0] == 0, "OPEN tcp");
-
-    /* CONNECT */
-    {
-        unsigned char c[6] = { 127, 0, 0, 1, TEST_PORT >> 8, TEST_PORT & 0xff };
-        tx_frame(0x04, 0, c, 6);
-    }
+    expect(len == 1 && type == P_ACK && sock == 1, "CLOSE slot 1");
+    tx_frame(C_CLOSE, 2, 0, 0);
     len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 1 && type == 0x80 && p[0] == 0, "CONNECT issued");
+    expect(len == 1 && type == P_ACK && sock == 2, "CLOSE slot 2");
 
-    /* EVENT connected */
-    len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 1 && type == 0x82 && p[0] == 1, "EVENT connected");
-
-    /* SEND "hello" */
-    tx_frame(0x06, 0, (const unsigned char *)"hello", 5);
-    len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 1 && type == 0x80 && p[0] == 0, "SEND accepted");
-
-    /* DATA: the echo */
-    len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 5 && type == 0x81 && memcmp(p, "hello", 5) == 0,
-           "DATA echoes hello");
-
-    /* CLOSE */
-    tx_frame(0x02, 0, 0, 0);
-    len = rx_frame(&type, &sock, p, sizeof p);
-    expect(len == 1 && type == 0x80 && p[0] == 0, "CLOSE");
-
-    kill(child, SIGKILL);
-
+    close(a);
+    close(b);
     if (failures == 0)
         printf("ALL PASS\n");
     else

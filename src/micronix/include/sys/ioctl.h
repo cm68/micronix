@@ -49,10 +49,11 @@
  * device number is tagged block or character, and the two are reached
  * through different paths, which is the same reason a raw read of a disk
  * goes through bread while a raw read of a tape goes through the
- * character switch.  A character device's requests are the terminal
- * driver's own calls - stty and gtty, sys/cio.c, which is what ioctl(2)
- * was in the sixth edition - and a driver whose bus has no command block
- * to run answers ENOTTY here rather than pretending otherwise.
+ * character switch.  A character device's requests are now one ioctl
+ * hook of its own: the terminal's status is TIOCGETA/TIOCSETA through
+ * stty(3) and gtty(3), and the network card's socket face is the NET*
+ * requests of include/sys/net.h.  A driver whose bus has no command
+ * block to run answers ENOTTY here rather than pretending otherwise.
  *
  * flags says which way the data goes, since the opcode cannot always be
  * asked: INQUIRY reads, READ CAPACITY reads, and READ(10) reads, but

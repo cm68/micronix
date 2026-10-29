@@ -141,10 +141,10 @@ krw(dev, rw)
  * major 2 and major 3, so the same vector serves both headers; each
  * module page gets its own copy because memdev.o is linked into each.
  */
-extern int nulldev(), nodev();
+extern int nulldev(), nodev(), noioctl();
 
 struct ciovec memcvec = {
-    &nulldev, &nulldev, &memread, &memwrite, &nodev
+    &nulldev, &nulldev, &memread, &memwrite, &noioctl
 };
 
 static

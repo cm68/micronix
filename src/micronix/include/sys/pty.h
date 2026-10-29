@@ -11,7 +11,7 @@
 #ifndef PTY_H
 #define PTY_H
 
-#define NPTY	1		/* pairs; two struct tty each */
+#define NPTY	2		/* pairs; two struct tty each, two sessions */
 #define PTYMAJ	5		/* a char major; block 5 is a different space */
 #define PTYMST	0		/* first master minor */
 #define PTYSLV	8		/* first slave minor */

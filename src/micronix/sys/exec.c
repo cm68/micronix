@@ -467,10 +467,12 @@ argbuild(args, env)
     argputw(av + 2 * (nargs + 1 + nenv), 0);    /* envp terminator */
 
     /*
-     * The first eight bytes of argv[0], for ps, stopping at the null.
+     * The first bytes of argv[0], for ps, stopping at the null.  The
+     * table field is fourteen so /bin/rshd survives; ps prints it with
+     * the same width.
      */
-    zero(u.p->args, 8);
-    i = nbytes < 8 ? nbytes : 8;
+    zero(u.p->args, 14);
+    i = nbytes < 14 ? nbytes : 14;
     for (d = 0; d < i; d++) {
         ((UINT8 *) u.p->args)[d] = argget(a + d);
         if (((UINT8 *) u.p->args)[d] == 0)

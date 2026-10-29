@@ -23,7 +23,7 @@
 extern UINT nbdev, ncdev;
 extern UINT8 map0[];
 extern unsigned bmajor(), cmajor();
-extern int nodev();
+extern int nodev(), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
 
@@ -307,19 +307,20 @@ ovlcwrite(dev)
 }
 
 int
-ovlcmode(dev, flag)
+ovlcioctl(dev, cmd, arg)
     UINT dev;
-    UINT8 flag;
+    int cmd;
+    char *arg;
 {
     UINT8 maj;
 
     maj = cmajor(dev);
     ovlcmap(maj);
-    if (ovlcvec[maj].mode == 0) {
-        nodev();
-        return (0);
+    if (ovlcvec[maj].ioctl == 0) {
+        noioctl();
+        return (-1);
     }
-    return ((*ovlcvec[maj].mode) (dev, flag));
+    return ((*ovlcvec[maj].ioctl) (dev, cmd, arg));
 }
 
 /*
@@ -349,13 +350,13 @@ bvecset(maj, open, close, strat, ioctl)
 }
 
 static
-cvecset(maj, open, close, read, write, mode)
+cvecset(maj, open, close, read, write, ioc)
     UINT maj;
     int (*open) ();
     int (*close) ();
     int (*read) ();
     int (*write) ();
-    int (*mode) ();
+    int (*ioc) ();
 {
     if (maj == 0 || maj >= ncdev || maj >= OVLMAJ)
         return (-1);
@@ -363,7 +364,7 @@ cvecset(maj, open, close, read, write, mode)
     ovlcvec[maj].close = close;
     ovlcvec[maj].read = read;
     ovlcvec[maj].write = write;
-    ovlcvec[maj].mode = mode;
+    ovlcvec[maj].ioctl = ioc;
     return (0);
 }
 
@@ -490,7 +491,7 @@ ovlplace(hdr, seg)
         cv.close = hdr->cvec->close;
         cv.read = hdr->cvec->read;
         cv.write = hdr->cvec->write;
-        cv.mode = hdr->cvec->mode;
+        cv.ioctl = hdr->cvec->ioctl;
     }
 
     if (bmaj)
@@ -509,7 +510,7 @@ ovlplace(hdr, seg)
     if (bmaj)
         bvecset(bmaj, bv.open, bv.close, bv.strat, bv.ioctl);
     if (cmaj)
-        cvecset(cmaj, cv.open, cv.close, cv.read, cv.write, cv.mode);
+        cvecset(cmaj, cv.open, cv.close, cv.read, cv.write, cv.ioctl);
     if (tick)
         tickset(tick, seg);
     if (intr)

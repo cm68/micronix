@@ -48,7 +48,7 @@
 extern int ttyread(), ttywrite(), ttymode(), ttyopen(), ttyclose();
 extern int cstart(), ustart(), drainques(), qinit(), sendque();
 extern int pty_start(), pty_stop(), pty_put();
-extern int ptymode();
+extern int ptyioctl();
 extern int ptyhang();            /* the process-table walk, resident */
 extern int selectchan;          /* select(2): a reader may be watching */
 
@@ -123,7 +123,6 @@ ptyopen(dev, mode)
             ptyinit(i);
         p->sopen++;
         ttyopen(s);
-
         /*
          * A process that opens a slave means it as its terminal.  The
          * daemon that forked it already had the console as its
@@ -137,21 +136,23 @@ ptyopen(dev, mode)
         return;
     }
 
-    if (!p->mopen) {
-        if (p->sopen) {
-            /*
-             * A new master over slave descriptors that are still
-             * open: the hangup is over, but the slave's open count
-             * stays what it was.
-             */
-            p->hung = 0;
-            s->mstate &= ~TTYHUP;
-            m->mstate &= ~TTYHUP;
-            drainques(s);
-            drainques(m);
-        } else
-            ptyinit(i);
-    }
+    /*
+     * The pair a session gets is the daemon's to allocate (rshd picks a
+     * free one before it forks); the driver has no open count to refuse
+     * with, and two masters on one pair would split a shell's bytes.
+     */
+    if (p->sopen) {
+        /*
+         * A new master over slave descriptors that are still open: the
+         * hangup is over, but the slave's open count stays what it was.
+         */
+        p->hung = 0;
+        s->mstate &= ~TTYHUP;
+        m->mstate &= ~TTYHUP;
+        drainques(s);
+        drainques(m);
+    } else
+        ptyinit(i);
     p->mopen++;
 }
 
@@ -296,7 +297,7 @@ ptywrite(dev)
  * is why sys/consts.c carries a row of ovl trampolines there.
  */
 struct ciovec ptycvec = {
-    &ptyopen, &ptyclose, &ptyread, &ptywrite, &ptymode
+    &ptyopen, &ptyclose, &ptyread, &ptywrite, &ptyioctl
 };
 
 /*

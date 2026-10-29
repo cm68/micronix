@@ -62,9 +62,15 @@ Eight sockets, one connection each.  A socket is in one of six states:
     4  tcp-connect   client, connect issued, not yet established
     5  tcp-open      established, ready to send/recv
 
-There is no `accept`: a listening socket becomes `tcp-open` when a client
-arrives (the W5500 shape; keeps the state machine tiny).  One connection
-per socket — to take a second connection the guest opens another socket.
+A listener is persistent.  One connection may be parked on it; until the
+guest `ACCEPT`s that connection the listener is paused and the tcp stack
+refuses (RST) anything else, so there is exactly one pending connection
+and no backlog to race over.  `ACCEPT` moves the parked connection to a
+new socket of its own, which becomes `tcp-open`, and reopens the
+listener; the listener keeps its port and stays `tcp-listen`.  A second
+server (rshd, telnetd) has its own listener and can never see the
+other's connection.  One connection per socket; to serve two clients at
+once the guest accepts two.
 
 ## 4. Commands — guest to card
 
@@ -80,12 +86,23 @@ Each is a frame; the socket is in the header, arguments in the payload.
     JOIN    0x08  card-level (socket 0xff), no payload
     GETCONF 0x09  card-level (socket 0xff), no payload
     SETCONF 0x0A  card-level (socket 0xff), payload = netconf
+    ACCEPT  0x0B  takes the parked connection; reply = status, new socket
+    SOCKSTAT 0x0C card-level (socket 0xff); reply = socket table
+    RECV    0x00  not a wire type: pull this socket's data, payload =
+                  count[2] little-endian
 
 `JOIN` puts the card on its network — the firmware does wifi associate +
 DHCP — and the `ACK` carries the assigned `ip[4]` in network order; the
 sim answers immediately with the host's address.  `RDY` stays clear until
-the join has finished.  There is no `recv`: the card pushes data
-(section 5); the channel is the flow control.
+the join has finished.
+
+`RECV` is a pull, not a pushed stream: the guest names the socket and the
+count it can take, and the card answers `DATA` with as much as it has, or
+an `ACK` whose status is `no-data-yet` or `closed`.  Because only the
+owner of a socket asks for that socket, two sessions cannot steal each
+other's bytes.  `SOCKSTAT` returns one nine-byte record per listener or
+connection — state, local port, peer address, peer port — which is what
+netstat(1) prints.
 
 `GETCONF` and `SETCONF` are the third way to give the card a network,
 over this interface.  The netconf payload is the station's credentials:
@@ -114,7 +131,10 @@ after it — address, mask, gateway, DNS — is DHCP.
     status[1]:  0 ok, else the error code below
 
 `JOIN`'s successful `ACK` carries `ip[4]` (section 4).  `GETCONF`'s
-carries the netconf payload.  `ACK` payload, for `STATUS`:
+carries the netconf payload.  `ACCEPT`'s carries status[1] and the new
+socket[1]; no connection waiting is the error code `no-data-yet`.
+`SOCKSTAT`'s carries the socket table.  `RECV` answers `DATA` or an
+`ACK` (`no-data-yet`, `closed`).  `ACK` payload, for `STATUS`:
 
     state[1]  rx[2 little-endian]  tx[2 little-endian]
 
@@ -122,13 +142,18 @@ carries the netconf payload.  `ACK` payload, for `STATUS`:
 
 `EVENT` payload:
 
-    code[1]:  1 connected, 2 closed, 3 reset
+    code[1]:  1 connected, 2 closed, 3 reset, 4 ready
 
-`connected` also carries the peer's address, so a server can authenticate
-the caller without a second command:
+`connected` also carries the peer's address and port, so a server can
+authenticate the caller and netstat can show the connection without a
+second command:
 
-    code[1] ip[4]          connected; ip in network order
-    code[1]                closed, reset
+    code[1] ip[4] port[2]  connected; network order
+    code[1]                closed, reset, ready
+
+`ready` means the socket has something to pull; the card sends one per
+socket until a `RECV` takes the data.  The card never pushes the data
+itself.
 
 The address is the one the connection was accepted from (the card's
 `accept`), not a name; a `.rhosts` line matches the dotted quad.
@@ -141,11 +166,11 @@ Error codes (the `ACK` status):
 ## 6. Flow control
 
 **Receive.**  The card buffers what the network delivered — a udp
-datagram, or tcp bytes up to its window — and pushes `DATA` frames; the
-guest reads them when `RXRDY` is set.  A slow guest fills the card's rx
-buffer, the tcp window shrinks, and the sender backs off; udp datagrams
-beyond the buffer are dropped (tftp's retry absorbs that).  End-to-end
-backpressure, no new mechanism.
+datagram, or tcp bytes up to its window — and pushes a one-byte `ready`
+event; the guest pulls the bytes with `RECV`, only for the socket it
+holds.  A slow guest leaves the data in the card, the tcp window shrinks,
+and the sender backs off; udp datagrams beyond the buffer are dropped
+(tftp's retry absorbs that).  End-to-end backpressure, no new mechanism.
 
 **Send.**  Two levels.  The FIFO is the byte throttle: the guest writes
 frame bytes only while `TXRDY` is set.  The card's memory is the frame
@@ -172,31 +197,34 @@ a shell.
 
 ## 8. The guest interface
 
-The card is one face of the ND module: `/dev/net` is block major 6,
-minor 1 (`dev/devlist`), and every operation is one ioctl command block
-(`include/sys/ioctl.h`):
+The card's socket face is `/dev/net0`, char major 6, and it is a clone
+node: `open` asks the card for the next free socket, and the file it
+returns is that socket, named by the forwarded minor (slot + 1).  The
+descriptor is the socket for everything after the open:
 
-    ioctl(fd, CDBCMD, &cdb)
+    read(fd, buf, n)        pull this socket's bytes
+    write(fd, buf, n)       send on this socket
+    ioctl(fd, NETLISTEN, 0) blocking: returns when a connection waits
+    ioctl(fd, NETACCEPT, &peer)
+                            takes it; the descriptor becomes the
+                            connection and the same fd number is used
+    ioctl(fd, NETBIND, &port), ioctl(fd, NETCONNECT, &addr)
+    ioctl(fd, NETCARD, &req)
+                            one card-level request (JOIN, GETCONF,
+                            SETCONF, SOCKSTAT)
 
-`cdb.cmd[0]` is the operation (`N_OPEN` … `N_SETCONF`, or `NET_OP_RECV`
-to take the next frame), `cdb.cmd[1]` the socket, and the operation's
-own fields follow at `cdb.cmd[2..]`; `cdb.buf`/`cdb.count` are its data
-phase.  The driver builds the frame from those fields, sends it, and
-reads the reply before returning: `cdb.cmd[0..2]` carry the reply type,
-socket and first payload byte, and `cdb.count` the payload copied back.
-The operation list and field layout are in `include/sys/net.h`; a reply
-payload needs `CDB_IN` and `count` set to the buffer's size.
-
-A caller that owns the whole pushed-frame stream may set `CDB_ASYNC` on a
-`SEND`.  The driver then does not read the reply: the ACK is pushed in
-order with the DATA frames and the caller reads it like any other, which
-is what lets rshd move bytes both ways from one process.  A caller that
-waits for each ACK inline (rcp) leaves the flag clear.
+The request codes and the two structures are in `include/sys/net.h`.
+`read` and `write` move at most 128 bytes a call and report end of file
+as 0; `read` returns `EAGAIN` when the selector woke for another socket's
+event, so `select(2)` is the wait (and an alarm bounds it when the card
+has no interrupt line).  The card and the driver never share a pushed
+frame stream, which is what makes concurrent sessions safe.
 
 ## 9. The three implementations
 
 One contract, three bodies, the same guest binary:
 
-    guest driver     builds the frames from the ioctl's typed fields
+    guest driver     builds the frames from the typed requests, pulls
+                     per socket, and demuxes events by socket
     sim nic.c        models the two ports, translates frames to host sockets
     esp32 firmware   lwIP + this framing over the bus channel

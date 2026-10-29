@@ -157,9 +157,9 @@ PIC_C_OBJ = pic.o
 # .c, linked together into a page at OVLBASE and stamped into the bootable
 # image (see the module rules at the end).
 #
-MODS    = dj mw ide ncr hdca nd disk1 disk2 disk3
-MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o nd.o disk1.o disk2.o disk3.o
-MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o ndhdr.o \
+MODS    = dj mw ide ncr hdca nd net disk1 disk2 disk3
+MOD_OBJ = dj.o mw.o ide.o ncr.o hdca.o nd.o net.o disk1.o disk2.o disk3.o
+MOD_HDR = djhdr.o mwhdr.o idehdr.o ncrhdr.o hdcahdr.o ndhdr.o nethdr.o \
 	disk1hdr.o disk2hdr.o disk3hdr.o
 
 #
@@ -192,9 +192,9 @@ OBJS      = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) \
 
 MODULES = $(MOD_OBJ) $(MOD_HDR) \
 	dj.mod mw.mod ide.mod ncr.mod hdca.mod \
-	nd.mod disk1.mod disk2.mod disk3.mod \
+	nd.mod net.mod disk1.mod disk2.mod disk3.mod \
 	dj.page mw.page ide.page ncr.page hdca.page \
-	nd.page disk1.page disk2.page disk3.page
+	nd.page net.page disk1.page disk2.page disk3.page
 
 all: unix
 
@@ -349,14 +349,14 @@ unix.link: $(OBJS)
 # so its data lands at the front of the page.  -A resolves the module
 # against unix.link, and -s drops the symbol table the page would carry.
 #
-dj.mod mw.mod ide.mod ncr.mod hdca.mod nd.mod disk1.mod disk2.mod \
+dj.mod mw.mod ide.mod ncr.mod hdca.mod nd.mod net.mod disk1.mod disk2.mod \
 	disk3.mod: $*hdr.o $*.o unix.link
 	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 
-# The ND module carries the network face too: net.o is its second
-# object, linked into the same page (sys/net.c, sys/nd.c).
-nd.mod: ndhdr.o nd.o net.o unix.link
-	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o net.o
+# The ND module is the network disk alone; the socket face that shares
+# its major number in the character namespace is net.mod.
+nd.mod: ndhdr.o nd.o unix.link
+	$(LD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o
 
 # One module is one page.  What the link produced is a 16 byte object
 # header followed by the page's bytes - all of them, because -Sdata puts
@@ -364,7 +364,7 @@ nd.mod: ndhdr.o nd.o net.o unix.link
 # follows the header.  dd strips the header, and a second dd through a
 # temp file pads a short module up to the 4K the kernel will read, which
 # is the ordinary case.
-dj.page mw.page ide.page ncr.page hdca.page nd.page disk1.page \
+dj.page mw.page ide.page ncr.page hdca.page nd.page net.page disk1.page \
 	disk2.page disk3.page: $*.mod
 	dd if=$*.mod of=$@ bs=1 skip=16
 	dd if=$@ of=$@.p bs=4096 count=1 conv=sync
@@ -382,10 +382,10 @@ dj.page mw.page ide.page ncr.page hdca.page nd.page disk1.page \
 # modbase lands inside the first one.  conv=sync pads the last block with
 # zeros to the block size, which is the same thing the host build's
 # truncate does.
-unix: unix.link dj.page mw.page ide.page ncr.page hdca.page nd.page \
+unix: unix.link dj.page mw.page ide.page ncr.page hdca.page nd.page net.page \
 	disk1.page disk2.page disk3.page
 	dd if=unix.link of=unix bs=4096 conv=sync
-	cat dj.page mw.page ide.page ncr.page hdca.page nd.page \
+	cat dj.page mw.page ide.page ncr.page hdca.page nd.page net.page \
 		disk1.page disk2.page disk3.page >> unix
 	setdev -i unix
 
@@ -440,9 +440,9 @@ clean:
 	rm -f access.o $(HIGHMEM)
 	rm -f $(MOD_OBJ) $(MOD_HDR)
 	rm -f dj.mod mw.mod ide.mod ncr.mod hdca.mod
-	rm -f nd.mod disk1.mod disk2.mod disk3.mod
+	rm -f nd.mod net.mod disk1.mod disk2.mod disk3.mod
 	rm -f dj.page mw.page ide.page ncr.page hdca.page
-	rm -f nd.page disk1.page disk2.page disk3.page
+	rm -f nd.page net.page disk1.page disk2.page disk3.page
 	rm -f consts.rel bus.rel pic.rel net.rel ovlslot.rel
 	rm -f *.nam *.tok *.x
 
@@ -513,6 +513,7 @@ ss1_clock.o: $(SYS)/sys.h
 upd1990_init.o: $(SYS)/sys.h
 nd.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/ioctl.h $(SYS)/nd.h $(SYS)/ovl.h
 ndhdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/nd.h $(SYS)/ovl.h
+nethdr.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/ovl.h
 disk1.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk1.h $(SYS)/ovl.h $(SYS)/dlabel.h $(SYS)/ioctl.h
 disk1hdr.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h $(SYS)/disk1.h $(SYS)/ovl.h
 disk2.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h $(SYS)/con.h $(SYS)/disk2.h $(SYS)/ovl.h $(SYS)/dlabel.h

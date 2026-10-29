@@ -1,0 +1,157 @@
+.he "gtty (3)                     10/28/26                     gtty (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+gtty
+- get typewriter status
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <sys/sgtty.h>
+.sp
+.nf
+.bd 3
+gtty(descriptor, vec)
+int descriptor;
+struct sgtty *vec;
+.fi
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Gtty
+asks the character device named by
+.bd
+descriptor
+for its status and writes the six-byte
+.bd
+struct sgtty
+pointed at by
+.bd
+vec:
+.sp
+.in +4
+.nf
+.bd 5
+char	ispeed;		/* input speed */
+char	ospeed;		/* output speed */
+char	erase;		/* erase character */
+char	kill;		/* kill character */
+UINT	mode;		/* see below */
+.in -4
+.fi
+.sp
+It is the request
+.bd
+TIOCGETA
+through
+.bd
+ioctl
+(2), so it may be made to any character device;
+a device with no terminal status answers ENOTTY.
+.bd
+Stty
+(3) is the other half and sets the same block.
+
+.bd
+Ispeed
+and
+.bd
+ospeed
+are one of:
+.nf
+.in +4
+.bd 16
+0     1200 baud
+1       50 baud
+2       75 baud
+3      110 baud
+4      134.5 baud
+5      150 baud
+6      200 baud
+7      300 baud
+8      600 baud
+9     1200 baud
+10    1800 baud
+11    2400 baud
+12    4800 baud
+13    9600 baud
+14   19200 baud
+15    1200 baud
+.in -4
+.fi
+.bp
+The next two characters are the erase and
+kill characters.  The defaults are ^H and ^X.
+.sp
+The mode says what the system does to input and output.
+Currently these bits are defined:
+.nf
+.in +4
+.bd 6
+0100000  use the RS-232 clear-to-send line
+ 040000  keep all 8 bits of input
+   0040  raw input
+   0020  cr -> lf mapping
+   0010  echo input
+   0002  expand tabs
+.in -4
+.fi
+.sp
+In raw mode every character goes straight to the program
+without waiting for a line, there is no erase or kill
+processing, and no control character is recognised.
+In cooked mode the following are recognised:
+.in +4
+.nf
+.bd 6
+^D  end-of-file, alone on a line
+^\  quit signal to the tty's processes
+DEL interrupt signal to the same
+^B  background signal to the same
+ESC freeze output from this tty
+^S  same as ESC
+.in -4
+.fi
+.sp
+Even in raw mode the other mode bits still apply.  With
+cr->lf mapping, input crs become lfs and output crs or lfs
+become cr-lfs.  With echo, input is echoed as it is typed;
+raw echoes it exactly, cooked does not echo the special
+characters, echoes kill as itself and a newline, and echoes
+erase as backspace-space-backspace.  With tab expansion,
+tabs go out as the spaces needed to reach the next column
+that is a multiple of eight.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 on success, with the status in the structure; -1 on failure.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+EBADF
+if descriptor is not an open file.
+.br
+.bd
+ENOTTY
+if it does not name a character device, or the device has no
+terminal status.

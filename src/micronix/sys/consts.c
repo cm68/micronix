@@ -104,7 +104,7 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 extern int nodev(), nulldev(), nullwrite();
 extern int memread(), memwrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
-extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
+extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();
 
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
@@ -142,12 +142,12 @@ struct biovec biosw[] = {
  */
 struct ciovec ciosw[] = {
     &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,   /* 0 = null */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 1 = tty (root) */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 2 = mem */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 3 = io */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 1 = tty (root) */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 2 = mem */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 3 = io */
     &nodev, &nodev, &nodev, &nodev, &nodev,             /* 4 */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 5 = pty */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 6 */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 5 = pty */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 6 = net */
     &nodev, &nodev, &nodev, &nodev, &nodev,             /* 7 */
     &nodev, &nodev, &nodev, &nodev, &nodev,             /* 8 */
     &nodev, &nodev, &nodev, &nodev, &nodev,             /* 9 */

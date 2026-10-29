@@ -29,9 +29,11 @@
  *		cooked: a line is in the cooked queue, or a break is
  *		in the raw one; TTYHUP or a closed job gate counts,
  *		because the read then returns end of file.
- *	net	a frame is waiting at the card (NETSTAT's RXRDY).  The
- *		card holds it until the driver reads it, so this looks
- *		and does not consume.
+ *	net	a socket has something.  The driver sets its resident
+ *		ready bit when an event or data waits, and a frame at the
+ *		card (NETSTAT's RXRDY) wakes every net descriptor; the
+ *		reader pulls its own socket and gets EAGAIN if the frame
+ *		was another's.
  *
  * Nothing else is selectable.  A regular file or a pipe is not a device
  * with a queue of its own here; a caller that wants one waits for it
@@ -64,6 +66,7 @@ extern struct tty mttys[];
 extern struct tty *ptyslave[], *ptymaster[];
 extern UINT console_minor;
 extern UINT netline;            /* the card's interrupt line, sys/netint.c */
+extern UINT8 netready[];        /* per socket: something to ask for */
 
 /*
  * The event a selector sleeps on.  Resident: every process has its own
@@ -139,7 +142,7 @@ select()
     register int fd;
     register struct file *fp;
     UINT netwanted;
-    int dev;
+    int dev, m;
 
     mask = u.hl;
     for (;;) {
@@ -155,10 +158,19 @@ select()
             if ((fp->inode->i_mode & IFMT) != IFCHR &&
                 (fp->inode->i_mode & IFMT) != IFBLK)
                 continue;
-            dev = fp->inode->i_addr[0];
-            if (major(dev) == NET_MAJOR && minor(dev) == NET_MINOR) {
+            dev = fp->f_dev;
+            if (major(dev) == NET_MAJOR &&
+                (fp->inode->i_mode & IFMT) == IFCHR) {
+                /*
+                 * A net socket: the driver's resident ready bits say
+                 * which socket has something, and a frame at the card
+                 * is a wakeup for all of them (the reader pulls its own
+                 * and gets EAGAIN if the frame was another's).
+                 */
                 netwanted = 1;
-                if (in(NETSTAT_PORT) & NETSTAT_RXRDY)
+                m = minor(dev);
+                if (m >= 1 && m <= 8 &&
+                    (netready[m - 1] || (in(NETSTAT_PORT) & NETSTAT_RXRDY)))
                     r |= bit;
             } else if (devready(dev))
                 r |= bit;

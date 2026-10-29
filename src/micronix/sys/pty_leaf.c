@@ -23,6 +23,7 @@
 #include <sys/proc.h>
 #include <sys/signal.h>
 #include <sys/pty.h>
+#include <sys/sgtty.h>
 #include <errno.h>
 
 extern int ttyout(), ttyin(), ttymode();
@@ -90,8 +91,9 @@ pty_put(t, c)
  * terminal, so let stty say so.
  */
 int
-ptymode(dev, flag)
-    int dev;
+ptyioctl(dev, cmd, arg)
+    int dev, cmd;
+    char *arg;
 {
     register int i;
 
@@ -103,7 +105,12 @@ ptymode(dev, flag)
         u.error = ENOTTY;
         return;
     }
-    ttymode(SLAVE(i), flag);
+    if (cmd == TIOCGETA)
+        ttymode(SLAVE(i), READ);
+    else if (cmd == TIOCSETA)
+        ttymode(SLAVE(i), WRITE);
+    else
+        u.error = ENOTTY;
 }
 
 /*

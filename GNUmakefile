@@ -42,12 +42,30 @@ bin/d1: src/hwsim/d1/d1
 	mkdir -p bin
 	ln -sf ../src/hwsim/d1/d1 bin/d1
 
-src/usersim/sim src/tools/readall:
+#
+# The simulator and image tools have to be told what they are built
+# from, or a rule with no prerequisites is "up to date" forever: the
+# binaries sat unchanged while the NIC's card model was rewritten under
+# them, and the simulator went on speaking the old protocol.  Naming the
+# sources is what makes an edit here reach the binary the tests run.
+#
+SIMSRCS = $(wildcard src/hwsim/*.c src/hwsim/*.h src/hwsim/d1/*.c \
+	src/hwsim/d1/*.h src/hwsim/lib/*.c src/hwsim/lib/*.h src/lib/*.c \
+	src/lib/*.h)
+USERSIMSRCS = $(wildcard src/usersim/*.c src/usersim/*.h src/lib/*.c \
+	src/lib/*.h)
+TOOLSRCS = $(wildcard src/tools/*.c src/tools/*.h)
+
+src/usersim/sim: $(USERSIMSRCS)
 	cd src ; make
 
-src/hwsim/d1/d1:
+src/tools/readall: $(TOOLSRCS)
+	cd src ; make
+
+src/hwsim/d1/d1: $(SIMSRCS)
 	cd src ; make
 	cd src/hwsim/d1 ; make
+	cd src/hwsim/d1 ; make NODEBUG=1
 
 #
 # The host manual tree, man/.  Every page in the tree is mirrored there

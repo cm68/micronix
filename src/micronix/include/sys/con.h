@@ -39,7 +39,9 @@ struct ciovec {
     int (*close) ();
     int (*read) ();
     int (*write) ();
-    int (*mode) ();
+    int (*ioctl) ();            /* the terminal's requests live here:
+                                 * stty/gtty are TIOCSETA/TIOCGETA rather
+                                 * than a hook of their own */
 } ciosw[];
 
 /*

@@ -9,7 +9,7 @@
  * A table of 1 proc structure per process is maintained in the kernel.
  */
 struct proc {
-    char args[8];               /* for ps */
+    char args[14];              /* for ps */
     UINT8 mode;                 /* see below */
     UINT8 uid;                  /* for signal sending */
     UINT event;                 /* for sleep-wakeup */
@@ -147,6 +147,7 @@ struct user {
     UINT32 offset;              /* for file access */
     char *base;                 /* ditto */
     UINT count;                 /* ditto */
+    UINT fdev;                  /* an open's forwarded device (iopen) */
     struct dir {
         UINT inum;
         char name[14];

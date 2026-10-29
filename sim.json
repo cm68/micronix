@@ -61,7 +61,8 @@
         { "controller": "hdcdma", "unit": 0, "geometry": "m16",
           "image": "disks/net/root.vol",
           "files": [
-            { "path": "/.login", "source": "src/micronix/rootfiles/login-net" }
+            { "path": "/.login", "source": "src/micronix/rootfiles/login-net" },
+            { "path": "/.rhosts", "source": "src/micronix/rootfiles/rhosts-net" }
           ] }
       ]
     }

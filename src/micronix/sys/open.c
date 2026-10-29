@@ -69,6 +69,7 @@ pipe(vec)
     }
     wf->count = 1;
     wf->mode = IWRITE | PIPE;
+    wf->f_dev = rf->f_dev = ip->i_addr[0];
     u.olist[wd] = wf;
     rf->inode = wf->inode = ip;
     ip->count = 2;
@@ -94,6 +95,7 @@ iopen(ip, mode)
     if (writ && (ip->i_mode & ISVTX))
         ip->flags |= IWRLOCK;
     dev = ip->i_addr[0];
+    u.fdev = dev;               /* a clone's open forwards a new one */
     switch (ip->i_mode & IFMT) {
     case IFDIR:
         if (writ)
@@ -125,6 +127,7 @@ iopen(ip, mode)
     fp->inode = ip;
     fp->count = 1;
     fp->mode = mode;
+    fp->f_dev = u.fdev;
     ip->count++;
     return (fd);
 }
@@ -166,28 +169,30 @@ fclose(fp)
         ip->flags &= ~IWRLOCK;
     if (fp->mode & PIPE)
         wakeup(ip);             /* wake any pipe dreamers */
-    iclose(ip, writ);
+    /*
+     * A character device is closed once per open, not once per inode: a
+     * clone open gives each file a device of its own (the forwarded
+     * minor), and two sockets on /dev/net0 are two devices sharing one
+     * node.  The inode is released below when its last open goes.
+     */
+    if ((ip->i_mode & IFMT) == IFCHR)
+        cclose(fp->f_dev, writ);
+    iclose(ip, writ, fp->f_dev);
 }
 
        /*
         * Close an inode, from fclose and umount.
         */
-iclose(ip, writ)
+iclose(ip, writ, dev)
     register struct inode *ip;
     UINT8 writ;
+    UINT dev;
 {
-    register int dev;
-
     if (--ip->count <= 0) {
         ilock(ip);
-        dev = ip->i_addr[0];
         switch (ip->i_mode & IFMT) {
         case IFCHR:
-            ip->count++;
-            irelse(ip);
-            cclose(dev, writ);
-            ilock(ip);
-            ip->count--;
+            /* fclose() closed the device; this is the node going away */
             break;
         case IFBLK:
             bflush(dev);

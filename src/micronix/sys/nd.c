@@ -333,8 +333,8 @@ ndclose(dev)
 /*
  * The ND has no command block: it is a flat block device, and every
  * control operation a disk needs - format, seek, geometry - is
- * meaningless here.  The minor does have one: NET_MINOR is the network
- * functions, the same card's other face, and its ioctl is sys/net.c's.
+ * meaningless here.  The card's socket face is a character device of its
+ * own (char major 6, sys/net.c) and does not come through this vector.
  */
 int
 ndcioctl(dev, cmd, r, b)
@@ -342,8 +342,6 @@ ndcioctl(dev, cmd, r, b)
 	struct cdb *r;
 	struct buf *b;
 {
-	if (minor(dev) == NET_MINOR)
-		return (netioctl(dev, cmd, r, b));
 	u.error = ENOTTY;
 	return (-1);
 }

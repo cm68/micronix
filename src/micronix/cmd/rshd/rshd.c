@@ -9,28 +9,20 @@
  *
  * checks the caller against /etc/hosts.equiv and the remote user's
  * ~/.rhosts, puts a shell (or the command) on a pty slave, and shuttles
- * bytes between the master and the connection.  The request and the
- * authentication are rcp(1)'s and BSD rsh's; the transport is the NIC's
- * socket face (sys/NET.md), one ioctl per frame.
+ * bytes between the master and the connection.
  *
- * One process owns the connection.  The pty master and /dev/net are
- * waited on with select(2), so there is no reader child and no polling:
+ * /dev/net0 is a clone node: the open hands back one socket and its
+ * descriptor is that socket.  LISTEN is a blocking ioctl - it returns
+ * when a connection is waiting, and the daemon then forks.  The child
+ * ACCEPTs, which keeps the same descriptor number but swaps the file
+ * underneath it to the accepted connection; the parent's descriptor is
+ * still the listener, so it goes straight back to LISTEN and a second
+ * client is served while the first is still running.  The card refuses
+ * further connections while one is parked, so two daemons (rshd and
+ * telnetd, say) cannot take each other's.
  *
- *	master readable -> read a chunk, SEND it (no-wait; its ACK comes
- *			   back through the same frame stream)
- *	net readable	-> one frame: DATA to the master, ACK to the
- *			   back-pressure bookkeeping, EVENT closed/reset
- *			   ends the session
- *
- * A SEND is issued CDB_ASYNC: waiting for its ACK inside the ioctl
- * would let the driver hand an incoming DATA frame to the sender and
- * lose it.  One SEND is in flight at a time; until its ACK arrives the
- * loop does not read the master, which is the pty's own back-pressure.
- * An ACK that says no-memory resends the same chunk.
- *
- * The peer's address comes in the connected EVENT (NET.md section 5);
- * .rhosts matches the dotted quad.  There is no password and no
- * encryption: this is rsh, and it trusts the hosts the files name.
+ * The pty pairs are the daemon's to allocate: NPTY of them, a free one
+ * picked before the fork and released when the child is reaped.
  *
  * The port defaults to 514; the simulator binds host ports for the
  * guest, so a run under d1 uses a high port and rcp -P.
@@ -45,58 +37,72 @@
 #include <sys/ioctl.h>
 #include <sys/signal.h>
 
-/* the socket face, include/sys/net.h, duplicated as rcp(1) does */
-#define NET_OP_RECV 0
-#define N_OPEN    0x01
-#define N_CLOSE   0x02
-#define N_BIND    0x03
-#define N_LISTEN  0x05
-#define N_SEND    0x06
-#define N_JOIN    0x08
-#define N_ACK     0x80
-#define N_DATA    0x81
-#define N_EVENT   0x82
-#define N_EV_CONNECTED 1
-#define N_EV_CLOSED    2
-#define N_EV_RESET     3
-#define N_NO_MEMORY    3
-#define N_MAXPAY  1024
+/* the socket face, include/sys/net.h, duplicated as the other commands do */
+#define NETBIND    0x7410
+#define NETCONNECT 0x7411
+#define NETLISTEN  0x7412
+#define NETACCEPT  0x7413
+#define NETCARD    0x7414
 
-#define CDB_ASYNC 2
+#define N_JOIN    0x08
 
 #define JOBCONT  02		/* job-control op bits (sys/sys.h) */
 #define JOBTTYIN 010
 extern int jobctl();
 
-#define DEVNET	"/dev/net"
-#define DEVMASTER "/dev/ptyp0"
-#define DEVSLV	"/dev/ttyp0"
+#define DEVNET	"/dev/net0"
 #define RSH_PORT 514
 #define REQMAX	256
+#define PAYMAX	256		/* the driver moves at most this a call */
+#define NPTY	2
 
-static int netfd;
-static int sk;			/* the connection's socket */
+/* one card-level request and its reply (include/sys/net.h) */
+struct netcard {
+    unsigned char op;
+    unsigned char len;
+    unsigned char data[1 + 32 + 1 + 63];
+};
+
+static int netfd = -1;
 static int master = -1;		/* the pty master, -1 outside a session */
 static int child;		/* the shell, 0 outside a session */
-static int awaiting;		/* one async SEND is in flight */
-static char sent[N_MAXPAY];	/* the chunk we may have to resend */
-static char fbuf[N_MAXPAY];	/* a frame's payload (static: an ioctl's
-				 * data buffer must be in the image, not
-				 * a deep stack page - rcp's rbuf) */
-static char cbuf[N_MAXPAY];	/* a command's reply */
-static int sentlen;
+static int parentpid;
+static volatile int reap;
 
+static char fbuf[PAYMAX];
 static char req[REQMAX];
 static int reqlen;
 static char ipstr[18];
 static char luser[32], ruser[32], command[REQMAX];
+
+/*
+ * The pty pairs: -1 free, else the session child's pid, and the pair a
+ * child is to use (set before the fork, read by the child).
+ */
+static int pairpid[NPTY];
+static int mypair;
+
+static struct passwd *pw;
 
 onalarm()
 {
     signal(SIGALRM, onalarm);   /* V7 semantics: re-arm the handler */
 }
 
-static int bit(fd)
+onterm()
+{
+    signal(SIGTERM, onterm);
+    reap = 1;
+}
+
+/* the child's alarm, for its own select deadlines */
+onchildalarm()
+{
+    signal(SIGALRM, onchildalarm);
+}
+
+static int
+bit(fd)
     int fd;
 {
     int b;
@@ -108,121 +114,87 @@ static int bit(fd)
 }
 
 /*
- * One pushed frame: its type and socket in t and s, payload in buf.
- * Returns the payload length, or -1.
+ * One card-level request (JOIN, the configuration pair, the socket
+ * table).  Returns the reply length, or -1.
  */
 static int
-net_frame(t, s, buf, max)
-    int *t, *s;
-    char *buf;
-    int max;
+net_card(op, data, len)
+    int op, len;
+    char *data;
 {
-    struct cdb r;
+    struct netcard c;
+    int i, n;
 
-    memset((char *) &r, 0, sizeof r);
-    r.cmd[0] = NET_OP_RECV;
-    r.cmd[1] = 0xff;
-    r.len = 4;
-    r.count = max;
-    r.flags = CDB_IN;
-    r.buf = buf;
-    r.hole = -1;
-    if (ioctl(netfd, CDBCMD, &r) < 0)
+    c.op = op;
+    c.len = len;
+    for (i = 0; i < len; i++)
+        c.data[i] = data[i];
+    if (ioctl(netfd, NETCARD, &c) < 0)
         return (-1);
-    *t = r.cmd[0] & 0xff;
-    *s = r.cmd[1] & 0xff;
-    return (r.count);
+    n = c.len;
+    for (i = 0; i < n; i++)
+        data[i] = c.data[i];
+    return (n);
 }
 
 /*
- * Wait for one frame.  select() is the wait; the alarm is what makes it
- * return when the card has no interrupt line to wake it (the driver
- * polls in that case), and it bounds the wait so a vanished card cannot
- * hang the daemon.
+ * One readable chunk.  The driver is non-blocking after select, so an
+ * EAGAIN is the selector's answer to "another socket's event"; it is
+ * not end of file.
  */
 static int
-wait_frame(t, s, buf, max)
-    int *t, *s;
+net_read(buf, max)
     char *buf;
     int max;
 {
-    int r;
+    int r, n;
 
     for (;;) {
         alarm(1);
         r = select(bit(netfd));
         if (r < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
+                alarm(0);
                 continue;
+            }
+            alarm(0);
             return (-1);
         }
-        if (r & bit(netfd))
-            return (net_frame(t, s, buf, max));
+        if (r & bit(netfd)) {
+            n = read(netfd, buf, max);
+            alarm(0);
+            if (n < 0 && errno == EAGAIN)
+                continue;
+            return (n);
+        }
     }
-}
-
-static int
-net_send_async(buf, len)
-    char *buf;
-    int len;
-{
-    struct cdb r;
-
-    memset((char *) &r, 0, sizeof r);
-    r.cmd[0] = N_SEND;
-    r.cmd[1] = sk;
-    r.len = 4;
-    r.count = len;
-    r.flags = CDB_ASYNC;
-    r.buf = buf;
-    r.hole = -1;
-    return (ioctl(netfd, CDBCMD, &r));
 }
 
 /*
- * A synchronous command: issue it and wait for its ACK.  A frame that
- * is not the ACK is dropped; the commands here are setup and teardown,
- * where nothing else should be in the stream.
+ * All of it.  A write moves a chunk and EAGAIN means the card's
+ * transmit buffer is full; it drains a hundred times a second.
  */
 static int
-net_cmd(sock, op, p, len)
-    int sock, op, len;
-    char *p;
+net_write(buf, len)
+    char *buf;
+    int len;
 {
-    struct cdb r;
-    char *rep;
-    int t, s, n;
+    int n, sent;
 
-    memset((char *) &r, 0, sizeof r);
-    r.cmd[0] = op;
-    r.cmd[1] = sock;
-    r.len = 4;
-    r.hole = -1;
-    switch (op) {
-    case N_OPEN:
-        r.cmd[2] = p[0];
-        break;
-    case N_BIND:
-        r.cmd[2] = p[0];
-        r.cmd[3] = p[1];
-        break;
-    }
-    rep = cbuf;
-    r.count = sizeof cbuf;
-    r.flags = CDB_IN;
-    r.buf = rep;
-    if (ioctl(netfd, CDBCMD, &r) < 0) {
+    sent = 0;
+    while (sent < len) {
+        n = write(netfd, buf + sent, len - sent);
+        if (n > 0) {
+            sent += n;
+            continue;
+        }
+        if (n < 0 && errno == EAGAIN) {
+            sleep(1);
+            continue;
+        }
         return (-1);
     }
-    t = r.cmd[0] & 0xff;
-    s = r.cmd[1] & 0xff;
-    for (;;) {
-        if (t == N_ACK && s == sock) {
-            return (rep[0] & 0xff);
-        }
-        if (net_frame(&t, &s, rep, N_MAXPAY) < 0)
-            return (-1);
-    }
+    return (0);
 }
 
 /*
@@ -272,12 +244,10 @@ trust(path, needuser)
     return (0);
 }
 
-static struct passwd *pw;
-
 /*
  * BSD's rule: hosts.equiv for an ordinary user, the user's own .rhosts
  * always, and never hosts.equiv for root.  The host is the dotted quad
- * from the connected event, so the files name addresses and not names.
+ * the accept returned, so the files name addresses and not names.
  */
 static int
 allowed()
@@ -297,38 +267,28 @@ allowed()
 }
 
 /*
- * Read the four NUL-terminated request fields.  Data frames may split
- * them anywhere; the event that ends the connection aborts the read.
+ * Read the four NUL-terminated request fields.  Data may split them
+ * anywhere; end of file aborts the read.
  */
 static int
 read_request()
 {
-    char *buf;
-    int t, s, n, i, done;
-
-    buf = fbuf;
+    int n, i, done;
 
     reqlen = 0;
     done = 0;
     while (done < 4) {
-        n = wait_frame(&t, &s, buf, N_MAXPAY);
-        if (n < 0)
+        n = net_read(fbuf, PAYMAX);
+        if (n <= 0)
             return (-1);
-        if (s != sk || t != N_DATA)
-            return (-1);		/* closed, or not a data frame */
         for (i = 0; i < n; i++) {
             if (reqlen >= REQMAX)
                 return (-1);
-            req[reqlen++] = buf[i];
-            if (buf[i] == 0)
+            req[reqlen++] = fbuf[i];
+            if (fbuf[i] == 0)
                 done++;
         }
     }
-    /*
-     * field 0 is the stderr port, which this server does not open; the
-     * child's stderr is the same pty, so a client that reads one stream
-     * sees both.
-     */
     {
         char *p;
         int f;
@@ -351,28 +311,86 @@ read_request()
 }
 
 /*
- * Put a shell on the slave and hand back the master.  The child opens
- * the slave before it lets go of the master, so the pair exists for the
- * moment that matters; opening the slave is what claims it as the
- * child's controlling tty (sys/pty.c).
+ * Move bytes both ways until one end is gone.  select is the wait; the
+ * alarm is what makes it return when the card has no interrupt line to
+ * wake it, and it bounds the wait so a vanished card cannot hang us.
  */
-static int
-start_session()
+static void
+session()
 {
-    int s;
+    int t, n, r, mask;
+
+    for (;;) {
+        alarm(1);
+        mask = bit(netfd) | bit(master);
+        r = select(mask);
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
+            break;
+        }
+        if (r & bit(master)) {
+            n = read(master, fbuf, PAYMAX);
+            if (n <= 0)
+                break;		/* the shell closed the slave */
+            if (net_write(fbuf, n) < 0)
+                break;
+        }
+        if (r & bit(netfd)) {
+            n = read(netfd, fbuf, PAYMAX);
+            if (n < 0) {
+                if (errno == EAGAIN)
+                    continue;
+                break;
+            }
+            if (n == 0)
+                break;		/* the client closed */
+            if (write(master, fbuf, n) != n)
+                break;		/* the slave is gone */
+        }
+    }
 
     /*
-     * The select loop's alarm is per-process and fork copies it: the
-     * shell would be killed by SIGALRM a second after it started.
+     * The client is gone or the shell is.  Closing the master hangs the
+     * slave up (SIGHUP to the shell); then the child is killed and
+     * reaped rather than waited on forever.
      */
+    if (master >= 0) {
+        close(master);
+        master = -1;
+    }
+    if (child) {
+        int st;
+
+        kill(child, SIGKILL);
+        wait(&st);
+        child = 0;
+    }
     alarm(0);
-    master = open(DEVMASTER, 2);
+}
+
+/*
+ * Put a shell on the assigned pty pair and shuttle for it.  The shell
+ * opens the slave before the session lets go of anything, so the pair
+ * exists for the moment that matters; opening the slave is what claims
+ * it as the shell's controlling tty (sys/pty.c).
+ */
+static int
+start_session(pair)
+    int pair;
+{
+    char mname[16], sname[16];
+    int s;
+
+    sprintf(mname, "/dev/ptyp%d", pair);
+    sprintf(sname, "/dev/ttyp%d", pair);
+    master = open(mname, 2);
     if (master < 0)
         return (-1);
     child = fork();
     if (child == 0) {
         alarm(0);
-        s = open(DEVSLV, 2);
+        s = open(sname, 2);
         if (s < 0)
             exit(1);
         dup2(s, 0);
@@ -405,162 +423,115 @@ start_session()
      * (and is root), so it can put it back in the foreground.
      */
     jobctl(child, JOBCONT | JOBTTYIN);
+    alarm(0);
+    session();
     return (0);
-}
-
-/*
- * Move bytes both ways until one end is gone.  One frame per select
- * pass: the driver's RECV blocks, so reading a second would sleep with
- * the descriptor set already answered.
- */
-static void
-session()
-{
-    char *buf;
-    int t, s, n, r, mask;
-
-    buf = fbuf;
-
-    awaiting = 0;
-    for (;;) {
-        alarm(1);			/* a polled card has no other wakeup */
-        mask = bit(netfd);
-        if (!awaiting)
-            mask |= bit(master);
-        r = select(mask);
-        if (r < 0) {
-            if (errno == EINTR)
-                continue;
-            break;
-        }
-        if ((r & bit(master)) && !awaiting) {
-            n = read(master, buf, N_MAXPAY);
-            if (n <= 0)
-                break;		/* the shell closed the slave */
-            memcpy(sent, buf, n);
-            sentlen = n;
-            if (net_send_async(sent, sentlen) < 0)
-                break;
-            awaiting = 1;
-        }
-        if (r & bit(netfd)) {
-            n = wait_frame(&t, &s, buf, N_MAXPAY);
-            if (n < 0)
-                break;
-            if (s != sk)
-                continue;
-            if (t == N_DATA) {
-                if (write(master, buf, n) != n)
-                    break;	/* the slave is gone */
-                continue;
-            }
-            if (t == N_ACK) {
-                if (!awaiting)
-                    continue;
-                if (n > 0 && (buf[0] & 0xff) == N_NO_MEMORY) {
-                    if (net_send_async(sent, sentlen) < 0)
-                        break;
-                } else
-                    awaiting = 0;
-                continue;
-            }
-            if (t == N_EVENT && (buf[0] == N_EV_CLOSED ||
-                                 buf[0] == N_EV_RESET))
-                break;
-        }
-    }
-
-    /*
-     * The client is gone or the shell is.  Closing the master hangs
-     * the slave up (SIGHUP to the shell); then the child is killed and
-     * reaped rather than waited on forever.
-     */
-    if (master >= 0) {
-        close(master);
-        master = -1;
-    }
-    if (child) {
-        int st;
-
-        kill(child, SIGKILL);
-        wait(&st);
-        child = 0;
-    }
-    net_cmd(sk, N_CLOSE, (char *) 0, 0);
-    awaiting = 0;
 }
 
 main(argc, argv)
     int argc;
     char **argv;
 {
-    char *buf;
-    char b[2];
-    char mode;
-    int t, s, n, prt, st;
+    char peer[6];
+    int prt, pid, r, st, i, n;
 
-    buf = fbuf;
     prt = RSH_PORT;
     if (argc > 1)
         prt = atoi(argv[1]);
 
     netfd = open(DEVNET, 2);
     if (netfd < 0) {
-        fprintf(stderr, "rshd: no %s\n", DEVNET);
+        perror(DEVNET);
         exit(1);
     }
 
+    parentpid = getpid();
     signal(SIGALRM, onalarm);
+    signal(SIGTERM, onterm);
+
     /* the card wants to be on its network; failure is the card's */
-    (void) net_cmd(0xff, N_JOIN, (char *) 0, 0);
+    (void) net_card(N_JOIN, peer, 0);
+
+    peer[0] = (prt >> 8) & 0xff;
+    peer[1] = prt & 0xff;
+    if (ioctl(netfd, NETBIND, peer) < 0) {
+        fprintf(stderr, "rshd: bind %d failed\n", prt);
+        exit(1);
+    }
+
+    for (i = 0; i < NPTY; i++)
+        pairpid[i] = -1;
 
     for (;;) {
-        sk = 0;
-        mode = 1;			/* tcp */
-        st = net_cmd(sk, N_OPEN, &mode, 1);
-        if (st) {
-            sleep(1);
-            continue;
+        if (reap) {
+            reap = 0;
+            pid = wait(&st);
+            for (i = 0; i < NPTY; i++)
+                if (pid > 0 && pairpid[i] == pid)
+                    pairpid[i] = -1;
         }
-        b[0] = (prt >> 8) & 0xff;
-        b[1] = prt & 0xff;
-        if (net_cmd(sk, N_BIND, b, 2) || net_cmd(sk, N_LISTEN, (char *) 0, 0)) {
-            net_cmd(sk, N_CLOSE, (char *) 0, 0);
+
+        /*
+         * A second's alarm bounds the wait: it is what reaps a finished
+         * session's pair, and what makes a card without an interrupt
+         * line wake the listener.
+         */
+        alarm(1);
+        r = ioctl(netfd, NETLISTEN, 0);
+        alarm(0);
+        if (r < 0) {
+            if (errno == EINTR)
+                continue;
             sleep(1);
             continue;
         }
 
         /*
-         * Wait for a connection.  The connected event carries the peer
-         * ip[4]; anything else on this socket is not a request yet.
+         * A free pair for the session, if there is one.  With none, the
+         * child still accepts and closes, so the client is told rather
+         * than left in the card's single pending slot.
          */
-        for (;;) {
-            n = wait_frame(&t, &s, buf, N_MAXPAY);
-            if (n < 0)
-                break;
-            if (s != sk)
-                continue;
-            if (t == N_EVENT) {
-                if (buf[0] == N_EV_CONNECTED) {
-                    sprintf(ipstr, "%d.%d.%d.%d", buf[1] & 0xff,
-                        buf[2] & 0xff, buf[3] & 0xff, buf[4] & 0xff);
-                    break;
-                }
-                n = -1;		/* closed or reset before a request */
+        mypair = -1;
+        for (i = 0; i < NPTY; i++)
+            if (pairpid[i] < 0) {
+                mypair = i;
                 break;
             }
-        }
-        if (n < 0 || read_request() < 0 || !allowed()) {
-            net_cmd(sk, N_CLOSE, (char *) 0, 0);
-            continue;
-        }
 
-        fprintf(stderr, "rshd: %s from %s for %s\n", ruser, ipstr, luser);
-        if (start_session() < 0) {
-            net_cmd(sk, N_CLOSE, (char *) 0, 0);
-            continue;
+        pid = fork();
+        if (pid == 0) {
+            alarm(0);
+            signal(SIGALRM, onchildalarm);
+            n = ioctl(netfd, NETACCEPT, peer);
+            if (n < 0 || mypair < 0) {
+                close(netfd);
+                kill(parentpid, SIGTERM);
+                exit(1);
+            }
+            sprintf(ipstr, "%d.%d.%d.%d", peer[0] & 0xff, peer[1] & 0xff,
+                peer[2] & 0xff, peer[3] & 0xff);
+            if (read_request() < 0 || !allowed()) {
+                close(netfd);
+                kill(parentpid, SIGTERM);
+                exit(1);
+            }
+            fprintf(stderr, "rshd: %s from %s for %s\n", ruser, ipstr, luser);
+            (void) start_session(mypair);
+            close(netfd);
+            kill(parentpid, SIGTERM);
+            exit(0);
         }
-        session();
+        if (pid < 0) {
+            /*
+             * No child to serve it.  The pending connection blocks the
+             * card's one slot, so there is no honest way to carry on:
+             * stop and let the machine's init start us again.
+             */
+            fprintf(stderr, "rshd: fork failed\n");
+            exit(1);
+        }
+        if (mypair >= 0)
+            pairpid[mypair] = pid;
     }
 }
 

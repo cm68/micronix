@@ -109,6 +109,14 @@ _trapvec:
 	.defw	_mlist
 
 ;
+; this is the u structure's offset in a process's u page, for ps.
+; The page holds the leaf code, then ustack, then u at a link-time
+; offset; without this ps would read the leaf code and report the same
+; "PC" for every process.
+;
+	.defw	_u
+
+;
 ; boot lands here
 ;
 

@@ -15,6 +15,12 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/inode.h>
+#include <sys/fs.h>
+#include <sys/con.h>
+#include <errno.h>
 
 extern long seconds;
 
@@ -69,7 +75,22 @@ r_fork()
  */
 r_ioctl()
 {
-    u.hl = bioctl(u.hl, arg[0], arg[1]);
+    register struct file *fp;
+    register struct inode *ip;
+
+    if ((fp = ofile(u.hl)) == 0) {
+        u.hl = -1;              /* ofile set u.error */
+    } else {
+        ip = fp->inode;
+        if ((ip->i_mode & IFMT) == IFBLK)
+            u.hl = bioctl(u.hl, arg[0], arg[1]);
+        else if ((ip->i_mode & IFMT) == IFCHR)
+            u.hl = cioctl(u.hl, arg[0], arg[1]);
+        else {
+            u.error = ENOTTY;
+            u.hl = -1;
+        }
+    }
     if (u.error) {
         u.af |= ERRBIT;
         u.hl = u.error;

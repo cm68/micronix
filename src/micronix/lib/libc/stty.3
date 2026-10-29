@@ -1,0 +1,84 @@
+.he "stty (3)                     10/28/26                     stty (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE
+.in +5
+.br
+.bd
+stty
+- set typewriter status
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <sys/sgtty.h>
+.sp
+.nf
+.bd 3
+stty(descriptor, vec)
+int descriptor;
+struct sgtty *vec;
+.fi
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Stty
+sets the status of the character device named by
+.bd
+descriptor
+from the six-byte
+.bd
+struct sgtty
+pointed at by
+.bd
+vec.
+The structure is the one
+.bd
+gtty
+(3) returns, and its fields - the two speeds, the erase and
+kill characters, and the mode word - are described there.
+.sp
+It is the request
+.bd
+TIOCSETA
+through
+.bd
+ioctl
+(2), so it may be made to any character device; a device
+whose status cannot be set answers ENOTTY.  Turning echo
+off for a password is the usual use: get the block with
+.bd
+gtty ,
+clear the echo bit, and set it back with
+.bd
+stty .
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 on success, -1 on failure.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+EBADF
+if descriptor is not an open file.
+.br
+.bd
+ENOTTY
+if it does not name a character device, or the device has no
+settable terminal status.

@@ -36,10 +36,12 @@
  *	  cpystr() is copied from cmd/upm, which had already solved it
  *	  the same way - see the note on it below.
  *
- * The kernel side did not have to change, and that is the point of the
- * port being possible at all: sys/uhdr.s still emits ".defw _plist" at
- * 0x1003 under a comment calling it the "Hook for ps", so the table
- * address this program seeks is exactly where it looks for it.
+ * The kernel side is what makes the port possible at all: sys/uhdr.s
+ * emits ".defw _plist" at 0x1003 under a comment calling it the "Hook
+ * for ps", so the table address this program seeks is exactly where it
+ * looks for it.  A third word at 0x1007 was added for the u structure's
+ * offset in its page - the page starts with the leaf code, so reading
+ * the PC from offset 0 reported the same code bytes for every process.
  *
  * One thing is carried over rather than fixed, because it is a
  * decision about the program and not about the port: the original
@@ -103,6 +105,11 @@ char detail[] = {
  * for that entry. The titles should have the same length as
  * this field width.
  *
+ * COMMAND and TTY are wider than the 1982 table's eight and four:
+ * /bin/rshd is nine characters, and ttyp0 and ttyp1 both came out
+ * "ttyp".  The long listing is 83 columns now, so an 80-column console
+ * wraps its last three.
+ *
  * value carries both numbers and strings - the original relies on the
  * two being the same width, which on this machine they are.
  */
@@ -113,8 +120,8 @@ struct
     int value;
 } pro[] = {
     {"%6u", "   PID"},
-    {"%-8.8s", "COMMAND "},
-    {"%-4.4s", "TTY "},
+    {"%-14.14s", "COMMAND       "},
+    {"%-5.5s", "TTY  "},
     {"%3u", "UID"},
     {"%3u", "PAR"},
     {"%3u", "SIZ"},
@@ -183,7 +190,8 @@ init(ac, av)
 ps()
 {
     static int mem, addr;
-    struct proc *p, *ptab;
+    static struct proc *p, *ptab;
+    static UINT uoff;           /* the u structure's offset in its page */
     struct tty tty;
     char *tname;
 
@@ -194,6 +202,11 @@ ps()
                                                                              */
         || read(mem, &ptab, sizeof ptab) != sizeof ptab)
         fail();
+
+    /* and the hook that says where u sits in the u page */
+    if (seek(mem, 0x1007, 0) < 0 || read(mem, &uoff, sizeof uoff) != sizeof uoff)
+        fail();
+    uoff &= 0x0fff;
 
     seek(mem, ptab, 0);
     read(mem, plist, sizeof plist);
@@ -246,9 +259,17 @@ ps()
             pro[EVENT].value = p->event;
 
             if (p->mem[16].seg) {
-                seek(mem, 8 * p->mem[16].seg, 3);
-                read(mem, &u, sizeof u);
-                pro[PC].value = (int)u.pc;
+                /*
+                 * The page holds the leaf code, ustack and then u; the
+                 * u structure is at the offset the kernel's hook named,
+                 * not at the page's first byte.
+                 */
+                if (seek(mem, 8 * p->mem[16].seg, 3) < 0 ||
+                    seek(mem, uoff, 1) < 0 ||
+                    read(mem, &u, sizeof u) != sizeof u)
+                    pro[PC].value = 0;
+                else
+                    pro[PC].value = (int)u.pc;
             } else {
                 pro[PC].value = 0;
             }

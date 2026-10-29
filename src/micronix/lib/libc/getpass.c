@@ -6,7 +6,7 @@
  * The seventh edition's getpass, rewritten against this kernel rather
  * than translated, because the v7 original drives the terminal with
  * ioctl(TIOCGETP/TIOCSETP) and there is no terminal ioctl here.  What
- * this tree has is gtty(2) and stty(2) and a six-byte terminal block,
+ * this tree has is gtty(3) and stty(3) and a six-byte terminal block,
  * which is what cmd/login/login.c uses to do the same job - echo_off
  * at 0x085f, echo_on at 0x0803 - and this follows it.
  *
