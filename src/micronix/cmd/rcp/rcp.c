@@ -3,8 +3,12 @@
  *
  * cmd/rcp/rcp.c
  *
- * The guest's remote-copy client, over the NIC's socket face (sys/NET.md).
- * One connection to the remote's rshd; .rhosts on that end does the auth.
+ * The guest's remote-copy client, and the server half rshd runs on the
+ * far end, over the NIC's socket face (sys/NET.md).  One connection to
+ * the remote's rshd; .rhosts on that end does the auth.  The client
+ * invokes the server as "rcp -f" (fetch: send the named files) or
+ * "rcp -t" (sink: receive into the destination) over the rsh session;
+ * those modes run on the pty's stdin/stdout and never touch the card.
  * The syntax and function clone the real rcp:
  *
  *     rcp host:file1 host:file2 ... /local/dir     GET remote -> local dir
@@ -15,7 +19,7 @@
  * the destination.  It drives /dev/net (sys/net.c), the frame-level
  * channel: this sends the rsh request, then streams the rcp files.
  *
- * The frame types below mirror include/sys/net.h, which this program
+ * The request codes below mirror include/sys/net.h, which this program
  * cannot see (it builds against lib/include, not the kernel's include).
  */
 
@@ -23,8 +27,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <types.h>
 #include <sys/ioctl.h>
 #include <sys/signal.h>
+#include <sys/fs.h>
+#include <sys/stat.h>
+#include <sys/sgtty.h>
+#include <sys/dir.h>
+#include <dirent.h>
 #include <pwd.h>
 
 #define DEV      "/dev/net0"
@@ -50,6 +60,7 @@ static int fd;                  /* the connection, after connect */
 static int port = RSH_PORT;
 static int recursive;           /* -r: walk directories */
 static char rsh_user[32];       /* who this end says it is, from getpwuid */
+static char cmd[512], req[512]; /* the rsh command and request lines */
 
 static int
 bit(n)
@@ -261,8 +272,8 @@ make_request(buf, command)
     return n;
 }
 
-/* send one local file: T header, basename, bytes, NUL, then read the ack */
-static void
+/* send one local file: C header, basename, bytes, NUL, then read the ack */
+static int
 put_one(path)
     char *path;
 {
@@ -273,7 +284,7 @@ put_one(path)
     f = open(path, 0);
     if (f < 0) {
         fprintf(stderr, "rcp: cannot read %s\n", path);
-        return;
+        return (-1);
     }
     size = lseek(f, 0L, 2);     /* seek to end: the size */
     lseek(f, 0L, 0);            /* rewind */
@@ -285,11 +296,11 @@ put_one(path)
 
     while ((n = read(f, rbuf, N_MAXPAY)) > 0)
         send_bytes(rbuf, n);
-    rx_exact(rbuf, 1);          /* the sink's ack */
 
     send_bytes("\0", 1);        /* end of file */
-    rx_exact(rbuf, 1);          /* the sink's ack */
+    rx_exact(rbuf, 1);          /* the sink's ack for the data and NUL */
     close(f);
+    return (0);
 }
 
 /* the -r directory walk: the current directory, and its depth below dest */
@@ -342,7 +353,7 @@ get_one(path, usedir)
     if (hdr[0] == 'D') {
         /* a directory: the top-level one is the dest itself; deeper ones
          * append their name */
-        if (depth > 0)
+        if (depth > 0 || usedir)
             sprintf(curpath + strlen(curpath), "/%s", name);
         mknod(curpath, 040000 | (mode & 0777), 0);
         depth++;
@@ -370,6 +381,176 @@ get_one(path, usedir)
     return 1;
 }
 
+/*
+ * The last path component, with any trailing slashes ignored, copied
+ * into buf so the result is stable.
+ */
+static char *
+basepath(path, buf)
+    char *path, *buf;
+{
+    int n = strlen(path);
+
+    while (n > 1 && path[n - 1] == '/')
+        n--;
+    memcpy(buf, path, n);
+    buf[n] = 0;
+    return (basename(buf));
+}
+
+static int
+isdirpath(path)
+    char *path;
+{
+    struct stat st;
+
+    if (stat(path, &st) < 0)
+        return (0);
+    return ((st.st_mode & S_IFMT) == S_IFDIR);
+}
+
+/*
+ * Send a file, or under -r a directory and everything below it.  A
+ * directory is a D header, its entries in readdir order, and an E; each
+ * piece waits for the sink's one-byte acknowledgement.
+ */
+static int
+send_tree(path)
+    char *path;
+{
+    struct stat st;
+    struct dir *dp;
+    DIR *d;
+    char child[512], pbuf[512], hdr[160], *name;
+
+    if (stat(path, &st) < 0) {
+        fprintf(stderr, "rcp: cannot read %s\n", path);
+        return (-1);
+    }
+    if ((st.st_mode & S_IFMT) != S_IFDIR) {
+        if ((st.st_mode & S_IFMT) != S_IFREG) {
+            fprintf(stderr, "rcp: %s is not a regular file\n", path);
+            return (-1);
+        }
+        return (put_one(path));
+    }
+    if (!recursive) {
+        fprintf(stderr, "rcp: %s is a directory (use -r)\n", path);
+        return (-1);
+    }
+
+    name = basepath(path, pbuf);
+    sprintf(hdr, "D%04o 0 %s\n", st.st_mode & 0777, name);
+    if (send_bytes(hdr, strlen(hdr)) < 0 || rx_exact(rbuf, 1) < 0)
+        return (-1);
+    if ((d = opendir(path)) == 0) {
+        fprintf(stderr, "rcp: cannot read %s\n", path);
+        return (-1);
+    }
+    while ((dp = (struct dir *) readdir(d)) != 0) {
+        if (dp->name[0] == '.' &&
+            (dp->name[1] == 0 || (dp->name[1] == '.' && dp->name[2] == 0)))
+            continue;
+        if (path[strlen(path) - 1] == '/')
+            sprintf(child, "%s%s", path, dp->name);
+        else
+            sprintf(child, "%s/%s", path, dp->name);
+        if (send_tree(child) < 0) {
+            closedir(d);
+            return (-1);
+        }
+    }
+    closedir(d);
+    if (send_bytes("E\n", 2) < 0 || rx_exact(rbuf, 1) < 0)
+        return (-1);
+    return (0);
+}
+
+/*
+ * Receive file and directory pieces until the source closes.  usedir
+ * says the destination is an existing directory, so a top-level D
+ * appends its name there rather than renaming the destination.
+ */
+static int
+recv_all(dest, usedir)
+    char *dest;
+    int usedir;
+{
+    int r;
+
+    strcpy(curpath, dest);
+    depth = 0;
+    for (;;) {
+        r = get_one(dest, usedir);
+        if (r == 2) {           /* "E": up a directory */
+            if (depth > 1 || usedir) {
+                char *slash = strrchr(curpath, '/');
+
+                if (slash == curpath)
+                    curpath[1] = 0;     /* stay at the root */
+                else if (slash)
+                    *slash = 0;
+            }
+            depth--;
+        } else if (r <= 0)
+            break;
+    }
+    return (0);
+}
+
+/*
+ * The protocol is 8-bit and unlined: a one-byte ack must come back
+ * before the next piece, and a NUL is a NUL.  rshd gives a command the
+ * connection itself, so this normally does nothing (gtty on a net fd is
+ * ENOTTY); a server run from an interactive shell has a cooked pty, and
+ * this puts it in raw mode before the first byte.
+ */
+static void
+rawmode()
+{
+    struct sgtty sg;
+
+    if (gtty(0, &sg) >= 0) {
+        sg.mode = RAW;          /* no echo, no line, no cr/lf or tab maps */
+        (void) stty(0, &sg);
+    }
+}
+
+/*
+ * The two server halves, run by rshd's shell on the pty.  fd 0 is the
+ * terminal and is open read/write, so it is both streams.
+ */
+static int
+server_fetch(args, nargs)
+    char **args;
+    int nargs;
+{
+    int i;
+
+    fd = 0;
+    rawmode();
+    signal(SIGALRM, onalarm);
+    if (send_bytes("\0", 1) < 0 || rx_exact(rbuf, 1) < 0)
+        return (1);
+    for (i = 0; i < nargs; i++)
+        if (send_tree(args[i]) < 0)
+            return (1);
+    return (0);
+}
+
+static int
+server_sink(dest)
+    char *dest;
+{
+    fd = 0;
+    rawmode();
+    signal(SIGALRM, onalarm);
+    if (send_bytes("\0", 1) < 0)
+        return (1);
+    recv_all(dest, isdirpath(dest));
+    return (0);
+}
+
 static void
 usage()
 {
@@ -378,15 +559,22 @@ usage()
     exit(1);
 }
 
-main(argc, argv)
+/*
+ * Flags and operands.  -f and -t are the server modes; the client
+ * builds them into the rsh command line, so the parser takes them in
+ * the same place it takes -r.
+ */
+static int
+parse_args(argc, argv, args, nargp)
     int argc;
     char **argv;
+    char **args;
+    int *nargp;
 {
-    char *args[64], *dest, *colon, *host, *rdest, cmd[512], req[512], hostbuf[64];
-    int ip[4], nargs, nsrc, i, j, k, n;
-    int get, isdir;
+    int i, nargs, server;
 
     nargs = 0;
+    server = 0;
     for (i = 1; i < argc; i++) {
         char *a = argv[i];
 
@@ -395,13 +583,37 @@ main(argc, argv)
                 port = atoi(argv[++i]);
             else if (a[1] == 'r')
                 recursive = 1;
+            else if (a[1] == 'f')
+                server |= 1;
+            else if (a[1] == 't')
+                server |= 2;
             else
                 usage();
         } else if (nargs < 64)
             args[nargs++] = a;
     }
+    if (server) {
+        if (server == 3 || nargs < 1)
+            usage();
+        if (server == 1)
+            exit(server_fetch(args, nargs));
+        exit(server_sink(args[0]));
+    }
     if (nargs < 2)
         usage();
+    *nargp = nargs;
+    return (0);
+}
+
+/* the client: resolve the remote, connect, and run the transfer */
+static void
+client(args, nargs)
+    char **args;
+    int nargs;
+{
+    char *dest, *colon, *host, *rdest, hostbuf[64];
+    int ip[4], nsrc, j, k, n;
+    int get, isdir;
 
     dest = args[nargs - 1];
     nsrc = nargs - 1;
@@ -437,6 +649,8 @@ main(argc, argv)
         if (n2 > 0 && d[n2 - 1] == '/')
             isdir = 1;
     }
+    if (get && isdirpath(dest))
+        isdir = 1;
 
     {
         struct passwd *pw = getpwuid(getuid());
@@ -496,28 +710,27 @@ main(argc, argv)
          * the end; ack each piece, the C header and its data too */
         rx_exact(rbuf, 1);
         send_bytes("\0", 1);    /* ack the opening NUL */
-        strcpy(curpath, dest);
-        depth = 0;
-        for (;;) {
-            i = get_one(dest, isdir);
-            if (i == 2) {       /* "E": up a directory */
-                if (depth > 1) {
-                    char *slash = strrchr(curpath, '/');
-
-                    if (slash)
-                        *slash = '\0';
-                }
-                depth--;
-            } else if (i <= 0)
-                break;
-        }
+        recv_all(dest, isdir);
     } else {
         /* the sink sends a NUL first; the remote -t places by basename */
         rx_exact(rbuf, 1);
         for (j = 0; j < nsrc; j++)
-            put_one(args[j]);
+            if (send_tree(args[j]) < 0)
+                break;
     }
 
     close(fd);
     exit(0);
+}
+
+main(argc, argv)
+    int argc;
+    char **argv;
+{
+    char *args[64];
+    int nargs;
+
+    parse_args(argc, argv, args, &nargs);
+    client(args, nargs);
+    return (0);
 }

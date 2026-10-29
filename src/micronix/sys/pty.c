@@ -47,7 +47,8 @@
 
 extern int ttyread(), ttywrite(), ttymode(), ttyopen(), ttyclose();
 extern int cstart(), ustart(), drainques(), qinit(), sendque();
-extern int pty_start(), pty_stop(), pty_put();
+extern int pty_start(), pty_put();
+extern int nulldev();          /* the kernel's empty entry */
 extern int ptyioctl();
 extern int ptyhang();            /* the process-table walk, resident */
 extern int selectchan;          /* select(2): a reader may be watching */
@@ -77,9 +78,9 @@ ttyinit1(t, dev, mode, ms)
     t->nbreak = 0;
 
     t->start = pty_start;
-    t->stop = pty_stop;
+    t->stop = nulldev;
     t->put = pty_put;
-    t->set = pty_stop;		/* set() is only called to change speed */
+    t->set = nulldev;		/* set() is only called to change speed */
 
     qinit(&t->rawque);
     qinit(&t->cokque);
@@ -112,7 +113,6 @@ ptyopen(dev, mode)
     }
     p = &ptyinfo[i];
     s = SLAVE(i);
-    m = MASTER(i);
 
     if (!ISMASTER(dev)) {
         if (!p->mopen) {
@@ -137,15 +137,21 @@ ptyopen(dev, mode)
     }
 
     /*
-     * The pair a session gets is the daemon's to allocate (rshd picks a
-     * free one before it forks); the driver has no open count to refuse
-     * with, and two masters on one pair would split a shell's bytes.
+     * One holder per pair.  A program that wants one tries each in
+     * turn; EBUSY says this one is taken, so two sessions cannot split
+     * a shell's bytes.  Pairs are scarce and a command that needs no
+     * terminal never asks for one.
      */
+    if (p->mopen) {
+        u.error = EBUSY;
+        return;
+    }
     if (p->sopen) {
         /*
          * A new master over slave descriptors that are still open: the
          * hangup is over, but the slave's open count stays what it was.
          */
+        m = MASTER(i);
         p->hung = 0;
         s->mstate &= ~TTYHUP;
         m->mstate &= ~TTYHUP;
@@ -266,7 +272,7 @@ ptywrite(dev)
 {
     register int i;
     register struct ptyinfo *p;
-    register struct tty *s, *m;
+    register struct tty *s;
 
     if ((i = ptyidx(dev)) < 0) {
         u.error = ENXIO;
@@ -274,7 +280,6 @@ ptywrite(dev)
     }
     p = &ptyinfo[i];
     s = SLAVE(i);
-    m = MASTER(i);
 
     if (!ISMASTER(dev)) {
         if (s->mstate & TTYHUP)
@@ -288,7 +293,7 @@ ptywrite(dev)
         u.error = EIO;
         return;
     }
-    ttywrite(m);
+    ttywrite(MASTER(i));
 }
 
 /*

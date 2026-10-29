@@ -67,13 +67,6 @@ pty_start(t)
         ttyout(t);
 }
 
-int
-pty_stop(t, cold)
-    struct tty *t;
-    int cold;
-{
-}
-
 /*
  * One cooked byte from this end becomes one for the other end to read,
  * through the same ttyin() a board port's interrupt calls.

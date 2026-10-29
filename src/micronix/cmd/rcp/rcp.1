@@ -1,4 +1,4 @@
-.he "rcp (1)                      10/14/26                     rcp (1)"
+.he "rcp (1)                      10/28/26                     rcp (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -28,9 +28,19 @@ Rcp moves files over the network card (sys/NET.md), speaking rsh to the
 remote's rshd and the rcp file stream over that one connection.  One
 side is remote and carries the host: prefix (an ip address); the other
 is local.  The last argument is the destination: a directory when there
-is more than one source or it ends in /, into which each source lands
-under its basename; a single source into a non-slash destination is
-renamed to it.
+is more than one source, it ends in /, or it names an existing
+directory, into which each source lands under its basename; a single
+source into a non-directory destination is renamed to it.
+.sp
+The remote side of a copy is not typed by the user.  The client puts
+bd
+rcp -f
+or
+bd
+rcp -t
+in the rsh command, and that process speaks the file stream on its
+standard input and output - for a command, the connection itself, not
+a pty - and never touches the card.
 .sp
 There is no password: the remote trusts this host (.rhosts).
 .sp 2
@@ -45,6 +55,14 @@ OPTIONS
 
 .ti -10
 -P port	Use port as the rshd port; the default is 514.
+
+.ti -10
+-f file ...	Server mode, fetch: send the named files to the client.
+	The client supplies this; not for direct use.
+
+.ti -10
+-t dir	Server mode, sink: receive into dir.  The client supplies
+	this; not for direct use.
 
 .in -10
 .sp 2

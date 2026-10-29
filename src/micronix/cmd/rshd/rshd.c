@@ -8,8 +8,10 @@
  *	<stderr-port> NUL <luser> NUL <ruser> NUL <command> NUL
  *
  * checks the caller against /etc/hosts.equiv and the remote user's
- * ~/.rhosts, puts a shell (or the command) on a pty slave, and shuttles
- * bytes between the master and the connection.
+ * ~/.rhosts.  An interactive request (no command) gets a login shell on
+ * a pty slave, with bytes shuttled between the master and the
+ * connection; a request with a command gets the connection itself as
+ * its stdin, stdout and stderr, and no pty.
  *
  * /dev/net0 is a clone node: the open hands back one socket and its
  * descriptor is that socket.  LISTEN is a blocking ioctl - it returns
@@ -21,8 +23,9 @@
  * further connections while one is parked, so two daemons (rshd and
  * telnetd, say) cannot take each other's.
  *
- * The pty pairs are the daemon's to allocate: NPTY of them, a free one
- * picked before the fork and released when the child is reaped.
+ * Pairs are scarce, so only an interactive session opens one; the
+ * child tries them in order and the driver refuses a pair another
+ * session holds (EBUSY).
  *
  * The port defaults to 514; the simulator binds host ports for the
  * guest, so a run under d1 uses a high port and rcp -P.
@@ -74,13 +77,6 @@ static char req[REQMAX];
 static int reqlen;
 static char ipstr[18];
 static char luser[32], ruser[32], command[REQMAX];
-
-/*
- * The pty pairs: -1 free, else the session child's pid, and the pair a
- * child is to use (set before the fork, read by the child).
- */
-static int pairpid[NPTY];
-static int mypair;
 
 static struct passwd *pw;
 
@@ -370,29 +366,44 @@ session()
 }
 
 /*
- * Put a shell on the assigned pty pair and shuttle for it.  The shell
- * opens the slave before the session lets go of anything, so the pair
- * exists for the moment that matters; opening the slave is what claims
- * it as the shell's controlling tty (sys/pty.c).
+ * Put a login shell on a pty pair and shuttle for it.  The driver
+ * refuses a pair another session holds (EBUSY), so trying them in
+ * order is the allocation; only an interactive request comes here, so
+ * a pty is spent by a login and not by a command.
  */
 static int
-start_session(pair)
-    int pair;
+start_session()
 {
     char mname[16], sname[16];
-    int s;
+    int s, pair;
 
-    sprintf(mname, "/dev/ptyp%d", pair);
-    sprintf(sname, "/dev/ttyp%d", pair);
-    master = open(mname, 2);
-    if (master < 0)
+    for (pair = 0; pair < NPTY; pair++) {
+        sprintf(mname, "/dev/ptyp%d", pair);
+        master = open(mname, 2);
+        if (master >= 0)
+            break;
+        if (errno != EBUSY) {
+            perror(mname);
+            return (-1);
+        }
+    }
+    if (pair >= NPTY)
         return (-1);
+    sprintf(sname, "/dev/ttyp%d", pair);
     child = fork();
+    if (child < 0) {
+        perror("fork");
+        close(master);
+        master = -1;
+        return (-1);
+    }
     if (child == 0) {
         alarm(0);
         s = open(sname, 2);
-        if (s < 0)
+        if (s < 0) {
+            perror(sname);
             exit(1);
+        }
         dup2(s, 0);
         dup2(s, 1);
         dup2(s, 2);
@@ -402,12 +413,9 @@ start_session(pair)
         close(netfd);
         setuid(pw->uid);
         chdir(pw->dir);
-        if (command[0] == 0)
-            execl(pw->shell && pw->shell[0] ? pw->shell : "/bin/sh",
-                "-sh", 0);
-        else
-            execl(pw->shell && pw->shell[0] ? pw->shell : "/bin/sh",
-                "sh", "-c", command, 0);
+        execl(pw->shell && pw->shell[0] ? pw->shell : "/bin/sh",
+            "-sh", 0);
+        perror("exec");
         exit(1);
     }
     if (child < 0) {
@@ -428,12 +436,43 @@ start_session(pair)
     return (0);
 }
 
+/*
+ * A request with a command runs on the connection itself: the socket
+ * is the command's stdin, stdout and stderr and no pty is spent.  The
+ * session child forks it and waits, so the daemon still reaps one child
+ * per SIGTERM.
+ */
+static int
+run_command()
+{
+    int pid, st;
+
+    pid = fork();
+    if (pid == 0) {
+        alarm(0);
+        dup2(netfd, 0);
+        dup2(netfd, 1);
+        dup2(netfd, 2);
+        if (netfd > 2)
+            close(netfd);
+        setuid(pw->uid);
+        chdir(pw->dir);
+        execl(pw->shell && pw->shell[0] ? pw->shell : "/bin/sh",
+            "sh", "-c", command, 0);
+        exit(1);
+    }
+    if (pid < 0)
+        return (-1);
+    wait(&st);
+    return (0);
+}
+
 main(argc, argv)
     int argc;
     char **argv;
 {
     char peer[6];
-    int prt, pid, r, st, i, n;
+    int prt, pid, r, st, n;
 
     prt = RSH_PORT;
     if (argc > 1)
@@ -459,22 +498,16 @@ main(argc, argv)
         exit(1);
     }
 
-    for (i = 0; i < NPTY; i++)
-        pairpid[i] = -1;
-
     for (;;) {
         if (reap) {
             reap = 0;
-            pid = wait(&st);
-            for (i = 0; i < NPTY; i++)
-                if (pid > 0 && pairpid[i] == pid)
-                    pairpid[i] = -1;
+            (void) wait(&st);
         }
 
         /*
          * A second's alarm bounds the wait: it is what reaps a finished
-         * session's pair, and what makes a card without an interrupt
-         * line wake the listener.
+         * session, and what makes a card without an interrupt line
+         * wake the listener.
          */
         alarm(1);
         r = ioctl(netfd, NETLISTEN, 0);
@@ -486,24 +519,12 @@ main(argc, argv)
             continue;
         }
 
-        /*
-         * A free pair for the session, if there is one.  With none, the
-         * child still accepts and closes, so the client is told rather
-         * than left in the card's single pending slot.
-         */
-        mypair = -1;
-        for (i = 0; i < NPTY; i++)
-            if (pairpid[i] < 0) {
-                mypair = i;
-                break;
-            }
-
         pid = fork();
         if (pid == 0) {
             alarm(0);
             signal(SIGALRM, onchildalarm);
             n = ioctl(netfd, NETACCEPT, peer);
-            if (n < 0 || mypair < 0) {
+            if (n < 0) {
                 close(netfd);
                 kill(parentpid, SIGTERM);
                 exit(1);
@@ -516,7 +537,17 @@ main(argc, argv)
                 exit(1);
             }
             fprintf(stderr, "rshd: %s from %s for %s\n", ruser, ipstr, luser);
-            (void) start_session(mypair);
+            if (command[0] != 0) {
+                if (run_command() < 0) {
+                    close(netfd);
+                    kill(parentpid, SIGTERM);
+                    exit(1);
+                }
+            } else if (start_session() < 0) {
+                close(netfd);
+                kill(parentpid, SIGTERM);
+                exit(1);
+            }
             close(netfd);
             kill(parentpid, SIGTERM);
             exit(0);
@@ -530,8 +561,6 @@ main(argc, argv)
             fprintf(stderr, "rshd: fork failed\n");
             exit(1);
         }
-        if (mypair >= 0)
-            pairpid[mypair] = pid;
     }
 }
 
