@@ -19,6 +19,10 @@ yyparse() {
 	register yystate, *yyps, yyn;
 	register YYSTYPE *yypv;
 	register *yyxi;
+	/* c1 miscompiles `if( ++yyps> &yys[YYMAXDEPTH] )`: the bound is
+	 * computed into hl and the load of yyps clobbers it.  Precompute
+	 * the bound and split the increment (CODEGENGAPS entry 22). */
+	int *yyslim = &yys[YYMAXDEPTH];
 
 	yystate = 0;
 	yychar = -1;
@@ -30,7 +34,8 @@ yyparse() {
  yystack:    /* put a state and value onto the stack */
 
 	if( yydebug  ) printf( "state %d, value %d, char %d\n",yystate,YYVALINT(yyval),yychar );
-		if( ++yyps> &yys[YYMAXDEPTH] ) yyerror( "yacc stack overflow" );
+		++yyps;
+		if( yyps> yyslim ) { yyerror( "yacc stack overflow" ); return(1); }
 		*yyps = yystate;
 		++yypv;
 		YYVCOPY(*yypv,yyval);

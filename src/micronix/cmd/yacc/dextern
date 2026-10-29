@@ -115,6 +115,7 @@ extern char **trmtype;	/* <field> for each terminal, or 0 */
 extern char **nttype;	/* <field> for each nonterminal, or 0 */
 extern char *unionbuf;	/* %union body, or 0 */
 extern int startidx;	/* %start symbol, 0 = first rule */
+extern int outc();	/* putc to ftable, minus form feeds */
  /* temporary vectors, indexable by states, terms, or nterms */
 extern int *temp1;
 extern int *trmlev;	/* vector with the precedence of the terminals */

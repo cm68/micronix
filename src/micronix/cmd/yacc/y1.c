@@ -228,13 +228,13 @@ others(){ /* put out other arrays, copy the parsers */
 			else { /* copy actions */
 				faction = fopen( ACTNAME, "r" );
 				if( faction == NULL ) error( "cannot reopen action tempfile" );
-				while( (c=getc(faction) ) != EOF ) putc( c, ftable );
+				while( (c=getc(faction) ) != EOF ) outc( c );
 				fclose(faction);
 				ZAPFILE(ACTNAME);
 				c = getc(finput);
 				}
 			}
-		putc( c, ftable );
+		outc( c );
 		}
 
 	fclose( ftable );

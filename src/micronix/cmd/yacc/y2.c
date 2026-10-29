@@ -92,6 +92,10 @@ getunion() { /* the '{' has been consumed; return the text to the '}' */
 	return( ub );
 	}
 
+outc( c ) int c; { /* ccc's cpp does not accept a form feed in C text */
+	if( c != '\f' ) putc( c, ftable );
+	}
+
 setup(argc,argv) int argc; char *argv[];
 {	int i,j,lev,t;
 	int c;
@@ -446,7 +450,7 @@ setup(argc,argv) int argc; char *argv[];
 
 	finact();
 	if( t == MARK ){
-		while( (c=getc(finput)) != EOF ) putc( c, ftable );
+		while( (c=getc(finput)) != EOF ) outc( c );
 		}
 	fclose( finput );
 	}
@@ -727,7 +731,7 @@ cpycode(){ /* copies code between \{ and \} */
 		if( c=='%' )
 			if( (c=getc(finput)) == '}' ) return;
 			else putc('%', ftable );
-		putc( c , ftable );
+		outc( c );
 		if( c == '\n' ) ++lineno;
 		c = getc(finput);
 		}
