@@ -40,6 +40,8 @@ allocgrammar() {
 	levprd = (int *)calloc( prdlim, sizeof(int) );
 	trmset = (struct sxxx1 *)calloc( tlim+1, sizeof(struct sxxx1) );
 	nontrst = (struct sxxx2 *)calloc( ntlim+1, sizeof(struct sxxx2) );
+	trmtype = (char **)calloc( tlim+1, sizeof(char *) );
+	nttype = (char **)calloc( ntlim+1, sizeof(char *) );
 	cnames = malloc( cnamsz + 1 );
 	trmlev = (int *)calloc( tlim+1, sizeof(int) );
 	}
@@ -69,7 +71,7 @@ alloclr() {
 
 freegrammar() {
 	free(mem0); free(prdptr); free(levprd); free(trmset); free(nontrst);
-	free(cnames); free(trmlev);
+	free(trmtype); free(nttype); free(cnames); free(trmlev);
 	}
 
 freelr() {
@@ -123,7 +125,12 @@ sizes(argc, argv) int argc; char *argv[]; {
 	memsiz = mc + 8*(mc + np) + 64;
 	cnamsz = cc + 2;
 	stsize = 2*(mc + np) + 16;
-	lsetsz = wssize = stsize;
+	/* the working and lookahead sets are bounded by the grammar,
+	   not by the state bound: the original PWB arrays were 250 and
+	   150, and 256 covers the corpus with room to spare.  Keep the
+	   stated requirement that they hold every nonterminal. */
+	lsetsz = wssize = 256;
+	if( lsetsz < nnonter+1 ) lsetsz = wssize = nnonter+1;
 	/* amem is the packed goto table while the states are built and
 	 * written (rows are nnonter wide, not nterms), then the
 	 * optimizer's yyact array.  Both are packed, so stsize*nnonter

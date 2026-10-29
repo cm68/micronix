@@ -31,6 +31,10 @@ char tokname[_namesize];
 char *cnames;
 int cnamsz;
 char *cnamp;
+char **trmtype;	/* <field> for each terminal, or 0 */
+char **nttype;	/* <field> for each nonterminal, or 0 */
+char *unionbuf = 0;	/* %union body, or 0 */
+int startidx = 0;	/* %start symbol, 0 = first rule */
 int *temp1; /* temporary storage, indexed by terms + nterms or states */
 int *trmlev;	/* vector with the precedence of the terminals */
 	/* The levels are the same as for levprd, but bit 04 is always 0 */

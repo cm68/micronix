@@ -10,14 +10,96 @@
 #define LCURLY 264
 #define C_IDENTIFIER 265  /* name followed by colon */
 #define NUMBER 266
+#define UNION 267
+#define TYPE 268
+#define START 269
 #define ENDFILE 0
+
+char *gettype();	/* field name in <...>, cstashed */
+char *getunion();	/* body of a %union, between its braces */
+
+char *
+gettype() { /* the '<' has been consumed */
+	static char tb[_namesize];
+	int i, c;
+
+	i = 0;
+	while( (c=getc(finput)) != EOF && c != '>' ){
+		if( c == '\n' ) error( "newline in a type name" );
+		if( i < _namesize-1 ) tb[i++] = c;
+		}
+	if( c != '>' ) error( "missing > after a type name" );
+	tb[i] = '\0';
+	return( cstash(tb) );
+	}
+
+char *
+getunion() { /* the '{' has been consumed; return the text to the '}' */
+	static char ub[1024];
+	int i, c, depth, q;
+
+	depth = 1;
+	i = 0;
+	while( (c=getc(finput)) != EOF ){
+		if( c == '\n' ) ++lineno;
+		if( c == '\'' || c == '"' ){
+			q = c;
+			if( i < 1023 ) ub[i++] = c;
+			while( (c=getc(finput)) != EOF ){
+				if( c == '\n' ) ++lineno;
+				if( i < 1023 ) ub[i++] = c;
+				if( c == '\\' ){
+					c = getc(finput);
+					if( c == '\n' ) ++lineno;
+					if( i < 1023 ) ub[i++] = c;
+					}
+				else if( c == q ) break;
+				}
+			continue;
+			}
+		if( c == '/' ){
+			q = getc(finput);
+			if( q == '*' ){
+				if( i < 1023 ) ub[i++] = '/';
+				if( i < 1023 ) ub[i++] = '*';
+				for(;;){
+					c = getc(finput);
+					if( c == EOF ) error( "EOF in %%union comment" );
+					if( c == '\n' ) ++lineno;
+					if( i < 1023 ) ub[i++] = c;
+					if( c == '*' ){
+						q = getc(finput);
+						if( q == '/' ){
+							if( i < 1023 ) ub[i++] = q;
+							break;
+							}
+						ungetc( q, finput );
+						}
+					}
+				continue;
+				}
+			ungetc( q, finput );
+			}
+		if( c == '{' ) ++depth;
+		else if( c == '}' ){
+			if( --depth == 0 ) break;
+			}
+		if( i >= 1023 ) error( "%%union body too large" );
+		ub[i++] = c;
+		}
+	if( c == EOF ) error( "EOF in %%union" );
+	ub[i] = '\0';
+	return( ub );
+	}
 
 setup(argc,argv) int argc; char *argv[];
 {	int i,j,lev,t;
 	int c;
 	int *p;
+	int firstrule;
 	char actname[8];
 	char *s, *z;
+	char *typ;
 
 	foutput = NULL;
 	fdefine = NULL;
@@ -93,6 +175,7 @@ setup(argc,argv) int argc; char *argv[];
 	mem=mem0;
 	lev=0;
 	i=0;
+	firstrule=1;
 
 	/* sorry -- no yacc parser here.....
 		we must bootstrap somehow... */
@@ -110,6 +193,7 @@ setup(argc,argv) int argc; char *argv[];
 			++i;
 		case TERM:
 			lev = 0;
+			typ = 0;
 
 			if( t -= TERM ){
 				SETASC(lev,t);
@@ -122,6 +206,11 @@ setup(argc,argv) int argc; char *argv[];
 			for(;;) {
 				switch( t ){
 
+				case '<':
+					typ = gettype();
+					t = gettok();
+					continue;
+
 				case ',':
 					t = gettok();
 					continue;
@@ -132,6 +221,7 @@ setup(argc,argv) int argc; char *argv[];
 				case IDENTIFIER:
 					j = chfind(0,tokname);
 					trmlev[j] = lev;
+					if( typ != 0 ) trmtype[j] = typ;
 					if( (t=gettok()) == NUMBER ){
 						trmset[j].value = numbval;
 						if( j < ndefout && j>2 ){
@@ -152,6 +242,48 @@ setup(argc,argv) int argc; char *argv[];
 		case LCURLY:
 			defout();
 			cpycode();
+			t = gettok();
+			continue;
+
+		case UNION:
+			t = gettok();
+			if( t != '=' ) error( "%%union needs {" );
+			/* gettok returns '=' for a plain '{' and puts it back */
+			c = getc(finput);
+			if( c != '{' ) error( "%%union needs {" );
+			unionbuf = getunion();
+			t = gettok();
+			continue;
+
+		case TYPE:
+			t = gettok();
+			if( t != '<' ) error( "%%type needs <field>" );
+			typ = gettype();
+			t = gettok();
+			for(;;){
+				if( t == IDENTIFIER ){
+					j = chfind(1,tokname);
+					/* %type may name a token, as make does
+					   with NAME; chfind returns its terminal
+					   index in that case */
+					if( j >= NTBASE ) nttype[j-NTBASE] = typ;
+					else trmtype[j] = typ;
+					t = gettok();
+					continue;
+					}
+				if( t == ',' ){
+					t = gettok();
+					continue;
+					}
+				break;
+				}
+			continue;
+
+		case START:
+			t = gettok();
+			if( t != IDENTIFIER ) error( "%%start needs a nonterminal" );
+			startidx = chfind(1,tokname);
+			if( startidx < NTBASE ) error( "%%start names a terminal" );
 			t = gettok();
 			continue;
 
@@ -188,8 +320,17 @@ setup(argc,argv) int argc; char *argv[];
 		fprintf( ftable,  "#define yyerrok yyerrflag = 0\n" );
 		fprintf( ftable,  "extern int yychar, yyerrflag;\n" );
 		fprintf( ftable,  "#ifndef YYMAXDEPTH\n#define YYMAXDEPTH 150\n#endif\n" );
-		fprintf( ftable,  "#ifndef YYSTYPE\n#define YYSTYPE int\n#endif\n" );
-		fprintf( ftable,  "#ifndef YYVCOPY\n#define YYVCOPY(x,y) x=y\n#endif\n" );
+		if( unionbuf != 0 ){
+			fprintf( ftable, "typedef union YYSTYPE {\n%s\n} YYSTYPE;\n", unionbuf );
+			fprintf( ftable, "extern void *memcpy();\n" );
+			fprintf( ftable, "#define YYVCOPY(x,y) memcpy((char *)&(x),(char *)&(y),sizeof(YYSTYPE))\n" );
+			fprintf( ftable, "#define YYVALINT(x) (*(int *)&(x))\n" );
+			}
+		else {
+			fprintf( ftable,  "#ifndef YYSTYPE\n#define YYSTYPE int\n#endif\n" );
+			fprintf( ftable,  "#ifndef YYVCOPY\n#define YYVCOPY(x,y) x=y\n#endif\n" );
+			fprintf( ftable,  "#ifndef YYVALINT\n#define YYVALINT(x) (x)\n#endif\n" );
+			}
 		fprintf( ftable,  "YYSTYPE yylval, yyval;\n" );
 		break;
 		}
@@ -197,7 +338,7 @@ setup(argc,argv) int argc; char *argv[];
 	prdptr[0]=mem;
 	/* added production */
 	*mem++ = NTBASE;
-	*mem++ = NTBASE+1;
+	*mem++ = startidx ? startidx : NTBASE+1;
 	*mem++ = 1;
 	*mem++ = 0;
 	prdptr[1]=mem;
@@ -219,6 +360,13 @@ setup(argc,argv) int argc; char *argv[];
 		else if( t == C_IDENTIFIER ){
 			*mem = chfind(1,tokname);
 			if( *mem < NTBASE ) error( "token illegal on LHS of grammar rule" );
+			/* The added production was written as $accept ->
+			   NTBASE+1, but a %type declaration may have defined
+			   other nonterminals first.  The start symbol is the
+			   first rule's LHS unless %start named one. */
+			if( firstrule && startidx == 0 )
+				prdptr[0][1] = *mem;
+			firstrule = 0;
 			++mem;
 			}
 		else error( "illegal rule: missing semicolon or | ?" );
@@ -247,7 +395,7 @@ setup(argc,argv) int argc; char *argv[];
 		if( t == '=' ){
 			levprd[nprod] |= ACTFLAG;
 			fprintf( faction, acts[lflag], nprod );
-			cpyact( mem-prdptr[nprod]-1 );
+			cpyact( mem-prdptr[nprod]-1, nprod );
 			fprintf( faction, acte[lflag] );
 			if( (t=gettok()) == IDENTIFIER ){
 				/* action within rule... */
@@ -527,6 +675,9 @@ begin:
 		if( !strcmp(tokname,"binary")) return( BINARY );
 		if( !strcmp(tokname,"right")) return( RIGHT );
 		if( !strcmp(tokname,"prec")) return( PREC );
+		if( !strcmp(tokname,"union")) return( UNION );
+		if( !strcmp(tokname,"type")) return( TYPE );
+		if( !strcmp(tokname,"start")) return( START );
 		error("invalid escape, or illegal reserved word: %s", tokname );
 		}
 
@@ -583,8 +734,10 @@ cpycode(){ /* copies code between \{ and \} */
 	error("eof before %%}" );
 	}
 
-cpyact(offset){ /* copy C action to the next ; or closing } */
-	int brac, c, match, j, s;
+cpyact(offset, prod) int offset, prod; { /* copy C action to the next ; or closing } */
+	int brac, c, match, j, s, n, i;
+	char typ[40];
+	char *tfield;
 
 	brac = 0;
 
@@ -607,8 +760,24 @@ case '{':
 case '$':
 		s = 1;
 		c = getc(finput);
+		tfield = 0;
+		if( c == '<' ){
+			i = 0;
+			while( (c=getc(finput)) != '>' && c != EOF ){
+				if( i < 39 ) typ[i++] = c;
+				}
+			typ[i] = '\0';
+			if( c != '>' ) error( "missing > in $<type>" );
+			tfield = typ;
+			c = getc(finput);
+			}
 		if( c == '$' ){
+			if( tfield == 0 ){
+				j = prdptr[prod][0];
+				if( j >= NTBASE ) tfield = nttype[j-NTBASE];
+				}
 			fprintf( faction, "yyval");
+			if( tfield != 0 ) fprintf( faction, ".%s", tfield );
 			goto loop;
 			}
 		if( c == '-' ){
@@ -622,12 +791,20 @@ case '$':
 				c = getc(finput);
 				}
 
+			n = 0;
+			if( s > 0 ) n = j;
 			j = j*s - offset;
 			if( j > 0 ){
 				error( "Illegal use of $%d", j+offset );
 				}
+			if( tfield == 0 && n >= 1 && n <= offset ){
+				i = prdptr[prod][n];
+				if( i >= NTBASE ) tfield = nttype[i-NTBASE];
+				else tfield = trmtype[i];
+				}
 
 			fprintf( faction, dollar[lflag], -j );
+			if( tfield != 0 ) fprintf( faction, ".%s", tfield );
 			goto swt;
 			}
 		putc( '$' , faction );

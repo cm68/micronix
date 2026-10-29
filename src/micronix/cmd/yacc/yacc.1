@@ -34,6 +34,11 @@ and the yacc library:
 	cc y.tab.c other.o -ly
 .fi
 .sp
+A %union declaration gives the type of the semantic values.  %token
+and %type may then name a union member in angle brackets, as in
+%token <ival> NUMBER, and actions may write $1 or $<ival>1.  %start
+names the start symbol when the first grammar rule is not it.
+.sp
 If the -v flag is given, the file y.output is prepared, containing a
 description of the parsing tables and a report on conflicts generated
 by ambiguities in the grammar.

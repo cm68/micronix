@@ -29,7 +29,7 @@ yyparse() {
 
  yystack:    /* put a state and value onto the stack */
 
-	if( yydebug  ) printf( "state %d, value %d, char %d\n",yystate,yyval,yychar );
+	if( yydebug  ) printf( "state %d, value %d, char %d\n",yystate,YYVALINT(yyval),yychar );
 		if( ++yyps> &yys[YYMAXDEPTH] ) yyerror( "yacc stack overflow" );
 		*yyps = yystate;
 		++yypv;
