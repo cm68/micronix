@@ -1,4 +1,40 @@
-.he "test (1)                    10/20/26                    test (1)"
+.\" Copyright (c) 1991, 1993
+.\"	The Regents of the University of California.  All rights reserved.
+.\"
+.\" This code is derived from software contributed to Berkeley by
+.\" the Institute of Electrical and Electronics Engineers, Inc.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by the University of
+.\"	California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     @(#)test.1	8.1.2 (2.11BSD) 1995/03/13
+.\"
+.he "test (1)                    10/28/26                    test (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -30,65 +66,170 @@ DESCRIPTION
 .in +5
 .br
 Test evaluates an expression and returns a zero exit status if it is
-true, one if it is false, and 255 if the expression is malformed.
-With no expression at all it is false.  Bracket is the same program
-under a second name and requires the closing bracket as its last
-argument.
+true, one if it is false, and a value greater than one if the expression
+is malformed.  With no expression at all it is false.  Bracket is the
+same program under a second name and requires the closing bracket as its
+last argument.
 .sp
-The primaries are:
+The file primaries are:
 .sp
--r file
+-b file
 .br
-true if the file exists and is readable.
+true if file exists and is a block special file.
 .sp
--w file
+-c file
 .br
-true if the file exists and is writable.
+true if file exists and is a character special file.
 .sp
 -d file
 .br
-true if the file is a directory.
+true if file exists and is a directory.
+.sp
+-e file
+.br
+true if file exists, whatever its type.
 .sp
 -f file
 .br
-true if the file exists and is not a directory.
+true if file exists and is a regular file.
+.sp
+-g file
+.br
+true if file exists and its set group id flag is set.
+.sp
+-h file
+.br
+true if file exists and is a symbolic link.  Micronix has no symbolic
+links, so this is always false.
+.sp
+-k file
+.br
+true if file exists and its sticky bit is set.  Micronix has no sticky
+bit, so this is always false.
+.sp
+-p file
+.br
+true if file is a named pipe.  Micronix has no named pipes, so this is
+always false.
+.sp
+-r file
+.br
+true if file exists and is readable.
 .sp
 -s file
 .br
-true if the file exists and has a size greater than zero.
+true if file exists and has a size greater than zero.
 .sp
 -t [fd]
 .br
-true if the descriptor, one if it is omitted, is a terminal.
+true if the descriptor, one if it is omitted, is associated with a
+terminal.
+.sp
+-u file
+.br
+true if file exists and its set user id flag is set.
+.sp
+-w file
+.br
+true if file exists and is writable.
+.sp
+-x file
+.br
+true if file exists and is executable, or, if it is a directory, that
+it can be searched.
+.sp
+For -r, -w and -x, a file the caller owns is tested on the owner's bits
+and anything else on the other bits.  There is no group membership list
+in this system, so the group bits are not consulted.
+.sp
+The string and integer primaries are:
 .sp
 -n string
 .br
-true if the string is not empty.
+true if the length of string is nonzero.
 .sp
 -z string
 .br
-true if the string is empty.
+true if the length of string is zero.
+.sp
+string
+.br
+true if string is not the null string.
 .sp
 s1 = s2
 .br
-true if the strings are identical.
+true if the strings s1 and s2 are identical.
 .sp
 s1 != s2
 .br
-true if the strings differ.
+true if the strings s1 and s2 are not identical.
 .sp
--l s1 op s2
+n1 -eq n2
 .br
-compares the lengths of the two strings rather than their values.
+true if the integers n1 and n2 are algebraically equal.
 .sp
-n1 op n2
+n1 -ne n2
 .br
-compares two integers, where op is one of -eq, -ne, -gt, -ge, -lt
-and -le.
+true if the integers n1 and n2 are not algebraically equal.
 .sp
-The operators ! (not), -a (and), -o (or) and parentheses combine
-primaries.  They are separate arguments, so the shell must see them
-as words: quote the parentheses.
+n1 -gt n2
+.br
+true if n1 is algebraically greater than n2.
+.sp
+n1 -ge n2
+.br
+true if n1 is algebraically greater than or equal to n2.
+.sp
+n1 -lt n2
+.br
+true if n1 is algebraically less than n2.
+.sp
+n1 -le n2
+.br
+true if n1 is algebraically less than or equal to n2.
+.sp
+Integers are read as 32-bit values.
+.sp
+The primaries are combined with:
+.sp
+! expression
+.br
+true if expression is false.
+.sp
+expression1 -a expression2
+.br
+true if both expressions are true.
+.sp
+expression1 -o expression2
+.br
+true if either expression is true.
+.sp
+( expression )
+.br
+true if expression is true.
+.sp
+-a binds more tightly than -o.  The operators are separate arguments,
+so the shell must see them as words: quote the parentheses and the
+exclamation mark.
+.sp 2
+.in -5
+.bd
+RETURN VALUES
+.in +5
+.br
+0 if the expression is true, 1 if it is false or there is no expression,
+and 2 if the expression is malformed or an operand is not an integer.
+.sp 2
+.in -5
+.bd
+GRAMMAR
+.in +5
+.br
+The test grammar is inherently ambiguous.  The four cases the IEEE Std
+1003.2 (POSIX) standard specifies are evaluated by its rules - a single
+argument as a nonempty string, "! arg" as its negation, "arg1 op arg2"
+as one comparison, and "! arg1 op arg2" as the negation of one - and
+everything else is parsed by operator precedence.
 .sp 2
 .in -5
 .bd

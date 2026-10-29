@@ -16,7 +16,9 @@ DEPTH	= ../..
 DIR	= test
 CLASS	= cmd
 
-CSRCS	= test.c
+CSRCS	= test.c operators.c
+
+HSRCS	= operators.h
 
 MANSRCS	= test.1
 

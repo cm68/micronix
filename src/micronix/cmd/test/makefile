@@ -20,7 +20,7 @@ BIN	= /bin
 MAN	= test.1
 MANDIR	= /usr/man/man1
 PROG	= test
-OBJS	= test.o
+OBJS	= test.o operators.o
 
 all: $(PROG)
 
