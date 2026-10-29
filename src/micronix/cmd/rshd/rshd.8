@@ -1,0 +1,98 @@
+.he "rshd (8)                      10/28/26                     rshd (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+rshd
+- the remote shell server
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+/bin/rshd [ port ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Rshd listens on a tcp socket and serves the classic rsh request over the
+network card (sys/NET.md).  The port defaults to 514; the command-line
+port exists for the simulator, which binds a high host port for the
+guest.
+.sp
+Each connection is one request:
+.sp
+.nf
+.in +4
+<stderr-port> NUL <luser> NUL <ruser> NUL <command> NUL
+.in -4
+.fi
+.sp
+The caller is checked against /etc/hosts.equiv and the remote user's
+~/.rhosts (/.rhosts for an account whose home is /), by address: the
+card's connected event carries the peer's dotted quad.  Root is never
+trusted through hosts.equiv, only through its own .rhosts.  There is no
+password and no encryption.
+.sp
+A request with a command runs it with the connection itself as its
+standard input, output and error: the login shell's sh -c starts on the
+socket, no pty is spent, and the session child forks it and waits so the
+daemon's reaping is one child per request.  This is what rcp (1) uses:
+rcp -f sends the named files and rcp -t receives them over that
+connection.
+.sp
+A request with an empty command is an interactive login.  The daemon
+puts a login shell on a pty slave and shuttles bytes between the master
+and the connection, which gives the shell its terminal, its line
+discipline and its job control.  There are two pairs, /dev/ptyp0 with
+/dev/ttyp0 and /dev/ptyp1 with /dev/ttyp1; a session claims one by
+trying each and the driver refuses a pair another session holds, so a
+command never spends one.  If both pairs are held the connection is
+closed.
+.sp
+The daemon forks a child per request.  The parent keeps the listener:
+LISTEN returns when the card has a connection parked - its one pending
+slot - and ACCEPT hands the child the connected socket while the parent
+goes back to listening, so two sessions run at once.  A finished child
+sends the parent SIGTERM and is reaped on the next pass; a one-second
+alarm bounds the wait for a card with no interrupt line.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/net0	the card's socket clone
+.br
+/dev/ptyp0, /dev/ttyp0	the first pty pair
+.br
+/dev/ptyp1, /dev/ttyp1	the second
+.br
+/etc/hosts.equiv	hosts trusted for ordinary users
+.br
+~/.rhosts	hosts and users trusted for this account
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rcp (1), netstat (1), sys/NET.md
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+There is no stderr back-channel: the request's first field is ignored
+and a command's standard error is the same connection as its output.
+The authentication is by address, and the request carries the user
+names in clear.

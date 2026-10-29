@@ -143,6 +143,7 @@ all:
 	cd pwd ; make all
 	cd ratfor ; make all
 	cd rcp ; make all
+	cd rshd ; make all
 	cd rm ; make all
 	cd rmdir ; make all
 	cd s ; make all
@@ -285,6 +286,7 @@ install:
 	cd pwd ; make install
 	cd ratfor ; make install
 	cd rcp ; make install
+	cd rshd ; make install
 	cd rm ; make install
 	cd rmdir ; make install
 	cd s ; make install
@@ -428,6 +430,7 @@ clean:
 	cd pwd ; make clean
 	cd ratfor ; make clean
 	cd rcp ; make clean
+	cd rshd ; make clean
 	cd rm ; make clean
 	cd rmdir ; make clean
 	cd s ; make clean
@@ -571,6 +574,7 @@ clobber:
 	cd pwd ; make clobber
 	cd ratfor ; make clobber
 	cd rcp ; make clobber
+	cd rshd ; make clobber
 	cd rm ; make clobber
 	cd rmdir ; make clobber
 	cd s ; make clobber
@@ -716,6 +720,7 @@ verify:
 	cd pwd ; make verify
 	cd ratfor ; make verify
 	cd rcp ; make verify
+	cd rshd ; make verify
 	cd rm ; make verify
 	cd rmdir ; make verify
 	cd s ; make verify

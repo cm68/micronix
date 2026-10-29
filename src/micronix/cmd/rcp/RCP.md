@@ -1,9 +1,11 @@
 # rcp — remote copy, over rsh
 
-The guest's remote-copy client, over the NIC's socket face (sys/NET.md).
-The command line and function clone the real rcp; the transport is rsh to
-the remote's rshd, and `.rhosts` on that end does the auth.  The ESP32
-does all of tcp/ip; this program speaks rsh and the rcp file stream.
+The guest's remote-copy client, and the server halves rshd runs, over the
+NIC's socket face (sys/NET.md).  The command line and function clone the
+real rcp; the transport is rsh to the remote's rshd, and `.rhosts` on
+that end does the auth.  The rshd runs `rcp -f` or `rcp -t` on the
+connection itself for a command request, so the file stream never sees a
+ptty.
 
 ## Command line
 
@@ -13,8 +15,9 @@ does all of tcp/ip; this program speaks rsh and the rcp file stream.
 
 One side is remote and carries the `host:` prefix (an ip); the other is
 local.  The last argument is the destination: a directory (each source
-lands in it under its basename) when there is more than one source or it
-ends in `/`; a single source into a non-`/` destination is renamed to it.
+lands in it under its basename) when there is more than one source, it
+ends in `/`, or it names an existing directory; a single source into a
+non-directory destination is renamed to it.
 
     rcp [-P port] [-r] host:file ... dir
     rcp [-P port] [-r] file ... host:dir
@@ -31,8 +34,8 @@ One connection to the rshd port.  The client sends, right after connect:
     "0" NUL <luser> NUL <ruser> NUL <command> NUL
 
 `0` is the stderr port (no back-channel yet), the two users are the local
-and remote account names (`RSH_USER`, "curt" by default), and `<command>`
-is what rshd runs on the remote:
+and remote account names - both the invoking user's name, from
+getpwuid - and `<command>` is what rshd runs on the remote:
 
     PUT   rcp -t <remote-dest>          (rcp -r -t for -r)
     GET   rcp -f <src1> <src2> ...      (rcp -r -f for -r)
@@ -40,8 +43,11 @@ is what rshd runs on the remote:
 ## The rcp file stream
 
 Over that same connection, after the request.  This is the wire protocol
-the real BSD rcp speaks, discovered by probing rshd, and it is a sequence
-of pieces, each of which the receiver acknowledges with one NUL byte:
+the real BSD rcp speaks, and the one this tree's `rcp -f` / `rcp -t`
+servers implement.  rshd gives a command the connection itself as its
+stdin/stdout, so the client and the server both use fd 0; the pty is for
+an interactive login only.  The stream is a sequence of pieces, each of
+which the receiver acknowledges with one NUL byte:
 
 The source opens with a NUL, then a piece per directory entry:
 
@@ -60,6 +66,21 @@ For PUT the client is the sender (`rcp -t` on the far end writes each
 file by basename); for GET the client is the receiver (`rcp -f` sends the
 named files) and writes each one locally, using the stream's name for a
 directory destination or the given name for a rename.
+
+## The server halves
+
+The same binary is the server.  The client puts `rcp -f` or `rcp -t` in
+the rsh command; rshd runs it with the connection on fds 0/1/2:
+
+    rcp -f file ...     send the named files (a directory under -r)
+    rcp -t dir          receive into dir
+
+Neither is normally typed.  `-f` walks a directory as D pieces, its
+entries and E; `-t` decides whether dir is an existing directory (place
+by basename) or a new name (rename the single file) and receives the
+pieces.  `rawmode()` is a no-op on the connection - gtty on a net fd is
+ENOTTY - and only matters if a server is run from an interactive shell,
+where its terminal is cooked.
 
 ## Notes
 
