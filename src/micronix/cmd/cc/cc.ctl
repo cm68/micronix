@@ -18,15 +18,15 @@ bytes 0x0198 0x54		; /lib/uhdr.o ... -i -cpm -ws -std ... a
 bytes 0x0598 0x0f		; .s .8 .c .p .c
 bytes 0x08d8 0x07		; -o ptc
 bytes 0x0975 0x18		; -o -x -i unix -d cpp pp
-bytes 0x0ab8 0x3d		; -c sh, | /bin/p1 ... /bin/pp
-bytes 0x0bbf 0x42		; -c sh, | /bin/p1 ... /bin/an ... /bin/pp
+bytes 0x0abc 0x37		; -c sh, | /bin/p1 ... /bin/pp
+bytes 0x0bbf 0x41		; -c sh, | /bin/p1 ... /bin/an ... /bin/pp
 bytes 0x0ccb 0x19		; -o -u -m -b0 -cem cp1 p1
 bytes 0x0e5e 0x07		; cp2 p2
 bytes 0x0fa7 0x06		; -o p3
 bytes 0x106a 0x09		; -o as an
 bytes 0x1159 0x11b		; /lib/libm.a ... link ld
 bytes 0x17ed 0x10		; /bin/ cc cc \n space
-bytes 0x2327 0x06		; /tmp/
+bytes 0x2328 0x05		; tmp/
 bytes 0x2767 0x22c		; errno strings, perror
 
 ; the Whitesmiths C runtime prologue/epilogue, as in td.ctl
@@ -48,6 +48,8 @@ define r4 0x433b
 main code 0x014a
 setup code 0x01ec
 opts code 0x05a7
+runcpm code 0x0af3	; sh -c, pp | p1 | p2
+runcpmx code 0x0c00	; sh -c, pp | p1 | p2 | an
 runptc code 0x08df
 runcpp code 0x098d
 runcp1 code 0x0ce5

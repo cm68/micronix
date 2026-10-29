@@ -52,6 +52,8 @@ What the listing shows
 		calls 1a16 (suffix/string test), 2482 and 2bba (string
 		helpers), and stores the results in the data globals;
 		early return at 0626, end 08d5
+	0af3	runcpm: sh -c, the pp | p1 | p2 pipeline
+	0c00	runcpmx: sh -c, the pp | p1 | p2 | an pipeline
 	08df	runptc: builds the ptc command from "ptc" and "-o"; ends 0972
 	098d	runcpp: cpp/pp runner
 	0ce5	runcp1: cp1/p1 runner
@@ -78,7 +80,8 @@ not functions: opts compares an argument against those strings.
 The runners are the vendor binary's split of the same idea as run() in
 the tree's cc.c: each tool has its own small function that lays out the
 argument vector (the strings just before it), and run at 17fd does the
-common verbose print, signal handling, fork/exec/wait.
+common verbose print, signal handling, fork/exec/wait.  runcpm and
+runcpmx instead build a "sh -c" pipeline for the CP/M tools.
 
 The program's own code is interleaved with its string literals from
 0100 to about 1e00; the library follows, and the errno message table is
