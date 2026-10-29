@@ -1,0 +1,62 @@
+/bin/cc from the Micronix 1.6 distribution
+
+There is no source for the distribution's cc.  cc.c in this directory
+is the tree's own v7-cc port, swizzled onto the Whitesmiths toolchain;
+it is a different program and builds a different binary.  This
+directory now also carries the distribution binary and its
+disassembly, following the method used for cmd/td, cmd/newuser and
+cmd/print.
+
+cc.dist is the binary off inode 29 of disks/dist/1014-8_c_1.IMD, 13706
+bytes, mode 0711, root, 7 August 1982.  It is identical to the one in
+filesystem/bin.
+
+The binary
+----------
+It is a Whitesmiths object/executable: 99 94, no symbols, no relocs,
+text at 0100 for 323d bytes, data at 4000 for 33d bytes, no bss and no
+heap.  It is the Whitesmiths C compiler supervisor: it drives the
+native pipeline (cpp, cp1, cp2, as, link) and the CP/M pipeline (pp,
+p1, p2, p3, an, ptc).  The usage text in the binary is
+
+	usage: pp -[c d*^ i* o* p? s? x 6] <files>
+
+and the program does not consult argv[0] for it.  Its string table
+contains both "cpp" and "pp"; the cc->wpp/pp naming experiment is
+separate from this reconstruction.
+
+The disassembly
+---------------
+	src/tools/disas -f cc.ctl cc.dist > cc.dis
+
+disas needs the data-range fix in src/tools/disas.c: a byte range
+marked with -d or `bytes` now overrides a CODE target.  Without it,
+the code tracer follows a non-returning call into the string constants
+and disassembles "/include/" as instructions.
+
+cc.ctl is the control file.  It marks every string run embedded in the
+text as `bytes`; without those marks the text/string mix in this
+binary makes the listing useless.  It also names the runtime entry and
+exit (c.ent 32e2, c.ret 32e9) and main (014a).
+
+What the listing shows
+----------------------
+	0100	jump over the startup
+	010b	crt startup; calls main at 014a, then exit at 223f
+	014a	main: saves argc at 414a and argv at 4148, calls 01ec and 05a7,
+		then 1ae1(1) and c.ret
+	01ec	setup: c.ent; two calls to 2cf0 with the handler 1ae1,
+		which is the signal/cleanup setup
+	05a7	the argument loop: walks argc/argv (DE+4/DE+6), calls
+		string and option helpers, ends at 0626
+	1ae1	the handler passed to 2cf0; called with 1
+	32e2	c.ent, the Whitesmiths function prologue
+	32e9	c.ret, the function epilogue
+	4000	data: the program's globals, including 4148 (argv) and
+		414a (argc) from the direct stores in main
+
+The program's own code is interleaved with its string literals from
+0100 to about 1e00; the library follows, and the errno message table is
+at 2767.  cc.dis is the complete listing.  Reading it back to C, the
+way td.c and newuser.c were written, is the next step; cc.c is not
+that read-back.
