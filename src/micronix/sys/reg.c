@@ -15,6 +15,12 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <sys/inode.h>
+#include <sys/fs.h>
+#include <sys/con.h>
+#include <errno.h>
 
 extern long seconds;
 
@@ -47,11 +53,6 @@ r_close()
     close(u.hl);
 }
 
-r_csw()
-{
-    u.hl = csw();
-}
-
 r_fork()
 {
     int id;
@@ -74,7 +75,22 @@ r_fork()
  */
 r_ioctl()
 {
-    u.hl = bioctl(u.hl, arg[0], arg[1]);
+    register struct file *fp;
+    register struct inode *ip;
+
+    if ((fp = ofile(u.hl)) == 0) {
+        u.hl = -1;              /* ofile set u.error */
+    } else {
+        ip = fp->inode;
+        if ((ip->i_mode & IFMT) == IFBLK)
+            u.hl = bioctl(u.hl, arg[0], arg[1]);
+        else if ((ip->i_mode & IFMT) == IFCHR)
+            u.hl = cioctl(u.hl, arg[0], arg[1]);
+        else {
+            u.error = ENOTTY;
+            u.hl = -1;
+        }
+    }
     if (u.error) {
         u.af |= ERRBIT;
         u.hl = u.error;
@@ -117,8 +133,8 @@ r_seek()
         u.hl = u.error;
     } else {
         u.af &= ~ERRBIT;
-        u.hl = (UINT) off;
-        u.hl2 = (UINT) (off >> 16);
+        u.hl = ((UINT *) &off)[1];
+        u.hl2 = ((UINT *) &off)[0];
     }
 }
 
@@ -126,7 +142,13 @@ r_ftruncate()
 {
     UINT32 length;
 
-    length = ((UINT32) arg[1] << 16) | (UINT32) arg[0];
+    {
+        union { UINT32 l; UINT w[2]; } t;
+
+        t.w[0] = arg[1];
+        t.w[1] = arg[0];
+        length = t.l;
+    }
     u.hl = ftruncate(u.hl, length);
     if (u.error) {
         u.af |= ERRBIT;
@@ -139,8 +161,8 @@ r_ftruncate()
 
 r_time()
 {
-    u.de = seconds;
-    u.hl = seconds >> 16;
+    u.de = ((UINT *) &seconds)[1];
+    u.hl = ((UINT *) &seconds)[0];
 }
 
 /*

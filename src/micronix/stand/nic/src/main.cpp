@@ -273,14 +273,6 @@ static void IRAM_ATTR busTask(void *arg)
 /* Replies, from the network side                                      */
 /* ------------------------------------------------------------------ */
 
-static bool rx_room(int len)
-{
-    uint32_t h = rx_head.load(std::memory_order_relaxed);
-    uint32_t t = rx_tail.load(std::memory_order_acquire);
-
-    return (uint32_t)(RXQ - (h - t)) >= (uint32_t)(4 + len);
-}
-
 static void push_frame(uint8_t type, uint8_t sock, const uint8_t *p, int len)
 {
     uint32_t h = rx_head.load(std::memory_order_relaxed);
@@ -314,6 +306,27 @@ static void push_event(uint8_t sock, uint8_t code)
     push_frame(P_EVENT, sock, &code, 1);
 }
 
+/*
+ * A connected event carries the peer's address: ip[4] in network order
+ * after the code, then the peer's port[2] network order.  rshd's .rhosts
+ * check needs the address and netstat shows the port; the guest has no
+ * other way to learn who connected.  Closed, reset and ready stay one
+ * byte.
+ */
+static void push_event_ip(uint8_t sock, uint8_t code, IPAddress ip, uint16_t port)
+{
+    uint8_t p[7];
+
+    p[0] = code;
+    p[1] = ip[0];
+    p[2] = ip[1];
+    p[3] = ip[2];
+    p[4] = ip[3];
+    p[5] = (port >> 8) & 0xff;
+    p[6] = port & 0xff;
+    push_frame(P_EVENT, sock, p, 7);
+}
+
 /* ------------------------------------------------------------------ */
 /* The socket state machine                                            */
 /* ------------------------------------------------------------------ */
@@ -326,8 +339,11 @@ struct Sock {
     uint16_t bindPort = 0;
     IPAddress peer;
     uint16_t peerPort = 0;
+    bool     notified = false;      /* a ready event is outstanding */
+    bool     pending = false;       /* a connection waits for ACCEPT */
     WiFiUDP   udp;
     WiFiClient client;
+    WiFiClient pend;
     WiFiServer *server = nullptr;
 };
 
@@ -364,6 +380,7 @@ static void close_sock(Sock &s)
 {
     s.udp.stop();
     s.client.stop();
+    s.pend.stop();
     if (s.server) {
         s.server->end();
         delete s.server;
@@ -371,6 +388,8 @@ static void close_sock(Sock &s)
     }
     s.state = S_CLOSED;
     s.txlen = 0;
+    s.notified = false;
+    s.pending = false;
     s.bindPort = 0;
     s.peerPort = 0;
 }
@@ -390,9 +409,18 @@ static void do_open(uint8_t i, uint8_t mode)
     }
     s.mode = mode ? 1 : 0;
     s.txlen = 0;
+    s.notified = false;
+    s.pending = false;
     s.bindPort = 0;
     s.peerPort = 0;
     if (s.mode) {
+        s.client.stop();
+        s.pend.stop();
+        if (s.server) {
+            s.server->end();
+            delete s.server;
+            s.server = nullptr;
+        }
         s.state = S_TCP_IDLE;
         ok = 1;
     } else {
@@ -434,7 +462,6 @@ static void do_bind(uint8_t i, const uint8_t *p)
     }
     push_ack(i, 0);
 }
-
 static void do_connect(uint8_t i, const uint8_t *p)
 {
     IPAddress ip(p[0], p[1], p[2], p[3]);
@@ -467,12 +494,33 @@ static void do_connect(uint8_t i, const uint8_t *p)
     s.client.stop();
     if (s.client.connect(ip, port, 5000)) {
         s.state = S_TCP_OPEN;
-        push_event(i, EV_CONNECTED);
+        push_event_ip(i, EV_CONNECTED, s.client.remoteIP(), s.client.remotePort());
     } else {
         s.client.stop();
         s.state = S_CLOSED;
         push_event(i, EV_RESET);
     }
+}
+
+/*
+ * Put the listener back in LISTEN.  A connection arriving is parked on the
+ * listener and the server is ended, so a second client is refused until
+ * ACCEPT has taken the first; this is what reopens that door.
+ */
+static bool
+arm_server(Sock &s)
+{
+    if (s.server) {
+        s.server->end();
+        delete s.server;
+        s.server = nullptr;
+    }
+    s.server = new WiFiServer(s.bindPort);
+    if (!s.server)
+        return false;
+    s.server->begin();
+    s.state = S_TCP_LISTEN;
+    return true;
 }
 
 static void do_listen(uint8_t i)
@@ -491,18 +539,61 @@ static void do_listen(uint8_t i)
         push_ack(i, E_BAD_STATE);
         return;
     }
-    if (s.server) {
-        s.server->end();
-        delete s.server;
+    if (s.pending) {
+        push_ack(i, 0);         /* the door reopens when ACCEPT takes it */
+        return;
     }
-    s.server = new WiFiServer(s.bindPort);
-    if (!s.server) {
+    if (s.state == S_TCP_LISTEN && s.server) {
+        push_ack(i, 0);         /* already armed */
+        return;
+    }
+    push_ack(i, arm_server(s) ? 0 : E_NO_MEMORY);
+}
+
+/*
+ * Take the parked connection.  The listener keeps its port and its state;
+ * the accepted connection gets a slot of its own, and the listener is
+ * armed again so the parent can go straight back to LISTEN.
+ */
+static void do_accept(uint8_t i)
+{
+    uint8_t p[2];
+    int n;
+
+    if (i >= NIC_NSOCK || socks[i].state != S_TCP_LISTEN) {
+        push_ack(i, E_BAD_STATE);
+        return;
+    }
+    if (!socks[i].pending) {
+        push_ack(i, E_AGAIN);
+        return;
+    }
+    for (n = 0; n < NIC_NSOCK; n++)
+        if (socks[n].state == S_CLOSED && !socks[n].pending)
+            break;
+    if (n >= NIC_NSOCK) {
         push_ack(i, E_NO_MEMORY);
         return;
     }
-    s.server->begin();
-    s.state = S_TCP_LISTEN;
-    push_ack(i, 0);
+
+    Sock &d = socks[n];
+    d.client = socks[i].pend;
+    d.client.setNoDelay(true);
+    d.mode = 1;
+    d.state = S_TCP_OPEN;
+    d.txlen = 0;
+    d.notified = false;
+    d.pending = false;
+    d.bindPort = socks[i].bindPort;
+    d.peer = d.client.remoteIP();
+    d.peerPort = d.client.remotePort();
+
+    socks[i].pend.stop();
+    socks[i].pending = false;
+    p[0] = 0;                   /* status: accepted */
+    p[1] = n;                   /* the socket it became */
+    push_frame(P_ACK, i, p, 2);
+    (void) arm_server(socks[i]);
 }
 
 static void do_send(uint8_t i, const uint8_t *p, int len)
@@ -651,6 +742,39 @@ static void do_setconf(const uint8_t *p, int len)
     push_ack(0xff, 0);
 }
 
+static void do_sockstat(void)
+{
+    uint8_t tab[NIC_NSOCK * 9];
+    int n = 0;
+
+    for (uint8_t i = 0; i < NIC_NSOCK; i++) {
+        Sock &s = socks[i];
+        uint16_t lport;
+        IPAddress rip(0, 0, 0, 0);
+        uint16_t rport = 0;
+
+        if (s.state != S_TCP_LISTEN && s.state != S_TCP_OPEN)
+            continue;
+        lport = s.bindPort;
+        if (s.state == S_TCP_OPEN) {
+            lport = s.client.localPort();
+            rip = s.client.remoteIP();
+            rport = s.client.remotePort();
+        }
+        tab[n] = s.state;
+        tab[n + 1] = (lport >> 8) & 0xff;
+        tab[n + 2] = lport & 0xff;
+        tab[n + 3] = rip[0];
+        tab[n + 4] = rip[1];
+        tab[n + 5] = rip[2];
+        tab[n + 6] = rip[3];
+        tab[n + 7] = (rport >> 8) & 0xff;
+        tab[n + 8] = rport & 0xff;
+        n += 9;
+    }
+    push_frame(P_ACK, 0xff, tab, n);
+}
+
 static void dispatch(void)
 {
     uint8_t type = frame[0];
@@ -664,11 +788,14 @@ static void dispatch(void)
     case C_BIND:    if (len >= 2) do_bind(sock, p); else push_ack(sock, E_BAD_STATE); break;
     case C_CONNECT: if (len >= 6) do_connect(sock, p); else push_ack(sock, E_BAD_STATE); break;
     case C_LISTEN:  do_listen(sock); break;
+    case C_ACCEPT:  do_accept(sock); break;
+    case C_RECV:    do_recv(sock, len >= 2 ? (p[0] | (p[1] << 8)) : NIC_MAXPAY); break;
     case C_SEND:    do_send(sock, p, len); break;
     case C_STATUS:  do_status(sock); break;
     case C_JOIN:    do_join(); break;
     case C_GETCONF: do_getconf(); break;
     case C_SETCONF: do_setconf(p, len); break;
+    case C_SOCKSTAT: do_sockstat(); break;
     default:        push_ack(sock, E_BAD_STATE); break;
     }
 }
@@ -761,7 +888,64 @@ static void poll_join(void)
     }
 }
 
-/* drain a socket's backlog and push arrived data */
+/*
+ * Pull this socket's data.  Nothing is pushed: a caller that wants bytes
+ * asks for them, which is what makes two readers on two sockets safe.
+ */
+static void do_recv(uint8_t i, int cap)
+{
+    static uint8_t buf[NIC_MAXPAY];
+    Sock &s = socks[i];
+    int n, r;
+
+    if (i >= NIC_NSOCK || s.state == S_CLOSED) {
+        push_ack(i, E_NO_SOCKET);
+        return;
+    }
+    if (cap <= 0 || cap > NIC_MAXPAY)
+        cap = NIC_MAXPAY;
+
+    if (s.state == S_TCP_OPEN) {
+        n = s.client.available();
+        if (n > 0) {
+            if (n > cap)
+                n = cap;
+            r = s.client.read(buf, n);
+            if (r > 0) {
+                s.notified = false;
+                push_frame(P_DATA, i, buf, r);
+                return;
+            }
+        }
+        if (!s.client.connected()) {
+            close_sock(s);
+            push_ack(i, E_CLOSED);
+            return;
+        }
+        push_ack(i, E_AGAIN);
+        return;
+    }
+
+    if (s.state == S_UDP) {
+        n = s.udp.parsePacket();
+        if (n > 0) {
+            if (n > cap)
+                n = cap;
+            r = s.udp.read(buf, n);
+            if (r > 0) {
+                s.notified = false;
+                push_frame(P_DATA, i, buf, r);
+                return;
+            }
+        }
+        push_ack(i, E_AGAIN);
+        return;
+    }
+
+    push_ack(i, E_AGAIN);
+}
+
+/* drain a socket's backlog and notice arrived data */
 static void poll_socket(uint8_t i)
 {
     Sock &s = socks[i];
@@ -770,18 +954,19 @@ static void poll_socket(uint8_t i)
         return;
 
     if (s.state == S_TCP_LISTEN) {
-        if (s.server) {
-            WiFiClient c = s.server->available();
+        WiFiClient c;
 
-            if (c) {
-                s.client = c;
-                s.client.setNoDelay(true);
-                s.server->end();
-                delete s.server;
-                s.server = nullptr;
-                s.state = S_TCP_OPEN;
-                push_event(i, EV_CONNECTED);
-            }
+        if (s.pending || !s.server)
+            return;
+        c = s.server->available();
+        if (c) {
+            s.pend = c;
+            s.pend.setNoDelay(true);
+            s.pending = true;
+            s.server->end();
+            delete s.server;
+            s.server = nullptr;
+            push_event_ip(i, EV_CONNECTED, c.remoteIP(), c.remotePort());
         }
         return;
     }
@@ -799,40 +984,23 @@ static void poll_socket(uint8_t i)
                 }
             }
         }
-        {
-            int n = s.client.available();
-
-            if (n > 0 && rx_room(NIC_MAXPAY)) {
-                uint8_t buf[NIC_MAXPAY];
-                int r = s.client.read(buf, n < NIC_MAXPAY ? n : NIC_MAXPAY);
-
-                if (r > 0)
-                    push_frame(P_DATA, i, buf, r);
-            }
-        }
-        if (!s.client.connected()) {
-            close_sock(s);
-            push_event(i, EV_CLOSED);
+        /*
+         * Readiness only: the data stays in lwIP until the guest pulls
+         * it, so two readers on two sockets cannot steal one another's
+         * bytes.  One notice is enough until it is pulled.
+         */
+        if (!s.notified &&
+            (s.client.available() > 0 || !s.client.connected())) {
+            s.notified = true;
+            push_event(i, EV_READY);
         }
         return;
     }
 
     if (s.state == S_UDP) {
-        int n = s.udp.parsePacket();
-
-        if (n > 0) {
-            if (rx_room(NIC_MAXPAY)) {
-                uint8_t buf[NIC_MAXPAY];
-                int r = s.udp.read(buf, n < NIC_MAXPAY ? n : NIC_MAXPAY);
-
-                if (r > 0)
-                    push_frame(P_DATA, i, buf, r);
-            } else {
-                uint8_t junk[64];       /* full card: drop the datagram */
-
-                while (s.udp.available())
-                    s.udp.read(junk, sizeof junk);
-            }
+        if (!s.notified && s.udp.parsePacket() > 0) {
+            s.notified = true;
+            push_event(i, EV_READY);
         }
     }
 }

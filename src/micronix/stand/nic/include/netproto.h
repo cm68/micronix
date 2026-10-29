@@ -38,11 +38,14 @@
 #define C_JOIN          0x08
 #define C_GETCONF       0x09
 #define C_SETCONF       0x0A
+#define C_ACCEPT        0x0B
+#define C_SOCKSTAT      0x0C    /* card-level: the socket table */
+#define C_RECV          0x00    /* not a wire type: pull this socket's data */
 
 /* card -> guest, NET.md section 5 */
 #define P_ACK           0x80
 #define P_DATA          0x81
-#define P_EVENT         0x82
+#define P_EVENT         0x82            /* EV_CONNECTED also carries ip[4] */
 
 /* socket states, NET.md section 3 */
 #define S_CLOSED        0
@@ -59,10 +62,12 @@
 #define E_REFUSED       4
 #define E_TIMEOUT       5
 #define E_CLOSED        6
+#define E_AGAIN         7
 
 /* EVENT codes, NET.md section 5 */
 #define EV_CONNECTED    1
 #define EV_CLOSED       2
 #define EV_RESET        3
+#define EV_READY        4       /* data waits; pull it with C_RECV */
 
 #endif

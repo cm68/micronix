@@ -56,7 +56,15 @@ acquire_lock(const char *image)
                 pidbuf[sizeof(pidbuf) - 1] = 0;
                 holder = atoi(pidbuf);
             }
-            fprintf(stderr, "%s: in use by pid %d\n", image, holder);
+            /*
+             * An image in use is not a condition to work around: two
+             * writers corrupt it, and a simulator that carries on
+             * without its root volume boots a broken machine and looks
+             * like a kernel bug.  Stop here, now, whoever we are.
+             */
+            fprintf(stderr, "%s: in use by pid %d - aborting\n",
+                image, holder);
+            exit(1);
         } else {
             fprintf(stderr, "lock: can't lock %s: %s\n",
                 lockpath, strerror(errno));

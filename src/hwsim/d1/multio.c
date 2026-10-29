@@ -369,21 +369,19 @@ multio_vi_change(unsigned char new)
     trace(trace_multio, "multio: vi_changed lines:%x new:%x diff:%x\n",
             vi_lines, new, mask);
 
-    if (mask == 0) {
-        l("multio: vi_change no change new:%02x prev:%02x\n", new, vi_lines);
-        return;
-    }
     vi_lines = new;
 
-    if (new & mask & MASTER_VI_MASK)
-        pics[0].irr |= mask & MASTER_VI_MASK;
-    else
-        pics[0].irr &= ~(mask & MASTER_VI_MASK);
-
-    if (new & mask & SLAVE_VI_MASK)
-        pics[1].irr |= (mask & SLAVE_VI_MASK) >> 3;
-    else
-        pics[1].irr &= ~((mask & SLAVE_VI_MASK) >> 3);
+    /*
+     * Level, not edge: set each VI input's IRR bit from the line's
+     * current level.  A change-only update loses a request that was
+     * acknowledged while the card kept the line high (the NIC does
+     * exactly that with a frame still in its FIFO).  VI2 on the master
+     * is the slave's cascade, below, and is not a VI input.
+     */
+    pics[0].irr = (pics[0].irr & ~MASTER_VI_MASK) |
+        (vi_lines & MASTER_VI_MASK);
+    pics[1].irr = (pics[1].irr & ~0x07) |
+        ((vi_lines & SLAVE_VI_MASK) >> 3);
 
     multio_set_int_line();
 }

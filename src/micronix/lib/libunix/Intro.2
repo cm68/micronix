@@ -32,7 +32,69 @@ if it wants [see
 perror 
 (3)].
 
-
+.bp
+.ce
+.bd
+The System Calls
+.in +5
+.br
+The calls are listed below by number and name.
+A number that does not appear is reserved; 43 (times)
+is documented but not implemented.
+.sp
+.in -5
+.ta 5
+.nf
+.bd 46
+0	indir - indirect system call
+1	exit - terminate this process
+2	fork - create a new process
+3	read - read a file
+4	write - write to a file
+5	open - open a file for reading or writing
+6	close - close a file
+7	wait - wait for a process to terminate
+8	creat - create a new file or truncate an old one
+9	link - link to a file
+10	unlink - remove a directory entry
+11	exec - execute a program
+12	chdir - change working directory
+13	time - get date and time
+14	mknod - make a directory or special file
+15	chmod - change mode of file
+16	chown - change owner and group of a file
+17	break - change core allocation
+18	stat - get the status of a named file
+19	seek - move read/write pointer
+20	getpid - get process ID
+21	mount - mount a file system
+22	umount - dismount a file system
+23	setuid - set process user IDs
+24	getuid - get user IDs
+25	stime - set date and time
+27	alarm - set the alarm clock
+28	fstat - get the status of an open file
+29	pause - wait for a signal
+31	stty - set typewriter status (use stty (3))
+32	gtty - get typewriter status (use gtty (3))
+33	access - test file access permissions
+34	nice - set process priority
+35	sleep - stop execution for an interval
+36	sync - update the disks
+37	kill - signal a process
+41	dup - duplicate a file descriptor
+42	pipe - create an inter-process channel
+45	dup2 - duplicate a file descriptor onto a chosen number
+46	ftruncate - truncate an open file to a length
+48	signal - set disposition of signals
+54	ioctl - run a raw command block on a block device
+55	reboot - halt or reboot the system
+56	execve - execute a program with an environment
+57	jobctl - control a process' scheduling and terminal input
+58	select - wait for input on a set of file descriptors
+.fi
+.in +5
+.sp 2
 .ce
 .bd
 C System Calls

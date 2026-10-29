@@ -12,6 +12,6 @@ DEPTH	= ../..
 DIR	= man2
 TARGET	=
 MANSEC	= 2
-MANSRCS	= alarm.2 reboot.2
+MANSRCS	= alarm.2 csw.2 reboot.2
 
 include $(DEPTH)/GNUmakefile.inc

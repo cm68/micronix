@@ -1,8 +1,15 @@
 /*
- * tty driver
+ * tty driver - the line discipline
  *
- * sys/tty.c 
- * Changed: <>
+ * sys/tty.c
+ *
+ * This file is linked into two pages, one copy in each: tty.mod (the
+ * console and its UART boards) and pty.mod (the pseudo-terminals).  A
+ * module cannot name another module, so a pty that called the console's
+ * copy would be reaching out of its own page; the copy here keeps every
+ * pty-to-tty call local.  What the two copies must not duplicate - the
+ * process-table walks, the start/stop helpers and the cooking buffer -
+ * is resident in sys/ttyres.c and called from both.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -13,28 +20,15 @@
 #include <sys/pic8259.h>
 
 /*
- * Signal the processes on a terminal that are in its foreground job.
- *
- * The terminal's own signals - interrupt, quit and input available -
- * belong to the foreground job.  A process the shell has stopped, or
- * one whose terminal input it has closed, is not in it, so ^C typed at
- * the shell must not reach it.  An explicit kill still does; this only
- * filters what the tty generates.
+ * The parts of the line discipline that both copies share - the process
+ * table walks and the start/stop helpers - are resident (sys/ttyres.c),
+ * as is the cooking scratch buffer.  This file is linked into both
+ * tty.mod and pty.mod, so anything that can be written once is in the
+ * resident half instead of twice in a page.
  */
-killfg(tty, sig)
-    register struct tty *tty;
-    UINT8 sig;
-{
-    register struct proc *p;
-    register UINT8 j;
-
-    for (p = plist; p < plist + NPROC; p++) {
-        j = jctl[p - plist];
-        if (p->tty == tty && (p->mode & ALIVE) &&
-            !(j & (JOBSTOP | JOBTTYOUT)))
-            send(p, sig);
-    }
-}
+extern int killfg(), ttynotify(), cstart(), ustart();
+extern char ttycbuf[];
+extern int selectchan;          /* select(2): a reader is watching */
 
 /*
  * Filter the raw input que into the cooked input que
@@ -45,7 +39,7 @@ cookin(tty)
 {
     register struct que *cook, *raw;
     register c;
-    static char buf[TTYHOG], *p, *q;
+    register char *p, *q;
 
     cook = &tty->cokque;
     raw = &tty->rawque;
@@ -95,9 +89,9 @@ cookin(tty)
 
     ei();
 
-    for (p = buf;;) {
-        if (p >= buf + TTYHOG - 2)
-            p = buf;            /* overflow */
+    for (p = ttycbuf;;) {
+        if (p >= ttycbuf + TTYHOG - 2)
+            p = ttycbuf;            /* overflow */
 
         di();
         c = getc(raw);
@@ -120,11 +114,11 @@ cookin(tty)
         }
 
         else if (c == tty->kill) {
-            p = buf;
+            p = ttycbuf;
         }
 
         else if (c == tty->erase) {
-            if (p != buf)
+            if (p != ttycbuf)
                 p--;
         }
 
@@ -153,7 +147,7 @@ cookin(tty)
         tty->nbreak--;
     ei();
 
-    for (q = buf; q < p; q++)
+    for (q = ttycbuf; q < p; q++)
         putc(cook, *q);
 
     /*
@@ -341,33 +335,6 @@ cookout(tty)
 }
 
 /*
- * Called on wrong baud rate detection.
- */
-
-ttyerror(t)
-    struct tty *t;
-{
-    t->state |= ERROR;
-}
-
-/*
- * called on carrier present detection
- * Don't disturb the sleepers waiting for carrier
- * if the tty is being used as a dialer.
- * We dial for ourselves.
- */
-
-ttyconnect(t)
-    struct tty *t;
-{
-    t->mstate |= CD;
-
-    if ((t->mstate & (WOPEN | DIALER)) == WOPEN) {
-        wakeup(&t->mstate);
-    }
-}
-
-/*
  * called on carrier loss
  */
 
@@ -380,34 +347,6 @@ ttyhangup(t)
         drainques(t);
         killall(t, SIGKILL);
     }
-}
-
-/*
- * Tell the shell that ^Z was typed.
- *
- * The terminal does not know which processes form the foreground job,
- * and must not guess: stopping every process on the tty would stop the
- * shell with them, and stopping none would leave the job running.  So
- * the kernel only notifies the shell - the process asleep in wait()
- * that has asked for SIGBACK - and the shell stops the pipeline it
- * recorded.  It is the handler, not the default, that identifies the
- * shell here: a program that calls wait() but never asked for the
- * signal is left alone.
- */
-ttynotify(tty)
-    register struct tty *tty;
-{
-    register struct proc *p;
-
-    for (p = plist; p < plist + NPROC; p++)
-        if (p->tty == tty && (p->mode & ALIVE) && !(p->mode & AWAKE) &&
-            p->event == (UINT) p && p->slist[SIGBACK] > 1)
-            break;
-
-    if (p >= plist + NPROC)
-        return;
-
-    send(p, SIGBACK);
 }
 
 /*
@@ -546,26 +485,13 @@ ttyin(c, tty)
         killfg(tty, SIGTINT);
         tty->line = 0;
     }
-}
 
-/*
- * Conditionally start output
- */
-cstart(tty)
-    register struct tty *tty;
-{
-    if (!(tty->state & LOSTOP))
-        (*tty->start) (tty);
-}
-
-/*
- * Unconditionally start output
- */
-ustart(tty)
-    register struct tty *tty;
-{
-    tty->state &= ~LOSTOP;
-    (*tty->start) (tty);
+    /*
+     * A selector watching this tty has to be woken whether the record
+     * is complete or not: the pty master is RAW and wants every byte,
+     * and a cooked reader re-checks its line on the next pass.
+     */
+    wakeup(&selectchan);
 }
 
 /*

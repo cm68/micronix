@@ -56,16 +56,23 @@ ndout(b)
 /*
  * Point the card at the block number and write it - four bytes, most
  * significant first, the way the HDCA's header is four bytes.
+ *
+ * The block number is a UINT (struct buf's blk), so the top two bytes
+ * are always zero.  The two that are not written through a UINT8 cast:
+ * that is the shape lower.c's byte-extraction pattern matches (a NARROW
+ * over a shift), and it loads the byte straight out of the word instead
+ * of emitting a shift (and the `& 0xff` that does not make it a NARROW
+ * at all) - which is ~200 bytes of unrolled srl/rr otherwise.
  */
 static void
 ndblk(blk)
 	UINT blk;
 {
 	out(ND_CMD, ND_BLOCK);
-	ndout((blk >> 24) & 0xff);
-	ndout((blk >> 16) & 0xff);
-	ndout((blk >> 8) & 0xff);
-	ndout(blk & 0xff);
+	ndout(0);
+	ndout(0);
+	ndout((UINT8) (blk >> 8));
+	ndout((UINT8) blk);
 }
 
 /*
@@ -326,8 +333,8 @@ ndclose(dev)
 /*
  * The ND has no command block: it is a flat block device, and every
  * control operation a disk needs - format, seek, geometry - is
- * meaningless here.  The minor does have one: NET_MINOR is the network
- * functions, the same card's other face, and its ioctl is sys/net.c's.
+ * meaningless here.  The card's socket face is a character device of its
+ * own (char major 6, sys/net.c) and does not come through this vector.
  */
 int
 ndcioctl(dev, cmd, r, b)
@@ -335,8 +342,6 @@ ndcioctl(dev, cmd, r, b)
 	struct cdb *r;
 	struct buf *b;
 {
-	if (minor(dev) == NET_MINOR)
-		return (netioctl(dev, cmd, r, b));
 	u.error = ENOTTY;
 	return (-1);
 }

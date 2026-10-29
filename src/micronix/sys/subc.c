@@ -46,9 +46,6 @@ pr(fmt, args)
     int *argp;
     char c;
 
-    if (csw() & 1)              /* supress messages if switch 1 is set */
-        return;
-
     argp = &args;
     while ((c = *fmt++) != '\0') {
         if (c != '%') {

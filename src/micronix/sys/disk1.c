@@ -387,7 +387,7 @@ d1cmd(head, sect)
  */
 d1dma()
 {
-    static UINT32 a;
+    UINT32 a;
 
     a = ((UINT32) d1buf->xmem << 12) | ((unsigned) d1buf->data & 0xfff);
     out(D1_DMA, (UINT8) (a >> 16));
@@ -704,7 +704,7 @@ disk1ioctl(dev, com, r, b)
 {
     static UINT8 res[7];
     static char *p;
-    static UINT32 a;
+    UINT32 a;
     static UINT i, n, op, hole;
     struct info *info;
 

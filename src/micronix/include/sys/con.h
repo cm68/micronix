@@ -39,14 +39,16 @@ struct ciovec {
     int (*close) ();
     int (*read) ();
     int (*write) ();
-    int (*mode) ();
+    int (*ioctl) ();            /* the terminal's requests live here:
+                                 * stty/gtty are TIOCSETA/TIOCGETA rather
+                                 * than a hook of their own */
 } ciosw[];
 
 /*
  * Macros for accessing the major and minor device numbers.
  */
 #define minor(dev)	((dev) & 0377)
-#define major(dev)	((UINT16)(dev) >> 8)
+#define major(dev)	((UINT8)((dev) >> 8))
 
 /*
  * The minor number of a disk, cut into the two things its driver wants

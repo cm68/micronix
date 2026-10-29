@@ -147,15 +147,23 @@ DEST	= $(ROOT)$(SRCDIR)
 NOWARN	= --warning=no-ignore-newer
 
 #
-# The host trees.  $(PREFIX)/bin holds the mx* tools and
-# $(PREFIX)/micronix is the man page tree mxman reads, installed by
-# install-man-host.  sudo is here because $(PREFIX) is not ours; SUDO=
-# runs it without, for a DESTDIR you already own.
+# Host-side install roots.  Nothing here escalates: an install runs as
+# whoever invoked make, and DESTDIR stages it under a root that user
+# can write - the ordinary "make install DESTDIR=/somewhere"
+# arrangement.  A copy under /usr/local is the exception, asked for by
+# naming the prefix (and MXROOT for the page tree) and running the
+# target as a user who can write there:
+#
+#	PREFIX=/usr/local MXROOT=/usr/local/micronix make ...
+#	DESTDIR=/tmp/stage PREFIX=/usr/local MXROOT=/usr/local/micronix make ...
+#
+# The checkout is the default MXROOT, so "make install-man-host"
+# mirrors the pages where the tree's own build keeps its host output,
+# and the mx tools are built into bin/ beside them.
 #
 PREFIX	?= /usr/local
-SUDO	?= sudo
-MXROOT	?= $(DESTDIR)$(PREFIX)/micronix
-MXMAN	 = $(MXROOT)/man
+MXROOT	?= $(HOSTROOT)
+MXMAN	 = $(DESTDIR)$(MXROOT)/man
 
 #
 # Where the binary goes in the filesystem.  Everything this tree
@@ -242,8 +250,8 @@ INSTALLMAN = @if [ -n "$(strip $(MANSRCS))" ] ; then \
 # source.
 #
 INSTALLMANHOST = @if [ -n "$(strip $(MANSRCS))" ] ; then \
-		$(SUDO) mkdir -p $(MXMAN)/man$(MANSEC) ; \
-		$(SUDO) cp $(MANSRCS) $(MXMAN)/man$(MANSEC) ; \
+		mkdir -p $(MXMAN)/man$(MANSEC) ; \
+		cp $(MANSRCS) $(MXMAN)/man$(MANSEC) ; \
 	fi
 
 #
@@ -379,7 +387,7 @@ all: $(TARGET) $(TARGETS)
 # rather than linking it against an old struct.  Depend on them too.
 #
 SYSHDRS	= $(patsubst %,$(DEPTH)/include/%,8080.h alloc.h bios.h cpm.h crypt.h dirent.h dtab.h dump.h errno.h fio.h fslib.h grp.h hitech.h mtab.h obj.h pascal.h pwd.h setjmp.h std.h stdio.h time.h types.h utmp.h)\
-	  $(patsubst %,$(DEPTH)/include/sys/%,access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h ncr.h ovl.h proc.h reboot.h reg.h sgtty.h signal.h stat.h sys.h times.h tty.h)
+	  $(patsubst %,$(DEPTH)/include/sys/%,access.h buf.h con.h dir.h disk2.h disk3.h dj.h dlabel.h file.h fs.h hdca.h ide.h inode.h ints.h ioctl.h lock.h mount.h mw.h ncr.h nd.h net.h ovl.h proc.h pty.h reboot.h reg.h sgtty.h signal.h stat.h sys.h times.h tty.h)
 
 $(OBJS): $(HSRCS) $(SYSHDRS)
 
@@ -448,10 +456,9 @@ install-man:
 # The same pages for mxman, under $(MXMAN).  Every directory is
 # entered and installs its own MANSRCS; one with no page does nothing.
 # The top level writes this rule itself because it also enters man/,
-# the archive pages no command owns - hence the test.  The chmod is
-# there and not in the canned recipe because it has to run once, at
-# the end, over the root: sudo's umask leaves every copy 0600 in a
-# 0700 directory, which mxman cannot read.
+# the archive pages no command owns - hence the test.  It copies as
+# the invoking user, so there is no root umask to repair afterwards:
+# the files are readable when they land.
 #
 ifneq ($(DEPTH),.)
 install-man-host:

@@ -1,0 +1,55 @@
+.he "netstat (1)                  10/28/26                  netstat (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+netstat
+- show the network card's listening and connected sockets
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+netstat
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+netstat opens the card's clone node, /dev/net0, and asks the card for
+its socket table.  It prints one line for every socket that is
+listening or connected:
+.sp
+.nf
+.in +4
+Proto Local          Foreign         State
+tcp   *.514           *.*             LISTEN
+tcp   *.514           127.0.0.1.40001 ESTABLISHED
+.in -4
+.fi
+.sp
+The local address is the port the socket is bound to; the card owns the
+interface address, and a star stands for it.  The foreign address is the
+peer's dotted quad and port, or *.* when there is no peer.  State is
+LISTEN for a server waiting for a connection and ESTABLISHED for a
+connection the card has accepted, or a client's connection.
+.sp
+The table is the card's, not the kernel's: a socket belongs to whatever
+process opened it, and only the card knows all of them.  A connection
+that has arrived but has not been accepted yet is still the listener's
+(the card is holding it), so it appears as a LISTEN line with no
+foreign address.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rcp(1), rshd(8), sys/NET.md

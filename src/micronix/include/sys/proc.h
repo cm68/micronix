@@ -9,7 +9,7 @@
  * A table of 1 proc structure per process is maintained in the kernel.
  */
 struct proc {
-    char args[8];               /* for ps */
+    char args[14];              /* for ps */
     UINT8 mode;                 /* see below */
     UINT8 uid;                  /* for signal sending */
     UINT event;                 /* for sleep-wakeup */
@@ -138,15 +138,16 @@ struct user {
      * ncr's scsistart and dj's busplease all sleep there - would be
      * switched out, another process would map another driver, and the
      * first would wake up executing the second's bytes.  Having it here
-     * makes the window per-process: ovlmap() and ovlcall() (sys/ovl.c)
-     * record the segment as they map it, and ovlremap() puts that page
-     * back at every switch, because the u page is the incoming process's
-     * by then.
+     * makes the window per-process: ovlbmap(), ovlcmap() and ovlcall()
+     * (sys/ovl.c) record the segment as they map it, and ovlremap() puts
+     * that page back at every switch, because the u page is the incoming
+     * process's by then.
      */
     UINT8 drv;
     UINT32 offset;              /* for file access */
     char *base;                 /* ditto */
     UINT count;                 /* ditto */
+    UINT fdev;                  /* an open's forwarded device (iopen) */
     struct dir {
         UINT inum;
         char name[14];

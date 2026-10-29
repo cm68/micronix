@@ -31,8 +31,11 @@ src/micronix/old/
 
 #
 # Core dumps under any name.  "core" above only catches the bare one.
+# The section 5 page in the man archive is a page, not a dump: MANSRCS
+# names it and install-man-host needs it.
 #
 core.*
+!src/micronix/man/man5/core.5
 
 #
 # macOS Finder junk: the .@__thumb thumbnail cache, .DS_Store, and the
@@ -73,6 +76,22 @@ src/hwsim/*.o
 src/hwsim/d1/*.o
 src/hwsim/d1/d1
 src/hwsim/d1/scsi-0
+#
+# Simulator drive units when d1 is run with the repository root as its
+# directory.  A controller with no drive path names its unit file
+# <controller>-<unit> in the current directory; these are the few-byte
+# stubs it leaves there, not disk images.
+#
+/disk1-[0-9]*
+/disk2-[0-9]*
+/disk3-[0-9]*
+/djdma-[0-9]*
+/hdca-[0-9]*
+/hdcdma-[0-9]*
+/hddma-[0-9]*
+/ide-[0-9]*
+/nd-[0-9]*
+/scsi-[0-9]*
 
 src/micronix/lib/libc/*.o
 src/micronix/lib/libc/*.a
@@ -91,12 +110,18 @@ src/tools/setdev
 # bin/../libexec, the runtime from bin/../ccc/lib and the headers from
 # bin/../ccc/include - so they are anchored to the root.
 #
+# man is the host page tree mxman reads, mirrored there by
+# install-man-host the same way pages are mirrored into the system
+# below it.  Like bin it is built output, regenerated from MANSRCS,
+# not a source.
+#
 # lib and usr are the same three under the names ccc.c uses when it is
 # compiled by ccc, for /bin/ccc on micronix: bin/../lib and
 # bin/../usr/include.  A host build reads neither; a -DCCC build of the
 # driver would, so the names stay ignored.
 #
 /bin/
+/man/
 /libexec/
 /ccc/
 /lib/
@@ -336,6 +361,7 @@ src/micronix/cmd/echo/echo
 src/micronix/cmd/ed/ed
 src/micronix/cmd/edit/edit
 src/micronix/cmd/entab/entab
+src/micronix/cmd/env/env
 src/micronix/cmd/expand/expand
 src/micronix/cmd/expr/expr
 src/micronix/cmd/false/false
@@ -390,6 +416,7 @@ src/micronix/cmd/netconf/netconf
 src/micronix/cmd/netcp/netcp
 src/micronix/cmd/netdaemon/netdaemon
 src/micronix/cmd/netmail/netmail
+src/micronix/cmd/netstat/netstat
 src/micronix/cmd/newuser/newuser
 src/micronix/cmd/nm/nm
 src/micronix/cmd/nm/wsnm
@@ -406,6 +433,7 @@ src/micronix/cmd/ratfor/ratfor
 src/micronix/cmd/rcp/rcp
 src/micronix/cmd/rm/rm
 src/micronix/cmd/rmdir/rmdir
+src/micronix/cmd/rshd/rshd
 src/micronix/cmd/s/s
 src/micronix/cmd/scsiformat/scsiformat
 src/micronix/cmd/sed/sed
@@ -540,6 +568,11 @@ src/hwsim/resources/cold_boot_loader.bin
 .@__thumb/
 benchmem.log
 benchmem.tsv
+
+#
+# Guest test harnesses, built on demand where a run needs them.
+#
+src/micronix/test/seltest/seltest
 
 # Local KiCad preference files never belong in the tree.
 *.kicad_prl

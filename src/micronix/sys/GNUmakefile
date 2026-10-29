@@ -57,7 +57,7 @@ EXTRA	= BUILDING ARCHITECTURE.md FEATURES-2.md TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca nd disk1 disk2 disk3 pty mem io
+MODS	= dj mw ide ncr hdca nd net disk1 disk2 disk3 pty tty mem io
 
 # Nothing is staged: every driver in the tree is linked into a module and
 # placed at boot.  A driver costs no address space when it is not placed -
@@ -112,7 +112,7 @@ LEAF_AS   = mem.o inout.o sub8.o unixtobcd.o slavevec.o $(LEAF_LIBC)
 # what the page holds.  Its callers are mount() and sys2.c and both are
 # resident, so nothing a driver module links against reaches it and it
 # is ordinary resident C again (KERNEL_C).
-LEAF_C    = consts.o pty_leaf.o
+LEAF_C    = consts.o ovlb.o
 
 # consts.c needs the same fold for the same reason, one literal at a
 # time: ccc puts the device-name strings the tables point at in .text,
@@ -126,17 +126,26 @@ consts.o: consts.c
 	$(MXLD) -r -Sdata -o consts.o consts.rel
 	rm -f consts.rel
 
-# pty_leaf.c is the pty driver's stateless half - the pair decode, the
-# four back-end calls the tty layer makes, and the pair's init and
-# hangup.  It is the same trade as bus.c: pure code with no static data,
-# folded to data so it can ride the u page, which has room where the
-# resident text does not.  The pty state itself stays resident
-# (sys/pty.c): the u page is cloned per process, and the queues and the
-# p->tty pointer must name one object.
+# pty_leaf.c is the pty driver's back end - the pair decode, the four
+# calls the tty layer makes into a terminal, and the pair's mode
+# handling.  It is folded to data and linked into pty.mod, so start,
+# stop, put and set are functions in the same page as the line
+# discipline that calls them.  The pty state itself stays resident
+# (sys/ptydata.c): the queues and the p->tty pointer must name one
+# object.
 pty_leaf.o: pty_leaf.c
 	$(CCC) $(CCFLAGS) $(INC) -c -o pty_leaf.rel $<
 	$(MXLD) -r -Sdata -o pty_leaf.o pty_leaf.rel
 	rm -f pty_leaf.rel
+
+# ovlb.c is the block switch's four trampolines.  They are stateless, so
+# they ride the u page with consts.o and bus.o instead of taking resident
+# text.  The pty back ends (pty_leaf.c) moved the other way, into the pty
+# page, where they are intra-module calls from the line discipline.
+ovlb.o: ovlb.c
+	$(CCC) $(CCFLAGS) $(INC) -c -o ovlb.rel $<
+	$(MXLD) -r -Sdata -o ovlb.o ovlb.rel
+	rm -f ovlb.rel
 
 # The resident PIC half - pic_eoi and inton - is leaf code (it reaches
 # only in()/out()/di()/ei(), all in the u page) and carries no static
@@ -148,9 +157,8 @@ pic.o: pic.c
 	$(MXLD) -r -Sdata -o pic.o pic.rel
 	rm -f pic.rel
 
-# net.o is not in the kernel: it is the network face of the ND module,
-# linked into nd.mod below.  It is compiled like a module object, not
-# folded.
+# net.o is the network card's socket face, char major 6, a module page of
+# its own (net.mod below).  It is compiled like a module object.
 net.o: net.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
@@ -159,9 +167,9 @@ KERNEL_AS     = $(KERNEL_AS_OBJ) highmem.o
 KERNEL_C      = mount.o balloc.o bus.o cio.o create.o exec.o fio.o fork.o \
 	ialloc.o iget.o imap.o job.o malloc.o name.o ptydata.o queue.o \
 	reg.o sig.o sleep.o subc.o swap.o sys1.o system.o time.o \
-	trap.o tty.o uio.o multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
-	picdata.o netint.o
-WIN_C         = open.o sys2.o rdwri.o link.o access.o ttysys.o
+	trap.o ttyres.o uio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o ss1_clock.o \
+	picdata.o netint.o select.o
+WIN_C         = open.o sys2.o rdwri.o link.o access.o
 HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
 HIGHMEM_AS_OBJ = inits.o unbcd.o
 HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
@@ -171,13 +179,9 @@ HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 # .c the way a wildcard "%.o : %.s" would.  These two rules are the whole
 # of it; every other object has a rule of its own below.
 $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
-	$(filter-out mem.o io.o,$(MODS:%=%.o)) $(MODS:%=%hdr.o): %.o: %.c
+	$(filter-out mem.o io.o,$(MODS:%=%.o)) $(MODS:%=%hdr.o) \
+	ttysys.o multio.o ss1_uartleaf.o: %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
-
-# The driver modules compile <sys/*.h> out of $(DEPTH)/include the same as
-# the resident objects do; the $(OBJS) half of that dependency lives in
-# GNUmakefile.inc, and this is the module half.
-$(MODS:%=%.o) $(MODS:%=%hdr.o): $(SYSHDRS)
 
 $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
@@ -204,8 +208,9 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 job.c link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
 	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
 	 net.c netint.c open.c ovl.c probe.c \
-	 pty.c pty_leaf.c ptydata.c ptyhdr.c memhdr.c iohdr.c ttysys.c queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
-	 ss1_uart.c stub.c \
+	 pty.c pty_leaf.c ptydata.c ptyhdr.c tty.c ttyhdr.c ttyres.c ttysys.c \
+	 multio.c ss1_uart.c ss1_uartleaf.c select.c memhdr.c iohdr.c ovlb.c queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
+	 stub.c \
 	 stub_intr.c subc.c swap.c sys1.c sys2.c system.c time.c trap.c tty.c \
 	 uio.c user.c pic.c picdata.c \
 	 pic_init.c probe_init.c \
@@ -216,6 +221,20 @@ ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
 	 tramp.s uhdr.s unbcd.s unixtobcd.s
 
 include $(DEPTH)/GNUmakefile.inc
+
+# The driver modules compile <sys/*.h> out of $(DEPTH)/include the same
+# as the resident objects do.  $(OBJS) is covered by GNUmakefile.inc;
+# these objects are not in $(OBJS), so they need this line of their own -
+# and the line has to come after the include that defines $(SYSHDRS).
+# Before the include the list expands empty, and a header change then
+# recompiles nothing: adding a field to struct ovlhdr left every driver
+# header object built against the old layout, and the kernel read past
+# the end of it.
+#
+# pty_leaf.o, net.o and memdev.o are the module-only objects with their
+# own rules above; they take the same dependency.
+$(MODS:%=%.o) $(MODS:%=%hdr.o) pty_leaf.o net.o memdev.o \
+	ttysys.o multio.o ss1_uartleaf.o: $(SYSHDRS)
 
 #
 # The buffer pool.  Unclamped by default: expand_bufs() mints headers up
@@ -476,7 +495,7 @@ unix.link: $(OBJS)
 # The header is an object of its own, named first, and the link is
 # -Sdata.  That flag folds every section into the data segment, and an
 # object's data is placed in the order the objects are named on the link
-# line - so the header's 29 bytes are the page's first 29 and nothing the
+# line - so the header's 30 bytes are the page's first 30 and nothing the
 # driver holds can get in front of them.  The same ordering is why the
 # header object holds the struct and nothing else, and why the name in it
 # is a character list: sys/ovl.h has what a string would cost.
@@ -497,7 +516,7 @@ unix.link: $(OBJS)
 # warning is the measure of what is left to do: it goes away when the
 # driver leaves the kernel.
 #
-$(filter-out nd.mod mem.mod io.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o unix.link
+$(filter-out nd.mod mem.mod io.mod pty.mod tty.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 
 # The memory and ports cdevs are the same driver (sys/memdev.c).  Each
@@ -509,10 +528,27 @@ mem.mod: memhdr.o memdev.o unix.link
 io.mod: iohdr.o memdev.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ iohdr.o memdev.o
 
-# The ND module carries the network face too: net.o is its second
-# object, linked into the same page (sys/net.c, sys/nd.c).
-nd.mod: ndhdr.o nd.o net.o unix.link
-	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o net.o
+# The pty page carries its own copy of the line discipline and the tty
+# syscall half (tty.o, ttysys.o), so the calls between pty and tty are
+# calls within one page.  That is what makes pty independent of whether
+# the console's tty page is placed - and it is why the shared helpers
+# (sys/ttyres.c) stay resident: they are written once for both copies.
+pty.mod: ptyhdr.o pty.o pty_leaf.o tty.o ttysys.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
+		ptyhdr.o pty.o pty_leaf.o tty.o ttysys.o
+
+# The console's tty page: the line discipline, its syscall half, the
+# MultIO front end and the SS1 back ends.  The resident interrupt stubs
+# reach it through ttyin/ttyout/mumint (sys/ttyres.c), which map the page
+# first; a process reaches it through the ovlc trampolines in ciosw[].
+tty.mod: ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
+		ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o
+
+# The ND module is the network disk alone; the socket face that shares
+# its major number in the other namespace is net.mod.
+nd.mod: ndhdr.o nd.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o
 
 #
 # One module is one page.  What the link produced is a 16 byte object

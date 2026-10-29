@@ -111,7 +111,7 @@
  * body no times.  The caller loads B from the count's home and the
  * value into A, so only this part is common to every home.
  */
-#define F_SH_SLA_A     "\310"	/*  inc b; jr $$+4; sla a; djnz $$-2 */
+#define F_SH_SLA_A     "\310"	/*  inc b; jr $$+3; add a,a; djnz $$-1 */
 #define F_SH_SRA_A     "\311"	/*  inc b; jr $$+4; sra a; djnz $$-2 */
 #define F_SH_SRL_A     "\312"	/*  inc b; jr $$+4; srl a; djnz $$-2 */
 #define F_SH_SRA_HL    "\313"	/*  inc b; jr $$+6; sra h; rr l; djnz $$-4 */
@@ -191,7 +191,7 @@ char *fragtab[] = {
 	"\tld $u,($L+)\n",	/* F_LDUL */
 	"\trla\n",	/* F_RLA */
 	"\texx\n",	/* F_EXX */
-	"\tinc b\n\tjr $$+4\n\tsla a\n\tdjnz $$-2\n",	/* F_SH_SLA_A */
+	"\tinc b\n\tjr $$+3\n\tadd a,a\n\tdjnz $$-1\n",	/* F_SH_SLA_A */
 	"\tinc b\n\tjr $$+4\n\tsra a\n\tdjnz $$-2\n",	/* F_SH_SRA_A */
 	"\tinc b\n\tjr $$+4\n\tsrl a\n\tdjnz $$-2\n",	/* F_SH_SRL_A */
 	"\tinc b\n\tjr $$+6\n\tsra h\n\trr l\n\tdjnz $$-4\n",	/* F_SH_SRA_HL */
@@ -1656,7 +1656,7 @@ struct rule rules[] = {
 	 */
 	R(LSHIFT,INHL,P_EIGHT,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "\tld h,l\n\tld l,0\n", R_HL),
 	R(LSHIFT,INHL,P_NUM,0,0,0, LSHIFT, P_L, P_R, P_NONE, 0, "%(" T_ADD_HL_HL ")", R_HL),
-	R(LSHIFT,INA,P_NUM,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, "%(\tsla a\n)", R_A),
+	R(LSHIFT,INA,P_NUM,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, "%(\tadd a,a\n)", R_A),
 	/*
 	 * A byte shifted by a count only known at runtime - "1 << n",
 	 * the ordinary way to make a mask.  Every other shift here
@@ -1666,7 +1666,7 @@ struct rule rules[] = {
 	 * and djnz walks it: one more than the count, then a jump
 	 * straight to the djnz, so a count of nought runs the body no
 	 * times rather than once.  Displacements are from each jump
-	 * itself - sla a is two bytes, so the entry jump clears it and
+	 * itself - add a,a is one byte, so the entry jump clears it and
 	 * the djnz reaches back over it.
 	 */
 	R(LSHIFT,P_NUM,INE,0,0,1, LSHIFT, P_L, P_R, P_NONE, 0, RT14, R_A),

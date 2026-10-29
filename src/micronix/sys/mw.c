@@ -661,7 +661,7 @@ reset()
     di();
     map0[2] = 0;
     ichan[0] = (UINT) mwphys;           /* the channel command address, */
-    ichan[1] = (UINT) (mwphys >> 16);   /* three bytes at physical 0x50 */
+    ichan[1] = ((UINT *) &mwphys)[0];   /* three bytes at physical 0x50 */
     map0[2] = 1;
 
     /*
@@ -868,7 +868,7 @@ mwlink()
     else
         mwphys = (unsigned) cp;
     cmd.link = (UINT) mwphys;
-    cmd.xlink = (UINT8) (mwphys >> 16);
+    cmd.xlink = ((UINT8 *) &mwphys)[0];
 }
 
 int
@@ -947,7 +947,7 @@ mwioctl(dev, com, r, b)
          */
         p = bhold(b);
         ((char *) &cmd)[hole] = (unsigned) p;
-        ((char *) &cmd)[hole + 1] = (unsigned) p >> 8;
+        ((char *) &cmd)[hole + 1] = (UINT8) ((unsigned) p >> 8);
         ((char *) &cmd)[hole + 2] = b->xmem;
     }
 

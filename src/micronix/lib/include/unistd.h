@@ -55,6 +55,7 @@ extern int pause(void);
 extern int pipe(int *fds);
 extern int read(unsigned char fd, char *buf, int count);
 extern int seek(unsigned char fd, int offset, int whence);
+extern int select(unsigned int mask);
 extern int setuid(int uid);
 extern void *sbrk(int incr);
 extern int brk(void *addr);

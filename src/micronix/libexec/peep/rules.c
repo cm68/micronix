@@ -63,6 +63,7 @@ int n_ccall = 0;
 int n_cret = 0;
 int n_jpnext = 0;
 int n_hlarg = 0;
+int n_shiftrun = 0;
 int n_noframe = 0;
 long saved = 0;
 
@@ -1448,6 +1449,48 @@ r_orclr(void)
 	return 1;
 }
 
+
+/*
+ * A shift by eight or more.  c1 spells a constant count out one bit at
+ * a time, and the first eight bits are a byte move: add hl,hl eight
+ * times is ld h,l / ld l,0, and srl h / rr l eight times is ld l,h /
+ * ld h,0.  Collapsing the run here covers every count past eight,
+ * including the ones no P_EIGHT rule reaches, and leaves the remainder
+ * to shift as before.  Only the logical right shift: an arithmetic one
+ * has to carry the sign, which a byte move does not.
+ */
+int
+r_shiftrun(void)
+{
+	int i;
+
+	if (is(0, "add hl,hl")) {
+		for (i = 0; is(i, "add hl,hl"); i++)
+			;
+		if (i < 8)
+			return 0;
+		delline(0, 8);
+		insline(0, "\tld l,0\n");
+		insline(0, "\tld h,l\n");
+		n_shiftrun++;
+		saved += 5;
+		return 1;
+	}
+	if (is(0, "srl h") && is(1, "rr l")) {
+		for (i = 0; is(2 * i, "srl h") && is(2 * i + 1, "rr l"); i++)
+			;
+		if (i < 8)
+			return 0;
+		delline(0, 16);
+		insline(0, "\tld h,0\n");
+		insline(0, "\tld l,h\n");
+		n_shiftrun++;
+		saved += 29;
+		return 1;
+	}
+	return 0;
+}
+
 /*
  * Which rules can possibly match, rather than all of them.
  *
@@ -1543,6 +1586,8 @@ applyrules(void)
 		if (r_exx())
 			return 1;
 		return r_exde();
+	case 'a':
+		return r_shiftrun();
 	case 'c':
 		return r_hlarg();
 	case 'i':
@@ -1569,6 +1614,8 @@ applyrules(void)
 		if (r_cret())
 			return 1;
 		return r_jpnext();
+	case 's':
+		return r_shiftrun();
 	case 'l':
 		if (k[1] != 'd' || k[2] != ' ')
 			return 0;
@@ -1629,9 +1676,10 @@ report(void)
 		n_constdup, n_orclr, n_reuse, n_pushsrc, n_ptrload, n_ixcopy,
 		n_autozero, n_xordup);
 	fprintf(stderr, "peep: exde %d  ldazero %d  bitset %d  pushswap %d"
-		"  pushsave %d  bytestore %d  astore %d  reload %d\n",
+		"  pushsave %d  bytestore %d  astore %d  reload %d"
+		"  shiftrun %d\n",
 		n_exde, n_ldazero, n_bitset, n_pushswap, n_pushsave,
-		n_bytestore, n_astore, n_reload);
+		n_bytestore, n_astore, n_reload, n_shiftrun);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

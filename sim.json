@@ -40,6 +40,31 @@
       "volumes": [
         { "controller": "hdcdma", "unit": 0, "geometry": "wren86", "image": "disks/wren.img" }
       ]
+    },
+    "net": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "clock": "normal"
+      },
+      "wiring": "multio,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m16",
+          "image": "disks/net/root.vol",
+          "files": [
+            { "path": "/.login", "source": "src/micronix/rootfiles/login-net" },
+            { "path": "/.rhosts", "source": "src/micronix/rootfiles/rhosts-net" }
+          ] }
+      ]
     }
   },
   "mediasets": {

@@ -134,7 +134,7 @@
 ;
 	.data
 	.globl	_ace_minit, _coninit
-	.extern	_di, _ei, _muopen
+	.extern	_di, _ei
 ; 
 ; /*
 ;  * port addresses of the Master Mult I/O

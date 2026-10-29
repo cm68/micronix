@@ -21,218 +21,127 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
 #include <sys/ioctl.h>
+#include <sys/signal.h>
+#include <pwd.h>
 
-#define DEV      "/dev/net"
-#define N_MAXPAY 1024
+#define DEV      "/dev/net0"
+#define N_MAXPAY 256
 
-/* frame types and the local receive op (include/sys/net.h) */
-#define N_OPEN    0x01
-#define N_CLOSE   0x02
-#define N_CONNECT 0x04
-#define N_SEND    0x06
-#define N_JOIN    0x08
-#define N_ACK     0x80
-#define N_DATA    0x81
-#define N_EVENT   0x82
-#define N_EV_CONNECTED 1
-#define NET_OP_RECV 0
+/* the socket face (include/sys/net.h) */
+#define NETCONNECT 0x7411
+#define NETCARD    0x7414
+#define N_JOIN     0x08
 
 #define RSH_PORT  514
-#define RSH_USER  "curt"        /* the host user the rshd's .rhosts names */
 
 extern long lseek();            /* the kernel's seek, which returns the offset */
 
-static int fd;                  /* /dev/net, the command channel */
-static int sock;                /* the one rsh socket */
-static char rbuf[N_MAXPAY];     /* a frame payload scratch */
-static int rtype, rsock;        /* the last frame net_rx read */
-static char stash[N_MAXPAY];    /* a command's reply frame */
-static int stype = -1, ssock, slen, shave;
+/* one card-level request and its reply (include/sys/net.h) */
+struct netcard {
+    unsigned char op;
+    unsigned char len;
+    unsigned char data[1 + 32 + 1 + 63];
+};
 
+static int fd;                  /* the connection, after connect */
 static int port = RSH_PORT;
 static int recursive;           /* -r: walk directories */
-static int stream_closed;       /* the remote closed; net_wait saw the event */
+static char rsh_user[32];       /* who this end says it is, from getpwuid */
 
-/* ---- frame io ---- */
+static int
+bit(n)
+    int n;
+{
+    int b;
+
+    b = 1;
+    while (n-- > 0)
+        b <<= 1;
+    return (b);
+}
+
+onalarm()
+{
+    signal(SIGALRM, onalarm);   /* V7 semantics: re-arm the handler */
+}
 
 /*
- * One command: the typed fields are laid into the command block and the
- * driver answers with the card's reply.  That reply is held for net_rx,
- * so a caller that sends and then waits sees the ACK in order.
+ * One readable chunk.  select is the wait; the alarm makes it return
+ * when the card has no interrupt line, and EAGAIN means the wakeup was
+ * another socket's event, not end of file.
  */
-static void
-net_tx(type, sk, p, len)
-    int type, sk, len;
-    char *p;
-{
-    struct cdb r;
-    int cap;
-
-    memset((char *) &r, 0, sizeof r);
-    r.cmd[0] = type;
-    r.cmd[1] = sk;
-    r.len = 4;
-    r.hole = -1;
-    cap = 1;
-    switch (type) {
-    case N_OPEN:
-        r.cmd[2] = p[0];
-        break;
-    case N_CONNECT:
-        memcpy((char *) &r.cmd[2], p, 6);
-        break;
-    case N_SEND:
-        r.count = len;
-        r.flags = 0;
-        r.buf = p;
-        cap = 0;
-        break;
-    }
-    if (cap) {
-        r.count = cap;
-        r.flags = CDB_IN;
-        r.buf = stash;
-    }
-    if (ioctl(fd, CDBCMD, &r) < 0) {
-        stype = -1;
-        slen = 0;
-        shave = 1;
-        return;
-    }
-    stype = r.cmd[0] & 0xff;
-    ssock = r.cmd[1] & 0xff;
-    slen = r.count;
-    shave = 1;
-}
-
-/* read one pushed frame into buf; return its payload length, or -1 */
 static int
-net_rx(typep, sockp, buf, max)
-    int *typep, *sockp, max;
+net_read(buf, max)
     char *buf;
+    int max;
 {
-    struct cdb r;
-    int n;
-
-    if (shave) {
-        shave = 0;
-        if (stype < 0)
-            return -1;
-        *typep = stype;
-        *sockp = ssock;
-        n = slen < max ? slen : max;
-        if (n)
-            memcpy(buf, stash, n);
-        return n;
-    }
-    memset((char *) &r, 0, sizeof r);
-    r.cmd[0] = NET_OP_RECV;
-    r.cmd[1] = 0xff;
-    r.len = 4;
-    r.count = max;
-    r.flags = max ? CDB_IN : 0;
-    r.buf = buf;
-    r.hole = -1;
-    if (ioctl(fd, CDBCMD, &r) < 0)
-        return -1;
-    *typep = r.cmd[0] & 0xff;
-    *sockp = r.cmd[1] & 0xff;
-    return r.count;
-}
-
-/* read frames until one of `want` on `sk`; return its payload length */
-static int
-net_wait(want, sk, buf, max)
-    int want, sk, max;
-    char *buf;
-{
-    int n;
+    int r, n;
 
     for (;;) {
-        n = net_rx(&rtype, &rsock, buf, max);
-        if (n < 0)
-            return -1;
-        if (rtype == want && rsock == sk)
-            return n;
-        if (rtype == N_EVENT && rsock == sk)
-            stream_closed = 1;  /* remember it; rx_byte will see it */
+        alarm(1);
+        r = select(bit(fd));
+        if (r < 0) {
+            if (errno == EINTR) {
+                alarm(0);
+                continue;
+            }
+            alarm(0);
+            return (-1);
+        }
+        if (r & bit(fd)) {
+            n = read(fd, buf, max);
+            alarm(0);
+            if (n < 0 && errno == EAGAIN)
+                continue;
+            return (n);
+        }
     }
 }
 
-static void
-net_join()
-{
-    net_tx(N_JOIN, 0xff, (char *)0, 0);
-    net_wait(N_ACK, 0xff, (char *)0, 0);
-}
-
-/* open tcp socket sk, connect it, wait for it to establish */
+/* all of it; the card's transmit buffer fills and drains under us */
 static int
-net_connect(sk, ip, prt)
-    int sk, prt;
-    int *ip;
-{
-    char c[6];
-    char mode = 1;              /* tcp */
-
-    net_tx(N_OPEN, sk, &mode, 1);
-    if (net_wait(N_ACK, sk, (char *)0, 0) < 0)
-        return -1;
-
-    c[0] = ip[0];
-    c[1] = ip[1];
-    c[2] = ip[2];
-    c[3] = ip[3];
-    c[4] = (prt >> 8) & 0xff;
-    c[5] = prt & 0xff;
-    net_tx(N_CONNECT, sk, c, 6);
-    if (net_wait(N_ACK, sk, (char *)0, 0) < 0)
-        return -1;
-    if (net_wait(N_EVENT, sk, rbuf, 1) < 0)
-        return -1;
-    return (rbuf[0] == N_EV_CONNECTED) ? 0 : -1;
-}
-
-static void
-net_close(sk)
-    int sk;
-{
-    net_tx(N_CLOSE, sk, (char *)0, 0);
-    net_wait(N_ACK, sk, (char *)0, 0);
-}
-
-/* send a chunk to the remote and wait for the card's ack */
-static void
 send_bytes(buf, len)
     char *buf;
     int len;
 {
-    net_tx(N_SEND, sock, buf, len);
-    net_wait(N_ACK, sock, (char *)0, 0);
+    int n, sent;
+
+    sent = 0;
+    while (sent < len) {
+        n = write(fd, buf + sent, len - sent);
+        if (n > 0) {
+            sent += n;
+            continue;
+        }
+        if (n < 0 && errno == EAGAIN) {
+            sleep(1);
+            continue;
+        }
+        return (-1);
+    }
+    return (0);
 }
 
 /* the rcp byte stream reader: serves the remote's bytes one at a time */
 static char rxacc[N_MAXPAY];
 static int rxoff, rxlen;
 
+/* a local scratch for the file protocol's one-byte acks and data */
+static char rbuf[N_MAXPAY];
+
 static int
 rx_byte()
 {
-    int n;
-
     for (;;) {
-        if (stream_closed)
-            return -1;      /* the remote closed: end of stream */
         if (rxoff < rxlen)
             return rxacc[rxoff++] & 0xff;
         rxoff = 0;
-        n = net_rx(&rtype, &rsock, rxacc, N_MAXPAY);
-        if (n < 0)
+        rxlen = net_read(rxacc, N_MAXPAY);
+        if (rxlen <= 0)
             return -1;
-        if (rtype == N_EVENT && rsock == sock)
-            return -1;      /* the remote closed or reset: end of stream */
-        rxlen = (rtype == N_DATA && rsock == sock) ? n : 0;
     }
 }
 
@@ -340,10 +249,10 @@ make_request(buf, command)
 
     buf[n++] = '0';             /* no stderr back-channel */
     buf[n++] = '\0';
-    for (u = RSH_USER; *u; u++) /* local user */
+    for (u = rsh_user; *u; u++) /* local user */
         buf[n++] = *u;
     buf[n++] = '\0';
-    for (u = RSH_USER; *u; u++) /* remote user */
+    for (u = rsh_user; *u; u++) /* remote user */
         buf[n++] = *u;
     buf[n++] = '\0';
     for (i = 0; command[i]; i++)
@@ -529,16 +438,41 @@ main(argc, argv)
             isdir = 1;
     }
 
+    {
+        struct passwd *pw = getpwuid(getuid());
+
+        if (pw && pw->name[0])
+            strncpy(rsh_user, pw->name, sizeof rsh_user - 1);
+        else
+            strcpy(rsh_user, "root");
+        rsh_user[sizeof rsh_user - 1] = 0;
+    }
+
     fd = open(DEV, 2);
     if (fd < 0) {
         fprintf(stderr, "rcp: no %s\n", DEV);
         exit(1);
     }
-    sock = 0;
-    net_join();
-    if (net_connect(sock, ip, port) < 0) {
-        fprintf(stderr, "rcp: connect to %s failed\n", host);
-        exit(1);
+    signal(SIGALRM, onalarm);
+    {
+        struct netcard c;
+
+        c.op = N_JOIN;
+        c.len = 0;
+        (void) ioctl(fd, NETCARD, &c);
+    }
+    {
+        unsigned char a[6];
+        int i;
+
+        for (i = 0; i < 4; i++)
+            a[i] = ip[i];
+        a[4] = (port >> 8) & 0xff;
+        a[5] = port & 0xff;
+        if (ioctl(fd, NETCONNECT, a) < 0) {
+            fprintf(stderr, "rcp: connect to %s failed\n", host);
+            exit(1);
+        }
     }
 
     /* the rsh request: the command is rcp -t (send) or rcp -f (fetch) */
@@ -584,7 +518,6 @@ main(argc, argv)
             put_one(args[j]);
     }
 
-    net_close(sock);
     close(fd);
     exit(0);
 }

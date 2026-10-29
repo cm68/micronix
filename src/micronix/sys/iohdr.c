@@ -18,8 +18,8 @@
 
 extern struct ciovec memcvec;
 
-struct ovlhdr iohdr = { 11, 0, 0, 0, 0, &memcvec, 0, 0,
-	{ 'i', 'o' } };
+struct ovlhdr iohdr = { 0, 0, 0, 0, 0, &memcvec, 0, 0,
+	{ 'i', 'o' }, 0, 3 };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -248,18 +248,12 @@ ss1_vi_change(unsigned char new)
 
     trace(trace_ss1, "ss1: vi_changed lines:%x new:%x diff:%x\n",
         vi_lines, new, mask);
-    if (mask == 0)
-        return;
     vi_lines = new;
 
-    for (i = 0; i < 7; i++) {
-        byte bit = 1 << i;
-
-        if (mask & bit)
-            pic_request(&ss1_pic[0], i, (new & bit) != 0);
-    }
-    if (mask & 0x80)
-        pic_request(&ss1_pic[1], SS1_IR_VI7, (new & 0x80) != 0);
+    /* level-triggered, so all of them, not only the changed bits */
+    for (i = 0; i < 7; i++)
+        pic_request(&ss1_pic[0], i, (new & (1 << i)) != 0);
+    pic_request(&ss1_pic[1], SS1_IR_VI7, (new & 0x80) != 0);
 
     ss1_set_int_line();
 }

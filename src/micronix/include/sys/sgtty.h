@@ -29,6 +29,17 @@ struct sgtty {
 #define B19200	14
 
 /*
+ * The two terminal requests.  A terminal is talked to through ioctl(2)
+ * (include/sys/ioctl.h) like everything else; these are the request
+ * codes stty(3) and gtty(3) send.
+ */
+#define TIOCGETA 0x7401         /* get the six-byte status */
+#define TIOCSETA 0x7402         /* set it */
+
+extern int ioctl();
+extern int stty(), gtty();      /* the library wrappers, lib/libc */
+
+/*
  * tty mode bits - note that micronix does not use most of this, and in
  * fact, appropriates some bits to do strange things like 'more'
  * see the 'Mode bits' section of tty.h

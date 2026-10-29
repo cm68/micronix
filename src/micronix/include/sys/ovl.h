@@ -152,7 +152,7 @@
 #define PROBE_TICKLE 1
 
 struct ovlhdr {
-    UINT major;                 /* the major this module serves */
+    UINT major;                 /* block major, 0 for none */
     int (*init) ();             /* init(seg), once, before it is reachable */
     int (*tick) ();             /* tick(), once a second, 0 for none */
     char *data;                 /* the driver's data, in its own segment */
@@ -162,6 +162,7 @@ struct ovlhdr {
     int (*intr) ();             /* the interrupt handler, 0 for none */
     char name[12];              /* what devname reports for the major */
     UINT8 ndrv;                 /* how many drives, enumerated at signon */
+    UINT8 cmajor;               /* char major, 0 for none */
 };
 
 /*
@@ -175,14 +176,18 @@ struct ovlhdr {
 #define devname ((char *)(OVLBASE + 0x10))
 
 /*
- * The resident half, in sys/ovl.c.  None of it is in the u page
- * (sys/consts.c): these tables are written when a module initializes and
- * are one table for the whole system, where the u page is per-process
- * and cloned by fork.
+ * The resident half, in sys/ovl.c.  These tables and maps are written
+ * when a module initializes and are one set for the whole system, where
+ * the u page is per-process and cloned by fork.  The block trampolines
+ * themselves are the exception and ride the u page (sys/ovlb.c); the
+ * char trampolines are here with the tables they index.
  */
-extern struct ovlhdr *ovlmap(); /* ovlmap(major): map that module, return its header */
+extern struct ovlhdr *ovlbmap(); /* ovlbmap(major): map that block module */
+extern struct ovlhdr *ovlcmap(); /* ovlcmap(major): map that char module */
+extern struct biovec ovlbvec[]; /* entries the block modules registered */
 extern int ovlremap();          /* ovlremap(): put this process's driver back */
-extern char *ovldata();         /* ovldata(major): the driver's data, or 0 */
+extern char *ovldata();         /* ovldata(major): the driver's data, or 0;
+                                 * block first, then char */
 extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
 extern int ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
 extern int ovlattach();         /* ovlattach(seg): place a module, run its init */

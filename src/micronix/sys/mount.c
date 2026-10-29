@@ -209,7 +209,7 @@ umount(ioname)
     sb->flags &= ~BLOCK;
     brelse(sb);
     irelse(io);                 /* avoid deadlock */
-    iclose(io, !m->ronly);
+    iclose(io, !m->ronly, io->i_addr[0]);
     ip = m->inode;
     ip->mount = 0;
     ip->count--;

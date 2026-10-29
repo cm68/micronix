@@ -21,7 +21,9 @@ static int nic_vi_line = -1;    /* the VI line, from the -w wiring; -1 = not wir
 static void
 nic_intr()
 {
-    set_vi(nic_vi_line, 0, (nic_status() & NETSTAT_RXRDY) ? 1 : 0);
+    int r = (nic_status() & NETSTAT_RXRDY) ? 1 : 0;
+
+    set_vi(nic_vi_line, 0, r);
 }
 
 static byte
@@ -37,6 +39,7 @@ static void
 net_data_out(portaddr p, byte v)
 {
     nic_data_out(v);
+    nic_intr();                /* a completed command may have queued a reply */
 }
 
 static byte

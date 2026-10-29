@@ -83,7 +83,7 @@
  * bytes say.  So the heir goes through ovlcall (sys/ovl.c), and each
  * pointer is stored with the segment that was mapped when it was
  * registered - which is its own, since a module registers from inside
- * itself (ovlmap maps the major before the kernel calls into it).
+ * itself (ovlbmap maps the major before the kernel calls into it).
  */
 #include <types.h>
 #include <sys/sys.h>

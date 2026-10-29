@@ -114,7 +114,6 @@ dup()
         return;
     u.olist[fd] = fp;
     fp->count++;
-    u.hl = fd;
 }
 
 /*
@@ -227,27 +226,6 @@ nice()
     if (nice < 0 && !super())
         return;
     u.p->nice = 128 - nice;
-}
-
-/*
- * Make up for the Decision's lack of console switches
- */
-unsigned switches = 0;
-
-/*
- * Set the switches
- */
-ssw()
-{
-    switches = u.hl;
-}
-
-/*
- * Read the switches
- */
-csw()
-{
-    return (switches);
 }
 
 /*

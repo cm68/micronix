@@ -25,8 +25,8 @@ DESCRIPTION
 .in +5
 .br
 netconf sends the card-level GETCONF and SETCONF operations of the
-network card (sys/NET.md) over /dev/net, the network face of the ND
-module.  With no arguments it prints the stored ssid and password.  With
+network card (sys/NET.md) over /dev/net0, the card's socket clone.
+With no arguments it prints the stored ssid and password.  With
 an ssid it stores that pair on the card; the password is optional, and
 its absence means an open network.  The card writes the pair to its
 non-volatile memory and reconnects at once, so a following JOIN gets

@@ -60,8 +60,8 @@ struct syscall syscalls[] = {
 /* 35  */	{1, "sleep", SF_FD },
 /* 36 */	{1, "sync", 0 },
 /* 37  */	{3, "kill", SF_FD|SF_ARG1 },
-/* 38  */	{1, "csw", 0 },
-/* 39  */	{1, "ssw", 0 },
+/* 38  */	{1, "bad", 0 },
+/* 39  */	{1, "bad", 0 },
 /* 40 */	{1, "bad", 0 },	
 /* 41 */	{1, "dup", SF_FD },
 /* 42 */	{1, "pipe", 0 },
@@ -80,6 +80,7 @@ struct syscall syscalls[] = {
 /* 55 */	{3, "reboot", SF_ARG1 },
 /* 56 */	{7, "execve", SF_NAME|SF_ARG2|SF_ARG3 },
 /* 57 */	{3, "jobctl", SF_FD|SF_ARG1 },
+/* 58 */	{1, "select", 0 },
 			{0, 0, 0}
 };
 

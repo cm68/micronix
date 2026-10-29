@@ -1,0 +1,188 @@
+.he "ioctl (2)                    10/28/26                     ioctl (2)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ioctl
+- control a device
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+ioctl(fd, cmd, arg)
+.br
+.bd
+int fd, cmd;
+.br
+.bd
+char *arg;
+.sp 2
+.in -5
+.bd
+FUNCTION
+.in +5
+.br
+.bd
+Ioctl
+runs the request
+.bd
+cmd
+against the driver of the device named by
+.bd
+fd.
+A device is a block device or a character device, and the request
+means a different thing on each.
+.sp
+On a block device
+.bd
+arg
+is a
+.bd
+struct cdb
+and the only request is
+.bd
+CDBCMD,
+which hands the command block it describes to the driver
+and lets it run.
+The block is the bus's own - a SCSI command descriptor
+block, the seven task-file registers of an ATA command,
+or the HD-DMA board's block - and the kernel never looks
+inside it.  A driver with no command block answers ENOTTY.
+
+.bd
+arg
+points at a
+.bd
+struct cdb
+(see <sys/ioctl.h>), and the structure's
+.bd
+cmd
+holds up to sixteen bytes of command, while
+.bd
+len
+says how many of those bytes are the command.
+.bd
+count
+is the number of bytes in the data phase, or zero if
+there is none.
+.bd
+flags
+says which way the data goes: CDB_IN means the device
+fills the buffer, and without it the buffer is sent.
+CDB_ASYNC, for the network card only, says the caller
+will read the answer from the card's frame stream
+rather than have the call wait for it.
+.bd
+buf
+is the caller's buffer for the data, and
+.bd
+hole
+is where in
+.bd
+cmd
+the address of that buffer is to be written, for a bus
+whose command block carries one, or -1 for a bus that
+does not.
+
+A data phase of one disk block (512 bytes) or less is
+moved by the kernel, and the caller's buffer is filled
+from it or sent from it.  A larger one, up to CDBDATA
+(one page), is moved by the driver itself.  The command
+block is copied back to the caller when the driver
+returns, including anything the driver wrote into it,
+so a bus that answers a command inside its block leaves
+its answer there.
+.sp
+On a character device
+.bd
+cmd
+is one of the device's own request codes and
+.bd
+arg
+is whatever that request wants.  A terminal has two:
+.bd
+TIOCGETA
+writes the six-byte
+.bd
+struct sgtty
+(see <sys/sgtty.h>) that
+.bd
+arg
+points at, and
+.bd
+TIOCSETA
+sets the terminal from it.  They are the requests behind
+.bd
+gtty
+(3) and
+.bd
+stty
+(3); those are the calls to make, and this is the call
+under them.  Both were system calls once, and a binary
+built before the library moved them here still reaches
+the same two requests through the old numbers
+(gtty = 32, stty = 31).  Any other character device has
+its own requests - the network card's are the NET*
+requests of <sys/net.h> - and a request its driver does
+not have answers ENOTTY.
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 if the request ran, or -1 if it did not.
+.sp 2
+.in -5
+.bd
+ERRORS
+.in +5
+.br
+.bd
+EINVAL
+if cmd is not CDBCMD, or len is not between 1 and
+CDBMAX, or count is negative or greater than CDBDATA.
+.br
+.bd
+EBADF
+if fd is not an open file.
+.br
+.bd
+ENOTTY
+if fd is not a block or character device, or the device
+does not have the request: a block driver with no command
+block to run, or a character driver with no such request.
+.br
+.bd
+EIO
+if the command failed and the driver gave no other
+reason.
+.sp 2
+.in -5
+.bd
+ASSEMBLER
+.in +5
+.br
+.bd
+(ioctl = 54)
+.br
+.bd
+(fd in hl, cmd and arg on the stack)
+.br
+.bd
+sys; ioctl; cmd; arg
+.sp 2
+.in -5
+.bd
+RETURNS
+.in +5
+.br
+0 is returned on success.  The carry flag is set on
+failure, and the error number is then in hl.

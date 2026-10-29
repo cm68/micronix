@@ -33,9 +33,25 @@ over a hundred buffers against 1.61's fifteen; the task maps are
 per-process and a switch no longer copies one, and each process has its
 own u page and stack; exec builds its arguments straight into the new
 image, and execve adds an environment; and the system call table has
-grown dup2, ftruncate, ioctl, reboot and execve.
+grown dup2, ftruncate, ioctl, reboot, execve and select.
 src/micronix/sys/FEATURES-2.md is the full account, with the counts
 taken from the two kernels.
+
+three additions since the release notes are worth calling out.  rshd is
+the big one: the machine can now be logged into from the network and
+not only copied from - an rsh from another machine reaches a shell on a
+pty, authenticated by /etc/hosts.equiv and ~/.rhosts, so micronix is no
+longer only a client.  ioctl now reaches character devices as well as
+block ones: a terminal's status is the two requests TIOCGETA and
+TIOCSETA, so gtty and stty are at last only library wrappers over them,
+and the network card's socket face is its own NET* requests.  select is
+there too - crippled but functional: it waits on a mask of up to
+sixteen descriptors and returns the ones that can be read, with no
+timeout and no write set, and sees only ttys and the network sockets; a
+deadline is an alarm(2), which returns it with EINTR.  with these,
+micronix is close to seventh edition.  the difference that stands out
+is the inode, which keeps two timestamps, access and modify, where V7
+keeps a third, change time.
 
 micronix 2.0 - release notes, 21 oct 2026
 
@@ -61,9 +77,10 @@ higher performance on the same hardware:
 	many others.
 
 	a network interface has been added supporting an ESP32 connection.
-	the ESP32 runs tcp/ip and wifi; rcp copies files over rsh, and nd is
-	a network disk on the same card - a block device that can serve a
-	volume with no local controller.
+	the ESP32 runs tcp/ip and wifi; rcp copies files over rsh, rshd
+	serves rsh into the box, and nd is a network disk on the same
+	card - a block device that can serve a volume with no local
+	controller.
 
 	the console is chosen at boot: the morrow multio ACE or the compupro
 	SS1's 2651.  wunderbus ACEs and the serial lines give additional

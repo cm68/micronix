@@ -81,10 +81,13 @@ set_vi(int line, int card, int value)
     new &= (0xff ^ (1 << line));
     new |= value << line;
 
-    // only have work to do if a change
-    if (vi_lines != new) {
-        (*vi_change)(new);     // the handler actually changes the line
-    }
+    /*
+     * Always tell the handler, change or not.  The lines are
+     * level-triggered, and a card may hold one high across an
+     * acknowledge: the 8259's IRR has to be re-latched from the level
+     * when that happens, which a change-only callback cannot see.
+     */
+    (*vi_change)(new);
 }
 
 /*

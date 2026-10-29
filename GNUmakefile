@@ -8,7 +8,7 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim d1 filesystem toolchain
+all: sim d1 filesystem toolchain man
 	cd src ; make
 
 #
@@ -42,12 +42,47 @@ bin/d1: src/hwsim/d1/d1
 	mkdir -p bin
 	ln -sf ../src/hwsim/d1/d1 bin/d1
 
-src/usersim/sim src/tools/readall:
+#
+# The simulator and image tools have to be told what they are built
+# from, or a rule with no prerequisites is "up to date" forever: the
+# binaries sat unchanged while the NIC's card model was rewritten under
+# them, and the simulator went on speaking the old protocol.  Naming the
+# sources is what makes an edit here reach the binary the tests run.
+#
+SIMSRCS = $(wildcard src/hwsim/*.c src/hwsim/*.h src/hwsim/d1/*.c \
+	src/hwsim/d1/*.h src/hwsim/lib/*.c src/hwsim/lib/*.h src/lib/*.c \
+	src/lib/*.h)
+USERSIMSRCS = $(wildcard src/usersim/*.c src/usersim/*.h src/lib/*.c \
+	src/lib/*.h)
+TOOLSRCS = $(wildcard src/tools/*.c src/tools/*.h)
+
+src/usersim/sim: $(USERSIMSRCS)
 	cd src ; make
 
-src/hwsim/d1/d1:
+src/tools/readall: $(TOOLSRCS)
+	cd src ; make
+
+src/hwsim/d1/d1: $(SIMSRCS)
 	cd src ; make
 	cd src/hwsim/d1 ; make
+	cd src/hwsim/d1 ; make NODEBUG=1
+
+#
+# The host manual tree, man/.  Every page in the tree is mirrored there
+# by install-man-host, and the two mx tools that read it - mxman and
+# mxform - are built into bin/ beside the other mx binaries.  This is
+# the host side of what "make install" does for the system below: the
+# same MANSRCS, put where mxman can read them without booting anything.
+#
+# MXROOT is the checkout by default, so this needs no privilege.  A
+# copy under /usr/local is a separate, deliberate run of the same
+# target with MXROOT set; see GNUmakefile.inc.
+#
+.PHONY: man
+man:
+	$(MAKE) -C src/micronix/cmd/man host
+	$(MAKE) -C src/micronix/cmd/form host
+	$(MAKE) -C src/micronix install-man-host
 
 test: filesystem  src/usersim/sim
 	src/usersim/sim
@@ -128,7 +163,7 @@ clobber:
 	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clobber) \
 	done
-	rm -rf filesystem bin libexec ccc lib usr sim
+	rm -rf filesystem bin libexec ccc lib usr sim man
 
 rebuildfs:
 	rm -rf filesystem

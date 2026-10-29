@@ -28,10 +28,13 @@
  * is still open hangs the slave up: reads on both ends return end of
  * file and the processes on the slave are sent SIGHUP.
  *
- * The helpers that hold no storage - the pair decode, the back-end
- * calls, init and hangup - are in sys/pty_leaf.c, in the u page, where
- * there is room; the state below is resident because it is one object
- * shared by every process.
+ * The stateless helpers - the pair decode and the four back-end calls -
+ * are in sys/pty_leaf.c, linked into the driver's own page (pty.mod)
+ * where the line discipline that calls them lives.  The pair's init is
+ * here; its hangup walk is resident (sys/ttyres.c) with killfg() and
+ * ttynotify(), because it walks the process table and it is not on any
+ * hot path.  The state is resident because it is one object shared by
+ * every process.
  */
 #include <types.h>
 #include <sys/sys.h>
@@ -43,9 +46,11 @@
 #include <errno.h>
 
 extern int ttyread(), ttywrite(), ttymode(), ttyopen(), ttyclose();
-extern int cstart(), drainques(), qinit(), sendque();
+extern int cstart(), ustart(), drainques(), qinit(), sendque();
 extern int pty_start(), pty_stop(), pty_put();
-extern int ptymode();
+extern int ptyioctl();
+extern int ptyhang();            /* the process-table walk, resident */
+extern int selectchan;          /* select(2): a reader may be watching */
 
 /*
  * Put one end of a pair in the state a fresh terminal has.  The two
@@ -99,12 +104,15 @@ ptyopen(dev, mode)
 {
     register int i;
     register struct ptyinfo *p;
+    register struct tty *s, *m;
 
     if ((i = ptyidx(dev)) < 0) {
         u.error = ENXIO;
         return;
     }
     p = &ptyinfo[i];
+    s = SLAVE(i);
+    m = MASTER(i);
 
     if (!ISMASTER(dev)) {
         if (!p->mopen) {
@@ -114,25 +122,37 @@ ptyopen(dev, mode)
         if (!p->sopen)
             ptyinit(i);
         p->sopen++;
-        ttyopen(SLAVE(i));
+        ttyopen(s);
+        /*
+         * A process that opens a slave means it as its terminal.  The
+         * daemon that forked it already had the console as its
+         * controlling tty, and ttyopen() only claims one for a process
+         * that has none - so the claim is made here, over whatever was
+         * there.  That is what gives the shell on an rshd's pty its
+         * job control and its hangup; there is no setsid(2) to do it
+         * the BSD way.
+         */
+        u.p->tty = s;
         return;
     }
 
-    if (!p->mopen) {
-        if (p->sopen) {
-            /*
-             * A new master over slave descriptors that are still
-             * open: the hangup is over, but the slave's open count
-             * stays what it was.
-             */
-            p->hung = 0;
-            SLAVE(i)->mstate &= ~TTYHUP;
-            MASTER(i)->mstate &= ~TTYHUP;
-            drainques(SLAVE(i));
-            drainques(MASTER(i));
-        } else
-            ptyinit(i);
-    }
+    /*
+     * The pair a session gets is the daemon's to allocate (rshd picks a
+     * free one before it forks); the driver has no open count to refuse
+     * with, and two masters on one pair would split a shell's bytes.
+     */
+    if (p->sopen) {
+        /*
+         * A new master over slave descriptors that are still open: the
+         * hangup is over, but the slave's open count stays what it was.
+         */
+        p->hung = 0;
+        s->mstate &= ~TTYHUP;
+        m->mstate &= ~TTYHUP;
+        drainques(s);
+        drainques(m);
+    } else
+        ptyinit(i);
     p->mopen++;
 }
 
@@ -141,6 +161,7 @@ ptyclose(dev, mode)
 {
     register int i;
     register struct ptyinfo *p;
+    register struct tty *s, *m;
 
     if ((i = ptyidx(dev)) < 0)
         return;
@@ -158,46 +179,26 @@ ptyclose(dev, mode)
         return;
     }
 
-    if (p->sopen)
-        p->sopen--;
-    ttyclose(SLAVE(i));
-    if (!p->sopen && !p->mopen)
-        ptyinit(i);
-}
-
-/*
- * Hang the slave up.  The open descriptors stay open but stop working:
- * reads on either end return end of file and writes fail, and the
- * processes that were using the slave are told (SIGHUP) rather than
- * killed, so a shell can notice and exit on its own.  This is resident
- * rather than in the leaf half because it walks the process table and
- * drains both ends; there is no room for all of that in the u page.
- */
-int
-ptyhang(i)
-    int i;
-{
-    register struct tty *s, *m;
-    register struct proc *pr;
-
     s = SLAVE(i);
     m = MASTER(i);
-    ptyinfo[i].hung = 1;
-
-    s->mstate |= TTYHUP;
-    m->mstate |= TTYHUP;
-
-    for (pr = plist; pr < plist + NPROC; pr++)
-        if (pr->tty == s && (pr->mode & ALIVE))
-            send(pr, SIGHUP);
-
-    drainques(s);
-    drainques(m);
-
-    wakeup(&s->rawque);
-    wakeup(&m->rawque);
-    wakeup(&s->outque);
-    wakeup(&m->outque);
+    if (p->sopen)
+        p->sopen--;
+    ttyclose(s);
+    if (!p->sopen && !p->mopen)
+        ptyinit(i);
+    else if (!p->sopen) {
+        /*
+         * The last slave is gone while a master still holds the pair:
+         * the master's read is now end of file.  Say so on both ends
+         * and wake a selector; without this a session whose shell
+         * exited would sit in select forever - the master has nothing
+         * to read and no hangup bit to report.
+         */
+        s->mstate |= TTYHUP;
+        m->mstate |= TTYHUP;
+        wakeup(&m->rawque);         /* a master read sleeping for output */
+        wakeup(&selectchan);
+    }
 }
 
 /*
@@ -210,32 +211,50 @@ ptyread(dev)
     int dev;
 {
     register int i;
+    register UINT want;
     register struct ptyinfo *p;
-    register struct tty *m;
+    register struct tty *s, *m;
 
     if ((i = ptyidx(dev)) < 0) {
         u.error = ENXIO;
         return;
     }
     p = &ptyinfo[i];
+    s = SLAVE(i);
+    m = MASTER(i);
 
     if (!ISMASTER(dev)) {
-        ttyread(SLAVE(i));
-        cstart(MASTER(i));
+        ttyread(s);
+        cstart(m);
         return;
     }
 
-    if (!p->sopen || p->hung)
-        return;			/* end of file */
-    m = MASTER(i);
-    while (u.count && m->rawque.count == 0) {
-        if (p->hung)
-            break;
-        sleep(&m->rawque, PRITTI);
+    /*
+     * The slave's output sits in its own outque until its start routine
+     * moves it to the master's raw queue, and a shell that writes and
+     * exits leaves it there.  Move it, take it, and only then decide
+     * end of file: checking the hangup first stranded the last output
+     * of every quick command.  ustart, not cstart, because the peer
+     * queue having been full is exactly the stopped state a read is
+     * here to clear.
+     */
+    want = u.count;
+    for (;;) {
+        ustart(s);
+        if (u.count && m->rawque.count)
+            sendque(&m->rawque);
+        if (u.count == 0 || u.count != want)
+            break;                  /* full, or something to return */
+        if (!p->sopen || p->hung) {
+            if (m->rawque.count == 0 && s->outque.count == 0 &&
+                s->nextc == 0)
+                return;         /* end of file, and nothing left */
+            continue;
+        }
+        if (m->rawque.count == 0 && s->outque.count == 0 && s->nextc == 0)
+            sleep(&m->rawque, PRITTI);
     }
-    if (u.count && m->rawque.count)
-        sendque(&m->rawque);
-    cstart(SLAVE(i));
+    ustart(s);
 }
 
 /*
@@ -247,18 +266,21 @@ ptywrite(dev)
 {
     register int i;
     register struct ptyinfo *p;
+    register struct tty *s, *m;
 
     if ((i = ptyidx(dev)) < 0) {
         u.error = ENXIO;
         return;
     }
     p = &ptyinfo[i];
+    s = SLAVE(i);
+    m = MASTER(i);
 
     if (!ISMASTER(dev)) {
-        if (SLAVE(i)->mstate & TTYHUP)
+        if (s->mstate & TTYHUP)
             u.error = EIO;
         else
-            ttywrite(SLAVE(i));
+            ttywrite(s);
         return;
     }
 
@@ -266,7 +288,7 @@ ptywrite(dev)
         u.error = EIO;
         return;
     }
-    ttywrite(MASTER(i));
+    ttywrite(m);
 }
 
 /*
@@ -275,7 +297,7 @@ ptywrite(dev)
  * is why sys/consts.c carries a row of ovl trampolines there.
  */
 struct ciovec ptycvec = {
-    &ptyopen, &ptyclose, &ptyread, &ptywrite, &ptymode
+    &ptyopen, &ptyclose, &ptyread, &ptywrite, &ptyioctl
 };
 
 /*

@@ -412,7 +412,7 @@ bioctl(fd, cmd, arg)
         u.error = ENOTTY;
         return (-1);
     }
-    dev = ip->i_addr[0];
+    dev = fp->f_dev;
     maj = bmajor(dev);
     if (biosw[maj].ioctl == 0) {
         u.error = ENOTTY;

@@ -129,6 +129,7 @@ all:
 	cd mwformat ; make all
 	cd ncheck ; make all
 	cd netconf ; make all
+	cd netstat ; make all
 	cd newuser ; make all
 	cd nm ; make all
 	cd od ; make all
@@ -270,6 +271,7 @@ install:
 	cd mwformat ; make install
 	cd ncheck ; make install
 	cd netconf ; make install
+	cd netstat ; make install
 	cd newuser ; make install
 	cd nm ; make install
 	cd od ; make install
@@ -412,6 +414,7 @@ clean:
 	cd mwformat ; make clean
 	cd ncheck ; make clean
 	cd netconf ; make clean
+	cd netstat ; make clean
 	cd newuser ; make clean
 	cd nm ; make clean
 	cd od ; make clean
@@ -554,6 +557,7 @@ clobber:
 	cd mwformat ; make clobber
 	cd ncheck ; make clobber
 	cd netconf ; make clobber
+	cd netstat ; make clobber
 	cd newuser ; make clobber
 	cd nm ; make clobber
 	cd od ; make clobber
@@ -698,6 +702,7 @@ verify:
 	cd mwformat ; make verify
 	cd ncheck ; make verify
 	cd netconf ; make verify
+	cd netstat ; make verify
 	cd newuser ; make verify
 	cd nm ; make verify
 	cd od ; make verify

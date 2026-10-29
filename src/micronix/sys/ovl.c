@@ -19,20 +19,36 @@
 #include <sys/ioctl.h>
 #include <sys/ovl.h>
 #include <sys/proc.h>
-#include <errno.h>
 
 extern UINT nbdev, ncdev;
 extern UINT8 map0[];
 extern unsigned bmajor(), cmajor();
-extern int nodev(), iodone();
+extern int nodev(), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
 
-static UINT ovlseg[OVLMAJ];		/* each major's module segment, 0 = none */
-static struct ovlhdr *ovlloc[OVLMAJ];	/* a resident driver's header, in the kernel */
-static struct biovec ovlbvec[OVLMAJ];	/* entries its init() registered */
+/*
+ * The two namespaces, each with its own major-to-segment map.  There is
+ * no single "major -> segment" table: char 2 and block 2 are unrelated
+ * rows in unrelated tables, and each module page is registered only in
+ * the space its header names.
+ */
+UINT bdevseg[NBDEV];			/* block major -> segment, 0 = none */
+UINT cdevseg[NCDEV];			/* char major -> segment, 0 = none */
+struct biovec ovlbvec[OVLMAJ];	/* entries its init() registered */
 static struct ciovec ovlcvec[OVLMAJ];
-static int (*ovltickc[OVLMAJ]) ();	/* each major's tick, 0 = none */
+
+/*
+ * Drivers that want a tick, in the order they were placed.  The entry
+ * carries its own segment, so the tick, like the interrupt line table,
+ * is per module and does not consult a major.
+ */
+#define	NTICK	12
+static struct tickrec {
+    int (*fn) ();
+    UINT seg;
+} ovlticks[NTICK];
+static UINT novltick;
 static char ovltickarmed = 0;		/* the resident tick is running */
 
 /*
@@ -118,39 +134,58 @@ ovlcall1(fn, seg, arg)
     int arg;
 {
     UINT8 drv;
+    int r;
 
-    if (seg == 0) {
-        (*fn) (arg);
-        return (0);
-    }
+    if (seg == 0)
+        return ((*fn) (arg));
 
     drv = u.drv;
     u.drv = (UINT8) seg;
     map0[2 * OVLSEG] = (UINT8) seg;
-    (*fn) (arg);
+    r = (*fn) (arg);
     u.drv = drv;
     map0[2 * OVLSEG] = drv;
-    return (0);
+    return (r);
 }
 
 /*
- * Map a major's module and return the header it starts with, or 0 if the
- * major has no driver at all.  A driver that is still linked into the
- * kernel is that first case with nothing to map: its header is a
- * resident object and its segment is 0, so the header in the kernel is
- * what is returned and no map register is touched.  The map register is
- * written directly - it is write-only, and the current segment is u.drv.
+ * Map a segment into the driver window.  The map register is write-only;
+ * the current segment is u.drv.  Zero is resident code - nothing to map.
+ */
+static
+ovlmapseg(seg)
+    UINT seg;
+{
+    if (seg == 0)
+        return (0);
+    u.drv = (UINT8) seg;                /* before the register - ovlcall() */
+    map0[2 * OVLSEG] = (UINT8) seg;
+    return (1);
+}
+
+/*
+ * Map a block major's module and return the header it starts with, or 0
+ * if that block major has no module.  The char entry point is the same
+ * against the other namespace; nothing here ever looks at a char major
+ * for a block device, or the reverse.
  */
 struct ovlhdr *
-ovlmap(maj)
+ovlbmap(maj)
     UINT maj;
 {
-    if (maj >= OVLMAJ)
+    if (maj >= NBDEV || bdevseg[maj] == 0)
         return (0);
-    if (ovlseg[maj] == 0)
-        return (ovlloc[maj]);
-    u.drv = (UINT8) ovlseg[maj];        /* before the register - ovlcall() */
-    map0[2 * OVLSEG] = (UINT8) ovlseg[maj];
+    ovlmapseg(bdevseg[maj]);
+    return ((struct ovlhdr *) OVLBASE);
+}
+
+struct ovlhdr *
+ovlcmap(maj)
+    UINT maj;
+{
+    if (maj >= NCDEV || cdevseg[maj] == 0)
+        return (0);
+    ovlmapseg(cdevseg[maj]);
     return ((struct ovlhdr *) OVLBASE);
 }
 
@@ -168,17 +203,18 @@ ovlmap(maj)
  * direction (sys/bus.c).
  *
  * What makes it per-process is u.drv, the segment of the page the process
- * is running in, which ovlmap() and ovlcall() record as they map it, each
- * writing u.drv before the map register so that a switch taken between
- * the two writes puts this page back and not the one being left - so the
- * door into a module the trampolines do not cover, the bus lock's heir,
- * is recorded too.  newmap() calls this at every switch with the u
- * page already the incoming process's, so u.drv is that process's page
- * and it is written back as it stands: what was recorded is the value the
- * register wants, and there is no major to look up.  A process that is
+ * is running in, which ovlbmap(), ovlcmap() and ovlcall() record as they
+ * map it, each writing u.drv before the map register so that a switch
+ * taken between the two writes puts this page back and not the one being
+ * left - so the door into a module the trampolines do not cover, the bus
+ * lock's heir, is recorded too.  newmap() calls this at every switch with
+ * the u page already the incoming process's, so u.drv is that process's
+ * page and it is written back as it stands: what was recorded is the value
+ * the register wants, and there is no major to look up.  A process that is
  * not inside a driver has nothing to put back and is left alone - the
- * next ovlmap at a module entry is what sets the window, and leaving a
- * stale page mapped costs nothing because no resident code reads OVLBASE.
+ * next ovlbmap or ovlcmap at a module entry is what sets the window, and
+ * leaving a stale page mapped costs nothing because no resident code reads
+ * OVLBASE.
  */
 ovlremap()
 {
@@ -200,97 +236,9 @@ ovldata(maj)
 {
     struct ovlhdr *hdr;
 
-    hdr = ovlmap(maj);
+    if ((hdr = ovlbmap(maj)) == 0)
+        hdr = ovlcmap(maj);
     return (hdr ? hdr->data : (char *) 0);
-}
-
-/*
- * The block trampolines.  Each recovers its major from the device it was
- * handed, which every call site passes (bopen, bclose, strat and bioctl
- * in sys/uio.c), and that is why four of them serve every major rather
- * than four for each.  A major with no driver behind it answers the way
- * the table's nodev row does, so an unloaded disk is indistinguishable
- * from one that was never there - except that a request against it
- * completes with an error rather than hanging, which is what a major
- * that may be loaded later has to do.
- *
- * The entry in the table is what says whether a driver is there, not the
- * segment: a driver still linked into the kernel has entries and no
- * segment, and needs none mapped.  ovlmap does whatever mapping there is
- * to do and its answer is not a test.
- */
-int
-ovlopen(dev, mode)
-    UINT dev;
-    UINT8 mode;
-{
-    UINT8 maj;
-
-    maj = bmajor(dev);
-    ovlmap(maj);
-    if (ovlbvec[maj].open == 0) {
-        nodev();
-        return (0);
-    }
-    return ((*ovlbvec[maj].open) (dev, mode));
-}
-
-int
-ovlclose(dev, mode)
-    UINT dev;
-    UINT8 mode;
-{
-    UINT8 maj;
-
-    maj = bmajor(dev);
-    ovlmap(maj);
-    if (ovlbvec[maj].close == 0) {
-        nodev();
-        return (0);
-    }
-    return ((*ovlbvec[maj].close) (dev, mode));
-}
-
-int
-ovlstrat(b)
-    register struct buf *b;
-{
-    UINT8 maj;
-
-    maj = bmajor(b->dev);
-    ovlmap(maj);
-    if (ovlbvec[maj].strat == 0) {
-        b->flags |= BERROR;
-        b->error = ENXIO;
-        iodone(b);
-        return (0);
-    }
-    return ((*ovlbvec[maj].strat) (b));
-}
-
-/*
- * Run a command block against a module's device (sys/uio.c's bioctl, which
- * has already copied the request in and found the block it moves the data
- * through).  The answer is the driver's, except for a driver that
- * declared no command block at all: that is not a failure of the request
- * but of the request against this device, and ENOTTY says so the way the
- * character side's mode() has always said it.
- */
-int
-ovlioctl(dev, cmd, r, b)
-    UINT dev, cmd;
-    struct cdb *r;
-    struct buf *b;
-{
-    UINT8 maj;
-
-    maj = bmajor(dev);
-    ovlmap(maj);
-    if (ovlbvec[maj].ioctl == 0) {
-        u.error = ENOTTY;
-        return (-1);
-    }
-    return ((*ovlbvec[maj].ioctl) (dev, cmd, r, b));
 }
 
 /*
@@ -304,7 +252,7 @@ ovlcopen(dev, mode)
     UINT8 maj;
 
     maj = cmajor(dev);
-    ovlmap(maj);
+    ovlcmap(maj);
     if (ovlcvec[maj].open == 0) {
         nodev();
         return (0);
@@ -320,7 +268,7 @@ ovlcclose(dev, mode)
     UINT8 maj;
 
     maj = cmajor(dev);
-    ovlmap(maj);
+    ovlcmap(maj);
     if (ovlcvec[maj].close == 0) {
         nodev();
         return (0);
@@ -335,7 +283,7 @@ ovlcread(dev)
     UINT8 maj;
 
     maj = cmajor(dev);
-    ovlmap(maj);
+    ovlcmap(maj);
     if (ovlcvec[maj].read == 0) {
         nodev();
         return (0);
@@ -350,7 +298,7 @@ ovlcwrite(dev)
     UINT8 maj;
 
     maj = cmajor(dev);
-    ovlmap(maj);
+    ovlcmap(maj);
     if (ovlcvec[maj].write == 0) {
         nodev();
         return (0);
@@ -359,19 +307,20 @@ ovlcwrite(dev)
 }
 
 int
-ovlcmode(dev, flag)
+ovlcioctl(dev, cmd, arg)
     UINT dev;
-    UINT8 flag;
+    int cmd;
+    char *arg;
 {
     UINT8 maj;
 
     maj = cmajor(dev);
-    ovlmap(maj);
-    if (ovlcvec[maj].mode == 0) {
-        nodev();
-        return (0);
+    ovlcmap(maj);
+    if (ovlcvec[maj].ioctl == 0) {
+        noioctl();
+        return (-1);
     }
-    return ((*ovlcvec[maj].mode) (dev, flag));
+    return ((*ovlcvec[maj].ioctl) (dev, cmd, arg));
 }
 
 /*
@@ -401,13 +350,13 @@ bvecset(maj, open, close, strat, ioctl)
 }
 
 static
-cvecset(maj, open, close, read, write, mode)
+cvecset(maj, open, close, read, write, ioc)
     UINT maj;
     int (*open) ();
     int (*close) ();
     int (*read) ();
     int (*write) ();
-    int (*mode) ();
+    int (*ioc) ();
 {
     if (maj == 0 || maj >= ncdev || maj >= OVLMAJ)
         return (-1);
@@ -415,7 +364,7 @@ cvecset(maj, open, close, read, write, mode)
     ovlcvec[maj].close = close;
     ovlcvec[maj].read = read;
     ovlcvec[maj].write = write;
-    ovlcvec[maj].mode = mode;
+    ovlcvec[maj].ioctl = ioc;
     return (0);
 }
 
@@ -443,11 +392,10 @@ cvecset(maj, open, close, read, write, mode)
 static
 ovltick()
 {
-    register UINT8 maj;
+    register UINT i;
 
-    for (maj = 1; maj < OVLMAJ; maj++)
-        if (ovltickc[maj])
-            ovlcall(ovltickc[maj], ovlseg[maj]);
+    for (i = 0; i < novltick; i++)
+        ovlcall(ovlticks[i].fn, ovlticks[i].seg);
 
     timeout(&ovltick, 0, TICKINT);
 }
@@ -468,74 +416,105 @@ ovlarm()
 }
 
 /*
- * Ask for a tick.  A module does this in its header; a driver the kernel
- * still holds has no header to say it in, so it says it here.  Zero
- * withdraws the request.
+ * Ask for a tick.  The entry carries its own segment, like a line-table
+ * entry: a tick belongs to a module, not to a major in either space.
+ * Zero withdraws the request.
  */
 static
-tickset(maj, fn)
-    UINT maj;
+tickset(fn, seg)
     int (*fn) ();
+    UINT seg;
 {
-    if (maj == 0 || maj >= OVLMAJ)
+    if (fn == 0)
+        return (0);
+    if (novltick >= NTICK)
         return (-1);
-    ovltickc[maj] = fn;
-    if (fn)
-        ovlarm();
+    ovlticks[novltick].fn = fn;
+    ovlticks[novltick].seg = seg;
+    novltick++;
+    ovlarm();
     return (0);
 }
 
 /*
- * Place a driver.  The caller has the header either way: the loader has
- * copied a module's page into seg and its header is at OVLBASE by
- * definition, and a driver the kernel still holds has its header in the
- * kernel, where the resident table at the bottom of this file names it.
+ * Place a driver.  The header is at OVLBASE, mapped by the caller.  Its
+ * entries are read into locals *before* init() is called: init is entered
+ * through the gate, which restores the caller's window on return, so the
+ * page is no longer necessarily mapped when it finishes.  Reading the
+ * entries afterwards was the race that an interrupt during a module-local
+ * init could turn into a crash.
  *
- * Everything the header is worth is taken from it only after init()
- * succeeds, because init() is the driver's answer to whether it is here
- * at all: a driver whose hardware is not on this machine returns non-zero
- * and is not registered, and its major goes on answering as nodev does.
- * That is what a kernel that carries a driver for a card this machine
- * does not have looks like from the inside - the page is spent, nothing
- * else is.
+ * A module registers in either namespace or both, by its own major in
+ * each.  The segment is the same page either way; the two rows are
+ * independent bindings, and a failed init withdraws both.
  *
- * The placement itself has to happen first, because init() is what has to
- * find the driver's own data: ovldata() maps the major (ovlmap above),
- * and for a driver the kernel still holds that is this header.  Failing
- * to init unplaces it again, and nothing else was taken.
+ * Registration happens before init, because init() is what finds the
+ * driver's own data through ovldata(), and that looks the major up here.
+ * A non-zero init is the driver saying the hardware is not on this
+ * machine: its rows go back and its major answers as nodev does, at the
+ * cost of the page and nothing else.
  */
 static
 ovlplace(hdr, seg)
     struct ovlhdr *hdr;
     UINT seg;
 {
-    UINT8 maj;
+    UINT8 bmaj, cmaj;
+    int (*init) (), (*tick) (), (*probe) (), (*intr) ();
+    struct biovec bv;
+    struct ciovec cv;
 
-    maj = hdr->major;
-    if (maj == 0 || maj >= OVLMAJ)
+    bmaj = hdr->major;
+    cmaj = hdr->cmajor;
+    init = hdr->init;
+    tick = hdr->tick;
+    probe = hdr->probe;
+    intr = hdr->intr;
+
+    if ((bmaj == 0) && (cmaj == 0))
         return (-1);
-    if (maj >= nbdev && maj >= ncdev)
+    if (bmaj >= NBDEV || cmaj >= NCDEV)
+        return (-1);
+    if ((bmaj && bdevseg[bmaj]) || (cmaj && cdevseg[cmaj]))
+        return (-1);
+    if ((bmaj && hdr->bvec == 0) || (cmaj && hdr->cvec == 0))
         return (-1);
 
-    ovlseg[maj] = seg;
-    if (seg == 0)
-        ovlloc[maj] = hdr;
+    if (hdr->bvec) {
+        bv.open = hdr->bvec->open;
+        bv.close = hdr->bvec->close;
+        bv.strat = hdr->bvec->strat;
+        bv.ioctl = hdr->bvec->ioctl;
+    }
+    if (hdr->cvec) {
+        cv.open = hdr->cvec->open;
+        cv.close = hdr->cvec->close;
+        cv.read = hdr->cvec->read;
+        cv.write = hdr->cvec->write;
+        cv.ioctl = hdr->cvec->ioctl;
+    }
 
-    if (hdr->init && (*hdr->init) (seg) != 0) {
-        ovlseg[maj] = 0;
-        ovlloc[maj] = 0;
+    if (bmaj)
+        bdevseg[bmaj] = seg;
+    if (cmaj)
+        cdevseg[cmaj] = seg;
+
+    if (init && ovlcall1(init, seg, seg) != 0) {
+        if (bmaj)
+            bdevseg[bmaj] = 0;
+        if (cmaj)
+            cdevseg[cmaj] = 0;
         return (-1);
     }
 
-    tickset(maj, hdr->tick);
-    if (hdr->bvec)
-        bvecset(maj, hdr->bvec->open, hdr->bvec->close, hdr->bvec->strat,
-                hdr->bvec->ioctl);
-    if (hdr->cvec)
-        cvecset(maj, hdr->cvec->open, hdr->cvec->close, hdr->cvec->read,
-                hdr->cvec->write, hdr->cvec->mode);
-    if (hdr->intr)
-        intrset(hdr->probe, hdr->intr, seg);
+    if (bmaj)
+        bvecset(bmaj, bv.open, bv.close, bv.strat, bv.ioctl);
+    if (cmaj)
+        cvecset(cmaj, cv.open, cv.close, cv.read, cv.write, cv.ioctl);
+    if (tick)
+        tickset(tick, seg);
+    if (intr)
+        intrset(probe, intr, seg);
 
     return (0);
 }
@@ -549,7 +528,7 @@ int
 ovlattach(seg)
     UINT seg;
 {
-    map0[2 * OVLSEG] = (UINT8) seg;
+    ovlmapseg(seg);             /* u.drv too: an interrupt may cut in */
     return (ovlplace((struct ovlhdr *) OVLBASE, seg));
 }
 
@@ -565,12 +544,12 @@ ovlattach(seg)
  *
  * The segment is OVLSEG because that is where the page is: the slot is
  * the page of the kernel's address space the frame occupies, so the
- * identity map the kernel runs under already has it mapped, and ovlmap's
- * mapping of a module placed here is the save and restore of a register
- * that never changes value.  A driver loaded later from elsewhere - out
- * of the kernel's own file, which is what _kino is for - would be copied
- * into a segment of its own and placed with ovlattach() at that segment;
- * it is the same table either way, and the same header.
+ * identity map the kernel runs under already has it mapped, and
+ * ovlbmap's mapping of a module placed here is the save and restore of a
+ * register that never changes value.  A driver loaded later from
+ * elsewhere - out of the kernel's own file, which is what _kino is for -
+ * would be copied into a segment of its own and placed with ovlattach()
+ * at that segment; it is the same table either way, and the same header.
  *
  * A kernel that was linked but never stamped has a page of zeros here,
  * whose major is 0 - not a major anything serves - so ovlplace refuses

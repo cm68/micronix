@@ -581,6 +581,9 @@ v_partition(const char *root, const char *name)
 }
 
 static void
+apply_files(const char *root, jv *v);
+
+static void
 v_mkfs(const char *root, const char *name)
 {
 	jv *sim = sim_get(name);
@@ -606,7 +609,58 @@ v_mkfs(const char *root, const char *name)
 		av[5] = "-f";
 		av[6] = NULL;
 		runv(av);
+		apply_files(root, v);
 	}
+}
+
+/*
+ * A volume's file overrides.  Each names a path in the image and the
+ * source file to place there, from anywhere in the tree, so a machine
+ * can be built with a particular .login or /etc/rc instead of whatever
+ * the tree installs.  mnix write creates or replaces the destination.
+ */
+static void
+apply_files(const char *root, jv *v)
+{
+	const char *img = json_str(v, "image");
+	jv *files = json_get(v, "files");
+	char *mnix = resolve_path(root, "src/tools/mnix");
+	int i;
+
+	if (!img)
+		return;
+	for (i = 0; files && i < files->n; i++) {
+		jv *f = files->v[i];
+		const char *path = json_str(f, "path");
+		const char *src = json_str(f, "source");
+		char *av[8];
+
+		if (!path || !src) {
+			fprintf(stderr,
+			    "hwsim: %s: file override %d needs path and source\n",
+			    img, i);
+			exit(1);
+		}
+		av[0] = mnix;
+		av[1] = "-f";
+		av[2] = resolve_path(root, img);
+		av[3] = "write";
+		av[4] = resolve_path(root, src);
+		av[5] = (char *) path;
+		av[6] = NULL;
+		runv(av);
+	}
+}
+
+static void
+v_files(const char *root, const char *name)
+{
+	jv *sim = sim_get(name);
+	jv *vols = json_get(sim, "volumes");
+	int i;
+
+	for (i = 0; vols && i < vols->n; i++)
+		apply_files(root, vols->v[i]);
 }
 
 static void
@@ -779,6 +833,7 @@ usage(void)
 	    "  format <sim>       mnix initialize (geometry label)\n"
 	    "  partition <sim>    mnix label (default slice table)\n"
 	    "  mkfs <sim>         mnix mkfs (filesystem + boot)\n"
+	    "  files <sim>        place each volume's file overrides\n"
 	    "  boot <sim>         launch d1/d1p from config + volumes\n"
 	    "  add / del <sim>    a volume in or out\n"
 	    "  list / show <sim>  manage sim.json\n");
@@ -846,6 +901,12 @@ main(int argc, char **argv)
 		if (!name)
 			usage();
 		v_mkfs(root, name);
+		return 0;
+	}
+	if (strcmp(verb, "files") == 0) {
+		if (!name)
+			usage();
+		v_files(root, name);
 		return 0;
 	}
 	if (strcmp(verb, "boot") == 0) {

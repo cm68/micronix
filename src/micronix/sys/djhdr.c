@@ -7,7 +7,7 @@
  * which folds every section into the data segment, and an object's data
  * is placed in the order the objects are named on the link line.  So the
  * header is alone in an object that is named first, and nothing this
- * file could grow can push it off the front: the 29 bytes below are all
+ * file could grow can push it off the front: the 30 bytes below are all
  * there is.
  *
  * Splitting it out is what that costs, and it is why the entries it

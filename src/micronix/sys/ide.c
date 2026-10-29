@@ -546,12 +546,18 @@ idecmd(ip, cmd, lba)
     if (!(st & SDRDY) || (st & SERR))
         return (-1);
 
-    (*ip->wr) (DRVHD, DLBA | ((lba >> 24) & 0x0f));
+    /*
+     * Every cast is load-bearing: a shift by a multiple of 8 is a byte
+     * access, and c1 only takes that shape (NARROW over the shift, or
+     * over the masked shift) as one.  Without the cast the >>24 is a
+     * qshr loop - twenty-four shifts for one nibble.
+     */
+    (*ip->wr) (DRVHD, DLBA | (UINT8) ((lba >> 24) & 0x0f));
     (*ip->wr) (ERRST, 0);
     (*ip->wr) (SCOUNT, 1);
-    (*ip->wr) (LBA0, (UINT8)lba);
-    (*ip->wr) (LBA1, (UINT8)(lba >> 8));
-    (*ip->wr) (LBA2, (UINT8)(lba >> 16));
+    (*ip->wr) (LBA0, (UINT8) lba);
+    (*ip->wr) (LBA1, (UINT8) (lba >> 8));
+    (*ip->wr) (LBA2, (UINT8) (lba >> 16));
     (*ip->wr) (STAT, cmd);
     return (0);
 }

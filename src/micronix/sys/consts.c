@@ -20,14 +20,14 @@ extern int indir(), exit(), r_fork(), read(), write(), open(),
     getpid(), mount(), umount(), setuid(), getuid(), stime(),
     unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), stty(), gtty(),
     r_ioctl(),
-    permission(), nice(), snooze(), sync(), reboot(), kill(), r_csw(), ssw(),
-    dup(), dup2(), r_pipe(), signal(), jobctl();
+    permission(), nice(), snooze(), sync(), reboot(), kill(),
+    dup(), dup2(), r_pipe(), signal(), jobctl(), select();
 
 /*
  * System call branch table.  Arguments from registers, and returns to
  * registers, are handled by the workers themselves; the r_ entries left
  * here are the ones with real register or carry convention work (fork,
- * seek, ftruncate, ioctl, pipe, time) or a shared worker (close, csw).
+ * seek, ftruncate, ioctl, pipe, time) or a shared worker (close).
  */
 struct syscall syssw[] = {
     2, &indir,                  /* 0 */
@@ -68,8 +68,8 @@ struct syscall syssw[] = {
     0, &snooze,                 /* 35 */
     0, &sync,                   /* 36 */
     2, &kill,                   /* 37 */
-    0, &r_csw,                  /* 38 */
-    0, &ssw,                    /* 39 */
+    0, &badcall,                /* */
+    0, &badcall,                /* */
     0, &badcall,                /* */
     0, &dup,                    /* 41 */
     0, &r_pipe,                 /* 42 */
@@ -88,6 +88,7 @@ struct syscall syssw[] = {
     2, &reboot,                 /* 55 */
     6, &execve,                 /* 56 execve(name, argv, envp) */
     2, &jobctl,                 /* 57 jobctl(pid in hl, op) */
+    0, &select,                 /* 58 select(mask in hl) */
 };
 
 int ncalls = sizeof(syssw) / sizeof(struct syscall);
@@ -101,10 +102,9 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 #include <sys/ovl.h>
 
 extern int nodev(), nulldev(), nullwrite();
-extern int muopen(), muclose(), muread(), muwrite(), mustty();
 extern int memread(), memwrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
-extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcmode();
+extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();
 
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
@@ -132,25 +132,28 @@ struct biovec biosw[] = {
 };
 
 /*
- * Character majors 2-9 are deliberately absent: they are the block
- * majors of the disk drivers, and ovl keys a placed module by major
- * alone.  The char drivers that are modules therefore live above the
- * block table (10 mem, 11 io, 12 pty), and the default tty stays at 1.
+ * The character space is its own namespace.  Its major numbers have
+ * nothing to do with the block table above: char 2 and block 2 are
+ * unrelated, and the seg map behind this table (cdevseg, sys/ovl.c) is
+ * separate from bdevseg.  The module rows point at the char overlay
+ * trampolines; the null device is the only direct row.  The tty is a
+ * module too: the console's line discipline and its board front ends
+ * live in tty.mod, with the state they need left resident.
  */
 struct ciovec ciosw[] = {
     &nulldev, &nulldev, &nulldev, &nullwrite, &nodev,   /* 0 = null */
-    &muopen, &muclose, &muread, &muwrite, &mustty,      /* 1 = tty (root) */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 2 = block dj */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 3 = block mw */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 4 = block ide */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 5 = block ncr */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 6 = block nd */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 7 = block disk2 */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 8 = block disk3 */
-    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 9 = block disk1 */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 10 = mem */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 11 = io */
-    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcmode,   /* 12 = pty */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 1 = tty (root) */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 2 = mem */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 3 = io */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 4 */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 5 = pty */
+    &ovlcopen, &ovlcclose, &ovlcread, &ovlcwrite, &ovlcioctl,   /* 6 = net */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 7 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 8 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 9 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 10 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 11 */
+    &nodev, &nodev, &nodev, &nodev, &nodev,             /* 12 */
 };
 
 UINT nbdev = sizeof(biosw) / sizeof(struct biovec);

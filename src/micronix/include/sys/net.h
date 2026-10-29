@@ -9,50 +9,67 @@
  */
 
 /*
- * /dev/net is a block device, major 6 minor 1 (dev/devlist), and every
- * operation is one ioctl(2) command block (include/sys/ioctl.h):
+ * /dev/net0 is a character device, major 6, and a clone node: open asks
+ * the card for the next free socket and the file it returns is that
+ * socket, named by the forwarded minor (slot + 1).  read and write move
+ * that socket's bytes; ioctl(2) carries the requests below.  Each is its
+ * own request code, so the driver copies only the little each needs:
  *
- *	ioctl(fd, CDBCMD, &cdb)
+ *	ioctl(fd, NETBIND, &port)	port[2] network order
+ *	ioctl(fd, NETCONNECT, &addr)	ip[4], port[2] network order
+ *	ioctl(fd, NETLISTEN, 0)		blocks until a connection waits
+ *	ioctl(fd, NETACCEPT, 0)		takes it; the descriptor becomes it
+ *	ioctl(fd, NETCARD, &card)	one card-level request (JOIN,
+ *					GETCONF, SETCONF, the socket table)
  *
- * cdb.cmd[0] is the operation below and cdb.cmd[1] the socket; the
- * operation's own fields follow at cdb.cmd[2..].  cdb.buf/cdb.count are
- * its data phase, if it has one.  On return cdb.cmd[0] is the reply type
- * (N_ACK/N_DATA/N_EVENT), cdb.cmd[1] the socket, cdb.cmd[2] the first
- * reply byte - the ACK status, a STATUS's state, or an EVENT's code -
- * and cdb.count the reply bytes copied back.
+ * The card never pushes data.  It pushes an event when a socket has
+ * something and the guest pulls the bytes with RECV - the driver asks
+ * only for the socket the caller holds, so two readers cannot lose one
+ * another's frames.
  *
- *	N_OPEN      cmd[2] mode (0 udp, 1 tcp)
- *	N_CLOSE     -
- *	N_BIND      cmd[2],cmd[3] port, network order
- *	N_CONNECT   cmd[2..5] ip, cmd[6],cmd[7] port, network order
- *	N_LISTEN    -
- *	N_SEND      buf/count payload; flags clear
- *	N_STATUS    reply payload: state, rx[2], tx[2]
- *	N_JOIN      reply payload: ip[4]
- *	N_GETCONF   reply payload: netconf
- *	N_SETCONF   buf/count payload; flags clear
- *	NET_OP_RECV send nothing; return the next frame
- *
- * A command's reply is read before the ioctl returns, so its ACK is
- * already there; a command with a reply payload needs CDB_IN and count
- * set to the buffer's size.
+ * A connected EVENT carries the peer's ip[4] and port[2] in network
+ * order behind it, so a server can authenticate the caller and netstat
+ * can show the connection.
  */
 #define NET_MAJOR 6
-#define NET_MINOR 1
-#define NET_OP_RECV 0           /* not a wire type: just receive */
+#define NET_MINOR 1             /* the old block face, now unused */
+#define NET_OP_RECV 0           /* not a wire type: pull this socket */
 
 /* the two S-100 ports (the d1 wiring's choice, src/hwsim/d1/nicd1.c) */
 #define NETDATA_PORT 0x60
 #define NETSTAT_PORT 0x61
 
 /*
- * The driver is part of the ND module (sys/nd.c's page); netchan is the
- * one resident piece, the event a blocked ioctl sleeps on.  The line is
+ * The ioctl request codes.  They are in the terminal's range's
+ * neighbourhood (whoever else wants a char device gets its own).
+ */
+#define NETBIND    0x7410
+#define NETCONNECT 0x7411
+#define NETLISTEN  0x7412
+#define NETACCEPT  0x7413
+#define NETCARD    0x7414
+
+/*
+ * One card-level request and its reply.  op is an N_* card operation
+ * (JOIN, GETCONF, SETCONF, SOCKSTAT); len is the payload the caller
+ * sends, and on return the payload the card answered with.  data is
+ * wide enough for the netconf pair and for the socket table.
+ */
+struct netcard {
+    UINT8 op;
+    UINT8 len;
+    UINT8 data[1 + 32 + 1 + 63];
+};
+
+
+/*
+ * The driver is its own module page (sys/nethdr.c).  netchan, netlock and
+ * netready are the resident pieces in sys/netint.c; the line is
  * discovered, not named.
  */
-extern int netprobe(), netint(), netwait(), netattached();
-extern int netioctl(), ndstart();
-extern int netchan;
+extern int netprobe(), netint(), netattached();
+extern int netchan, netlock;
+extern UINT8 netready[];
 
 /* NETSTAT bits */
 #define NETSTAT_RXRDY 0x01     /* a pushed byte waits to be read */
@@ -70,6 +87,8 @@ extern int netchan;
 #define N_JOIN    0x08
 #define N_GETCONF 0x09
 #define N_SETCONF 0x0A
+#define N_ACCEPT  0x0B
+#define N_SOCKSTAT 0x0C         /* card-level: the socket table */
 
 /* card -> guest */
 #define N_ACK     0x80
@@ -91,11 +110,19 @@ extern int netchan;
 #define N_REFUSED   4
 #define N_TIMEOUT   5
 #define N_CLOSED_E  6
+#define N_AGAIN     7
 
 /* event codes */
-#define N_EV_CONNECTED 1
+#define N_EV_CONNECTED 1        /* code, peer ip[4], peer port[2] */
 #define N_EV_CLOSED    2
 #define N_EV_RESET     3
+#define N_EV_READY     4        /* data waits; pull it with RECV */
+
+/*
+ * One N_SOCKSTAT record, nine bytes: state, local port[2], peer ip[4],
+ * peer port[2], each port in network order.  netstat(1) reads these.
+ */
+#define NETSTATSZ 9
 
 /* a frame's largest payload */
 #define N_MAXPAY 1024

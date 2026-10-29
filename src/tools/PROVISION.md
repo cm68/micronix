@@ -80,6 +80,10 @@ the file is relative to the top of the tree unless it is absolute.
   tokens, not raw major/minor.  `show` resolves and prints them; `boot`
   does not pass them to anything, and no kernel is patched.
 - **volumes** — the disks, each a controller + unit + geometry + image.
+  A volume may also carry **files**: a list of `path`/`source` pairs
+  placed in the image, each `path` absolute in the image and each
+  `source` a file in the tree.  They are how a machine gets a
+  particular `.login` or `/etc/rc` without editing the tree's defaults.
 - **mediasets** — the removable-media sets (MEDIACHG.md).  The tool
   writes the `-e` manifest itself, in the format `dist/distsets` prints:
   one line per set, the set name then the absolute image paths.
@@ -213,7 +217,9 @@ about the card is in `sim.json`.
 
     format <sim>       mnix initialize <geometry> <image>    geometry label
     partition <sim>    mnix label <image> -s ...             slice table
-    mkfs <sim>         mnix mkfs <image> -i <bootimg> -f     filesystem + boot
+    mkfs <sim>         mnix mkfs <image> -i <bootimg> -f     filesystem + boot,
+                       then the volume's file overrides
+    files <sim>        write each volume's file overrides into its image
     boot <sim>         launch the volumes; d1p headless by default, d1 with
                        -g/--debug, logging to /tmp/hwsim-<sim>.log
     add <sim> <controller> <unit> <geometry> <image>

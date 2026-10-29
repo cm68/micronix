@@ -24,10 +24,11 @@ extern char zpage[];            /* exec.c: a 512-byte zero page */
  * Called by the read system call (including pipes),
  * to read directories, and to load files for execution.
  */
-iread(ip)
+iread(ip, dev)
     register struct inode *ip;
+    int dev;
 {
-    int request, dev;
+    int request;
     UINT log, phys, rahead;
     register int into, nbytes;
     static int type;
@@ -37,7 +38,6 @@ iread(ip)
     if ((request = u.count) == 0)
         return (0);
     type = ip->i_mode & IFMT;
-    dev = (type & IIO) ? ip->i_addr[0] : ip->i_dev;
     if (type == IFCHR) {
         cread(dev);
         goto done;
@@ -82,10 +82,11 @@ iread(ip)
  * Write a file from its inode. See iread comments above.
  * Used for system write calls, pipes, and directories.
  */
-iwrite(ip)
+iwrite(ip, dev)
     register struct inode *ip;
+    int dev;
 {
-    int request, dev;
+    int request;
     UINT8 pipe;
     UINT log, phys;
     register int into, nbytes;
@@ -97,7 +98,6 @@ iwrite(ip)
         return (0);
     type = ip->i_mode & IFMT;
     pipe = ip->i_flags & IPIPE;
-    dev = (type & IIO) ? ip->i_addr[0] : ip->i_dev;
     if (type == IFCHR) {
         cwrite(dev);
         goto done;
@@ -173,9 +173,12 @@ nwrite(ip, base, count)
     char *base;
     UINT count;
 {
+    int dev;
+
+    dev = (ip->i_mode & IIO) ? ip->i_addr[0] : ip->i_dev;
     u.base = base;
     u.count = count;
-    return (iwrite(ip));
+    return (iwrite(ip, dev));
 }
 
 /*
@@ -189,9 +192,12 @@ nread(ip, base, count)
     char *base;
     UINT count;
 {
+    int dev;
+
+    dev = (ip->i_mode & IIO) ? ip->i_addr[0] : ip->i_dev;
     u.base = base;
     u.count = count;
-    return (iread(ip));
+    return (iread(ip, dev));
 }
 
 /*
