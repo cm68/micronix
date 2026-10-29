@@ -7,13 +7,15 @@
 # cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
 # it cross builds the same program on the host.
 #
-# y.tab.c is the parser yacc generated from gram.y, committed so the
-# native build does not have to run yacc first.  defs.h is the shared
-# header every .c includes.
+# The native build regenerates y.tab.c from gram.y with the installed
+# yacc.  The cross build still compiles the committed y.tab.c, because
+# it has no yacc it can run before this directory builds.  defs.h is
+# the shared header every .c includes.
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
 CC	= ccc
+YACC	= /bin/yacc
 CFLAGS	= -O
 BIN	= /bin
 MAN	= make.1
@@ -29,6 +31,9 @@ $(PROG): $(OBJS)
 
 $(OBJS): $(HDRS)
 
+y.tab.c: gram.y
+	$(YACC) gram.y
+
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
@@ -39,7 +44,7 @@ clean:
 	rm -f $(OBJS) *.nam *.tok *.x
 
 clobber: clean
-	rm -f $(PROG)
+	rm -f $(PROG) y.tab.c
 
 #
 # verify - the inverse of install: every installed artifact against

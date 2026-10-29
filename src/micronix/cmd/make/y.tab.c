@@ -1,40 +1,28 @@
 #include "defs.h"
-
-/*
- * y.tab.c is the parser yacc emits from gram.y, hand-edited for ccc
- * (see GNUmakefile; a regeneration from gram.y must re-apply these):
- *
- *   - #line directives stripped (ccc's cpp does not know them)
- *   - the %union typedef is tagged  (ccc rejects an unnamed union typedef)
- *   - short tables/variables retyped int  (matches cmd/yacc's yaccopar)
- *   - YYSTYPE copies spelled member-wise  (ccc has no struct assignment)
- *   - the state-stack overflow test is split and the bound pre-computed
- *     into yyslim  (c1 miscompiles `++yyps > &yys[YYMAXDEPTH]`, see
- *     CODEGENGAPS entry 22)
- */
-
-typedef union yysym
-	{
-	struct shblock *yshblock;
-	struct depblock *ydepblock;
-	struct nameblock *ynameblock;
-	} YYSTYPE;
-# define NAME 257
-# define SHELLINE 258
-# define START 259
-# define MACRODEF 260
-# define COLON 261
-# define DOUBLECOLON 262
-# define GREATER 263
+#define NAME 257
+#define SHELLINE 258
+#define START 259
+#define MACRODEF 260
+#define COLON 261
+#define DOUBLECOLON 262
+#define GREATER 263
 #define yyclearin yychar = -1
 #define yyerrok yyerrflag = 0
-extern int yychar;
-extern int yyerrflag;
+extern int yychar, yyerrflag;
 #ifndef YYMAXDEPTH
 #define YYMAXDEPTH 150
 #endif
-YYSTYPE yylval, yyval;
+typedef union YYSTYPE {
 
+	struct shblock *yshblock;
+	struct depblock *ydepblock;
+	struct nameblock *ynameblock;
+	
+} YYSTYPE;
+extern void *memcpy();
+#define YYVCOPY(x,y) memcpy((char *)&(x),(char *)&(y),sizeof(YYSTYPE))
+#define YYVALINT(x) (*(int *)&(x))
+YYSTYPE yylval, yyval;
 struct depblock *pp;
 FSTATIC struct shblock *prevshp;
 
@@ -45,8 +33,7 @@ FSTATIC int nlefts;
 struct lineblock *lp, *lpp;
 FSTATIC struct depblock *prevdep;
 FSTATIC int sepc;
-# define YYERRCODE 256
-
+#define YYERRCODE 256
 
 
 char *zznextc;	/* zero if need another line; otherwise points to next char */
@@ -237,45 +224,46 @@ for(p = zznextc = text ; *p ; ++p )
 		return(START);
 goto again;
 }
-int yyexca[] ={
+int yyexca[] = {
 -1, 1,
 	0, -1,
 	-2, 0,
 	};
-# define YYNPROD 19
-# define YYLAST 18
-int yyact[]={
+#define YYNPROD 19
+extern int yychar;
+
+int yylast = 18;
+int yyact[] = {
 
    9,  11,  18,   5,  12,  13,   3,   4,  16,  17,
    7,   2,   1,  10,   8,   6,  14,  15 };
-int yypact[]={
+int yypact[] = {
 
 -1000,-253,-1000,-247,-1000,-1000,-257,-1000,-250,-1000,
 -248,-1000,-1000,-1000,-1000,-256,-1000,-1000,-1000 };
-int yypgo[]={
+int yypgo[] = {
 
    0,  17,  16,  15,  14,  13,  12,  11,   1 };
-int yyr1[]={
+int yyr1[] = {
 
    0,   6,   6,   7,   7,   7,   7,   3,   3,   4,
    4,   5,   5,   8,   8,   2,   2,   1,   1 };
-int yyr2[]={
+int yyr2[] = {
 
    0,   0,   2,   1,   1,   4,   1,   1,   2,   0,
    1,   1,   2,   1,   1,   0,   1,   1,   2 };
-int yychk[]={
+int yychk[] = {
 
 -1000,  -6,  -7, 259, 260, 256,  -3, 257,  -4, 257,
   -5,  -8, 261, 262,  -2,  -1, 258, 257, 258 };
-int yydef[]={
+int yydef[] = {
 
    1,  -2,   2,   3,   4,   6,   9,   7,  15,   8,
   10,  11,  13,  14,   5,  16,  17,  12,  18 };
-#
-# define YYFLAG -1000
-# define YYERROR goto yyerrlab
-# define YYACCEPT return(0)
-# define YYABORT return(1)
+#define YYFLAG -1000
+#define YYERROR goto yyerrlab
+#define YYACCEPT return(0)
+#define YYABORT return(1)
 
 /*	parser for yacc output	*/
 
@@ -289,17 +277,13 @@ yyparse() {
 
 	int yys[YYMAXDEPTH];
 	int yyj, yym;
-	YYSTYPE *yypvt;
-	int yystate, *yyps, yyn;
-	YYSTYPE *yypv;
-	int *yyxi;
-	/*
-	 * ccc's c1 miscompiles the v7 spelling `if( ++yyps> &yys[YYMAXDEPTH] )`:
-	 * the bound &yys[150] is computed into hl, then loading yyps clobbers
-	 * it, and the compare runs against the size constant instead of the
-	 * address - so the check fires on the first push.  Pre-computing the
-	 * bound and splitting the increment sidesteps it (CODEGENGAPS entry 22).
-	 */
+	register YYSTYPE *yypvt;
+	register yystate, *yyps, yyn;
+	register YYSTYPE *yypv;
+	register *yyxi;
+	/* c1 miscompiles `if( ++yyps> &yys[YYMAXDEPTH] )`: the bound is
+	 * computed into hl and the load of yyps clobbers it.  Precompute
+	 * the bound and split the increment (CODEGENGAPS entry 22). */
 	int *yyslim = &yys[YYMAXDEPTH];
 
 	yystate = 0;
@@ -311,12 +295,12 @@ yyparse() {
 
  yystack:    /* put a state and value onto the stack */
 
-	if( yydebug  ) printf( "state %d, char 0%o\n", yystate, yychar );
+	if( yydebug  ) printf( "state %d, value %d, char %d\n",yystate,YYVALINT(yyval),yychar );
 		++yyps;
 		if( yyps> yyslim ) { yyerror( "yacc stack overflow" ); return(1); }
 		*yyps = yystate;
 		++yypv;
-		yypv->yshblock = yyval.yshblock;
+		YYVCOPY(*yypv,yyval);
 
  yynewstate:
 
@@ -325,11 +309,11 @@ yyparse() {
 	if( yyn<= YYFLAG ) goto yydefault; /* simple state */
 
 	if( yychar<0 ) if( (yychar=yylex())<0 ) yychar=0;
-	if( (yyn += yychar)<0 || yyn >= YYLAST ) goto yydefault;
+	if( (yyn += yychar)<0 || yyn >= yylast ) goto yydefault;
 
 	if( yychk[ yyn=yyact[ yyn ] ] == yychar ){ /* valid shift */
 		yychar = -1;
-		yyval.yshblock = yylval.yshblock;
+		YYVCOPY(yyval,yylval);
 		yystate = yyn;
 		if( yyerrflag > 0 ) --yyerrflag;
 		goto yystack;
@@ -342,7 +326,11 @@ yyparse() {
 		if( yychar<0 ) if( (yychar=yylex())<0 ) yychar = 0;
 		/* look through exception table */
 
-		for( yyxi=yyexca; (*yyxi!= (-1)) || (yyxi[1]!=yystate) ; yyxi += 2 ) ; /* VOID */
+		yyxi = yyexca;
+		for(;;){
+			if( (*yyxi == (-1)) && (yyxi[1] == yystate) ) break;
+			yyxi += 2;
+			}
 
 		while( *(yyxi+=2) >= 0 ){
 			if( *yyxi == yychar ) break;
@@ -370,7 +358,7 @@ yyparse() {
 
 			while ( yyps >= yys ) {
 			   yyn = yypact[*yyps] + YYERRCODE;
-			   if( yyn>= 0 && yyn < YYLAST && yychk[yyact[yyn]] == YYERRCODE ){
+			   if( yyn>= 0 && yyn < yylast && yychk[yyact[yyn]] == YYERRCODE ){
 			      yystate = yyact[yyn];  /* simulate a shift of "error" */
 			      goto yystack;
 			      }
@@ -407,16 +395,16 @@ yyparse() {
 		yyps -= yyr2[yyn];
 		yypvt = yypv;
 		yypv -= yyr2[yyn];
-		yyval.yshblock = yypv[1].yshblock;
+		YYVCOPY(yyval,yypv[1]);
 		yym=yyn;
 			/* consult goto table to find next state */
 		yyn = yyr1[yyn];
 		yyj = yypgo[yyn] + *yyps + 1;
-		if( yyj>=YYLAST || yychk[ yystate = yyact[yyj] ] != -yyn ) yystate = yyact[yypgo[yyn]];
+		yystate = yyact[yyj];
+		if( yyj>=yylast || (yychk[yystate] + yyn) ) yystate = yyact[yypgo[yyn]];
 		switch(yym){
 			
-case 5:
- {
+case 5: {
 	    while( --nlefts >= 0)
 		{
 		leftp = lefts[nlefts];
@@ -451,21 +439,16 @@ case 5:
 			}
 		}
 	} break;
-case 7:
- { lefts[0] = yypvt[-0].ynameblock; nlefts = 1; } break;
-case 8:
- { lefts[nlefts++] = yypvt[-0].ynameblock;
+case 7: { lefts[0] = yypvt[-0].ynameblock; nlefts = 1; } break;
+case 8: { lefts[nlefts++] = yypvt[-0].ynameblock;
 	    	if(nlefts>NLEFTS) fatal("Too many lefts"); } break;
-case 9:
-{
+case 9:{
 		char junk[10];
 		sprintf(junk, "%d", yylineno);
 		fatal1("Must be a separator on rules line %s", junk);
 		} break;
-case 11:
- { prevdep = 0;  yyval.ydepblock = 0; } break;
-case 12:
- {
+case 11: { prevdep = 0;  yyval.ydepblock = 0; } break;
+case 12: {
 			  pp = ALLOC(depblock);
 			  pp->nxtdepblock = NULL;
 			  pp->depname = yypvt[-0].ynameblock;
@@ -473,18 +456,12 @@ case 12:
 			  else  prevdep->nxtdepblock = pp;
 			  prevdep = pp;
 			  } break;
-case 13:
- { sepc = ALLDEPS; } break;
-case 14:
- { sepc = SOMEDEPS; } break;
-case 15:
- {yyval.yshblock = 0; } break;
-case 16:
- { yyval.yshblock = yypvt[-0].yshblock; } break;
-case 17:
- { yyval.yshblock = yypvt[-0].yshblock;  prevshp = yypvt[-0].yshblock; } break;
-case 18:
- { yyval.yshblock = yypvt[-1].yshblock;
+case 13: { sepc = ALLDEPS; } break;
+case 14: { sepc = SOMEDEPS; } break;
+case 15: {yyval.yshblock = 0; } break;
+case 16: { yyval.yshblock = yypvt[-0].yshblock; } break;
+case 17: { yyval.yshblock = yypvt[-0].yshblock;  prevshp = yypvt[-0].yshblock; } break;
+case 18: { yyval.yshblock = yypvt[-1].yshblock;
 			prevshp->nxtshblock = yypvt[-0].yshblock;
 			prevshp = yypvt[-0].yshblock;
 			} break;
