@@ -96,6 +96,14 @@ sizes(argc, argv) int argc; char *argv[]; {
 	np = nprod;
 	mc = mem - mem0;
 	cc = cnamp - cnames;
+	/* pass 1 opened the output files as well as the grammar; close
+	   them here, or pass 2 opens a second set and the -v and -d
+	   options run the guest out of file descriptors. */
+	if( ftable != NULL ) fclose( ftable );
+	if( ftemp != NULL ) fclose( ftemp );
+	if( foutput != NULL ) fclose( foutput );
+	if( fdefine != NULL ) fclose( fdefine );
+	ftable = ftemp = foutput = fdefine = NULL;
 	freegrammar();
 
 	if( NWORDS(nt) > _tbitset )
@@ -116,7 +124,17 @@ sizes(argc, argv) int argc; char *argv[]; {
 	cnamsz = cc + 2;
 	stsize = 2*(mc + np) + 16;
 	lsetsz = wssize = stsize;
-	actsiz = stsize * (nt + 2) + 4;
+	/* amem is the packed goto table while the states are built and
+	 * written (rows are nnonter wide, not nterms), then the
+	 * optimizer's yyact array.  Both are packed, so stsize*nnonter
+	 * is far too pessimistic: the largest packed table in the
+	 * corpus is 97 words (ratfor) and the largest optimizer output
+	 * is 363 (cpp).  512 is the default; -a sizes it by hand when a
+	 * grammar overflows, which the apack/optimizer errors report. */
+	if( actsiz_req )
+		actsiz = actsiz_req;
+	else
+		actsiz = _actsize;
 	allocgrammar();
 	alloclr();
 

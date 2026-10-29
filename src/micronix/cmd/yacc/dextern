@@ -9,7 +9,11 @@
 #define ERRCODE  8190
 #define ACCEPTCODE 8191
 
-#define _actsize 1500
+/* default action/goto table, in words.  -a overrides it.  512 covers
+   every grammar in the corpus - the packed goto table peaks at 97 and
+   the optimizer output at 363 - and is the size to raise by hand when
+   one overflows.  The old fixed PWB array was 1500. */
+#define _actsize 512
 #define _memsize 4000
 #define _nstates 475
 #define _nterms 95
@@ -81,6 +85,7 @@ struct item { int *pitem; struct looksets *look; } ;
 extern int nstate ;		/* number of states */
 extern struct item **pstate;	/* pointers to the descriptions of the states */
 extern int actsiz;  	/* size of the action table array */
+extern int actsiz_req;	/* -a override in words, 0 = default */
 extern int *tystate;	/* contains type information about the states */
   /* 0 = simple state, completely generated
      1 = state awaiting generation

@@ -95,7 +95,7 @@ apack(p, n ) int *p;{ /* pack state i from temp1 into amem */
 
 		for( qq=rr,pp=p; pp<=q; ++pp,++qq ){
 			if( *pp ){
-				if( qq > r ) error( "action table overflow" );
+				if( qq > r ) error( "action table overflow - use -a" );
 				if( qq>memp ) memp = qq;
 				*qq = *pp;
 				}
@@ -111,7 +111,7 @@ apack(p, n ) int *p;{ /* pack state i from temp1 into amem */
 
 		nextk: ;
 		}
-	error("no space in action table" );
+	error("no space in action table - use -a" );
 	/* NOTREACHED */
 	}
 

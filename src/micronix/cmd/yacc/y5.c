@@ -5,6 +5,14 @@
 #ifndef TWOPASS
 #include "dextern"
 
+/* The optimizer places its output in amem, which yacc now sizes at
+ * run time (from the grammar and -a) instead of the old fixed array.
+ * Track that size here; the standalone optimizer below keeps its own
+ * _actsize.  Without this the zeroing loop and the bounds checks would
+ * write past a smaller amem. */
+#undef _actsize
+#define _actsize actsiz
+
 #define a amem
 #define mem mem0
 #define pa indgo
@@ -253,14 +261,14 @@ gin(i){
 			s = p + *r +1;
 			if( *s ) goto nextgp;
 			if( s > maxa ){
-				if( (maxa=s) > &a[_actsize] ) error( "a array overflow" );
+				if( (maxa=s) > &a[_actsize] ) error( "a array overflow - use -a" );
 				}
 			}
 		/* we have found a spot */
 
 		*p = *q2;
 		if( p > maxa ){
-			if( (maxa=p) > &a[_actsize] ) error( "a array overflow" );
+			if( (maxa=p) > &a[_actsize] ) error( "a array overflow - use -a" );
 			}
 		for( r=q1; r<q2; r+=2 ){
 			s = p + *r + 1;
@@ -316,7 +324,7 @@ stin(i){
 			}
 
 		for( r = q1; r < q2; r += 2 ){
-			if( (s = *r + n + a ) >= &a[_actsize] ) error( "out of space in optimizer a array" );
+			if( (s = *r + n + a ) >= &a[_actsize] ) error( "out of space in optimizer a array - use -a" );
 			if( s > maxa ) maxa = s;
 			if( *s != 0 && *s != r[1] ) error( "clobber of a array, pos'n %d, by %d", s-a, r[1] );
 			*s = r[1];

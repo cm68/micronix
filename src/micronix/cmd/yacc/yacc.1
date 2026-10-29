@@ -16,7 +16,7 @@ SYNTAX
 .in +5
 .br
 .bd
-yacc [ -vrd ] grammar
+yacc [ -vrd ] [ -a size ] grammar
 .sp 2
 .in -5
 .bd
@@ -45,6 +45,11 @@ If the -d flag is used, the file y.tab.h is generated with the define
 statements that associate the yacc-assigned token codes with the
 user-declared token names.  This allows source files other than y.tab.c
 to access the token codes.
+.sp
+If the -a flag is given, its argument is the size in words of the
+action table.  The default is 512 words.  If yacc reports
+"no space in action table" or "out of space in optimizer a array",
+rerun it with a larger size.
 .sp 2
 .in -5
 .bd

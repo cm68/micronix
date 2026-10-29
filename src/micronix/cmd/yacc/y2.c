@@ -17,13 +17,18 @@ setup(argc,argv) int argc; char *argv[];
 	int c;
 	int *p;
 	char actname[8];
+	char *s, *z;
 
 	foutput = NULL;
 	fdefine = NULL;
 	i = 1;
 	while( argc >= 2  && argv[1][0] == '-' ) {
-		while( *++(argv[1]) ){
-			switch( *argv[1] ){
+		/* s, not *argv[1]: setup is called twice, and advancing
+		   the pointer stored in the caller's argv would leave the
+		   second pass looking at the NUL instead of the grammar. */
+		s = argv[1] + 1;
+		while( *s ){
+			switch( *s++ ){
 			case 'v':
 			case 'V':
 				foutput = fopen(FILEU, "w" );
@@ -45,7 +50,24 @@ setup(argc,argv) int argc; char *argv[];
 			case 'E':
 				lflag = EFL;
 				continue;
-			default:  error( "illegal option: %c", *argv[1]);
+			case 'a':
+			case 'A':
+				if( *s == '\0' ){
+					if( argc < 3 )
+						error( "option -a needs a table size" );
+					argv++;
+					argc--;
+					s = argv[1];
+					}
+				j = 0;
+				z = s;
+				while( *s >= '0' && *s <= '9' )
+					j = j*10 + *s++ - '0';
+				if( j <= 0 || j > 16000 )
+					error( "bad action table size: %s", z );
+				actsiz_req = j;
+				continue;
+			default:  error( "illegal option: %c", *(s-1) );
 				}
 			}
 		argv++;

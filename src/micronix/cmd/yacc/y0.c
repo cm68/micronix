@@ -15,6 +15,7 @@ int *mem0; /* production storage */
 int *mem;
 int *amem;  /* action table storage */
 int actsiz; /* action table size */
+int actsiz_req = 0; /* -a override in words; 0 means size it from the grammar */
 int *memp;		/* next free action table position */
 int nprod = 1;	/* number of productions */
 int **prdptr;	/* pointers to descriptions of productions */
