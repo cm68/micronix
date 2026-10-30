@@ -69,7 +69,13 @@ struct pass {
 	char *name;
 	char *path;
 } pass[] = {
-	{ "cpp", 0 },       /* PASS_CPP */
+	/*
+	 * The Whitesmiths preprocessor is wpp, not cpp: cpp is the
+	 * tree's own (Reiser) preprocessor now, and this driver is the
+	 * one thing that still runs the vendor pipeline.  The other
+	 * passes keep their names.
+	 */
+	{ "wpp", 0 },       /* PASS_CPP */
 	{ "cp1", 0 },       /* PASS_P1 */
 	{ "cp2", 0 },       /* PASS_CGEN */
 	{ "optim", 0 },     /* PASS_OPTIM */

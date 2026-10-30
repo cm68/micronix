@@ -2,9 +2,15 @@
 
 There is no source for the distribution's cc.  cc.c in this directory
 is the tree's own v7-cc port, swizzled onto the Whitesmiths toolchain;
-it is a different program and builds a different binary.  This
-directory also carries the distribution binary and its disassembly,
-following the method used for cmd/td, cmd/newuser and cmd/print.
+it is a different program and builds a different binary, and it is the
+one installed as /bin/cc.  This directory also carries the
+distribution binary and its disassembly, following the method used for
+cmd/td, cmd/newuser and cmd/print.
+
+The vendor preprocessor has no source either.  It is here as wpp.dist
+and installs as /bin/wpp, because cpp is now the tree's own
+preprocessor (cmd/cpp, the Reiser preprocessor).  cc.c names the pass
+wpp in its table for the same reason.
 
 cc.dist is the binary off inode 29 of disks/dist/1014-8_c_1.IMD, 13706
 bytes, mode 0711, root, 7 August 1982.  It is identical to the one in
@@ -21,8 +27,8 @@ p1, p2, p3, an, ptc).  The usage text in the binary is
 	usage: pp -[c d*^ i* o* p? s? x 6] <files>
 
 and the program does not consult argv[0] for it.  Its string table
-contains both "cpp" and "pp"; the cc->wpp/pp naming experiment is
-separate from this reconstruction.
+contains both "cpp" and "pp", but this vendor binary is not what runs:
+the installed cc is cc.c, which invokes wpp.
 
 The disassembly
 ---------------

@@ -29,6 +29,8 @@ $(PROG): $(OBJS)
 install: $(PROG)
 	mkdir -p $(BIN)
 	cp $(PROG) $(BIN)/$(PROG)
+	cp wpp.dist $(BIN)/wpp
+	chmod 755 $(BIN)/wpp
 	mkdir -p $(MANDIR)
 	cp $(MAN) $(MANDIR)/$(MAN)
 
@@ -46,4 +48,5 @@ clobber: clean
 #
 verify: $(PROG)
 	cmp $(PROG) $(BIN)/$(PROG)
+	cmp wpp.dist $(BIN)/wpp
 	cmp $(MAN) $(MANDIR)/$(MAN)

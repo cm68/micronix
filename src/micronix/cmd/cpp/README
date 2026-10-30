@@ -4,6 +4,11 @@ cmd/cpp is /bin/cpp, the preprocessor the distribution shipped.  It is
 John F. Reiser's cpp from v7 (usr/src/cmd/cpp), the one the v7 README
 calls "5 to 12 times faster than the old", ported to micronix.
 
+The Whitesmiths compiler carries its own preprocessor, which is a
+different program.  It lives in cmd/cc as wpp.dist and installs as
+/bin/wpp, and the legacy cc (also in cmd/cc) is what runs it; the two
+names keep the two preprocessors apart.
+
 NOT THE COMPILER
 
 This program is a filter: standard input to standard output.  It is
