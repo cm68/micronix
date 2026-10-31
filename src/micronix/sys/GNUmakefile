@@ -598,13 +598,12 @@ unix: unix.link $(MODS:%=%.page)
 # is the asz dialect ccc drives, not the A-Natural .s files KERNEL_AS
 # names - those were hand-ported and checked in.
 #
-# The rule is idle while a normal build runs: .o is made straight from
-# .c.  Once a .s has been generated, the %.o : %.s rule in
-# GNUmakefile.inc assembles it in place of the .c - the same "the
-# assembly wins" ordering the tree relies on everywhere else - so
-# delete the .s to go back to compiling the .c.
+# The rule is GNUmakefile.inc's, so every directory has it; it was
+# written here first, for the kernel.  There it is a static pattern
+# rule, so it is explicit and never enters implicit-rule search: a
+# generated .s is not a way to make a .o.  The normal build compiles
+# .c to .o and never looks at the .s.  Delete the .s when you have
+# done reading it.
 #
-%.s : %.c
-	$(CCC) $(CCFLAGS) $(INC) -s $<
 
 .PHONY: objects unix build.h
