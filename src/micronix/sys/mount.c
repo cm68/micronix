@@ -98,8 +98,8 @@ syncsuper()
     struct super *sp;
 
     for (m = mlist; m < mlist + NMOUNT; m++) {
-        if (m->dev == 0)
-            continue;
+        if (m->dev == 0 || m->ronly)
+            continue;           /* a read-only mount has nothing to write */
         sb = getsb(m->dev);
         sp = (struct super *)bhold(sb);
         sp->s_bfree = m->bfree;
@@ -151,7 +151,8 @@ tmount(dev, ip, ronly, dname)
      */
     copyin(dname, sp->s_mount, 63);
     sp->s_mount[63] = 0;
-    sp->s_fmod = 1;
+    if (!ronly)
+        sp->s_fmod = 1;         /* a read-only mount has nothing to write out */
 
     if (dev == rootdev)         /* part of power-up */
         (*rtcinit)(sp->s_time);
@@ -201,11 +202,19 @@ umount(ioname)
             }
     iflush(dev);
     sb = getsb(dev);
-    sp = (struct super *)bhold(sb);
-    sp->s_bfree = m->bfree;    /* persist the live counts */
-    sp->s_ifree = m->ifree;
-    brel();
-    bdwrite(sb);
+    /*
+     * A read-only mount wrote nothing: its superblock counts cannot have
+     * moved, and writing them - or the s_flock the mount set in memory -
+     * would be a write to media that may not take one at all.  Release
+     * the buffer and leave the disk as it was.
+     */
+    if (!m->ronly) {
+        sp = (struct super *)bhold(sb);
+        sp->s_bfree = m->bfree;    /* persist the live counts */
+        sp->s_ifree = m->ifree;
+        brel();
+        bdwrite(sb);
+    }
     sb->flags &= ~BLOCK;
     brelse(sb);
     irelse(io);                 /* avoid deadlock */

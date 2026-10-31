@@ -109,8 +109,15 @@ fi
 # host tool at all.  Neither is an install step, so neither is required
 # for the install to finish - they are here for the loop, not for init.
 #
+# halt is the other end of the install: a diskette that has just written
+# a hard disk stops the machine with "sync; halt", and that is what syncs
+# the new superblock and lets the simulation end cleanly instead of being
+# killed.  scsiformat is the SCSI target's formatter, for a diskette that
+# installs onto the 5380; the other two formatters were already here.
+#
 BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
-	mknod setdev ln sync echo hdformat mwformat label chg fdj"
+	mknod setdev ln sync echo hdformat mwformat label chg fdj halt
+	scsiformat"
 
 #
 # What the five inch medium cannot hold.  The list above is 487 blocks of
@@ -129,7 +136,7 @@ BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
 # knapsack in the README is that list, and this is the only difference
 # between them.
 #
-DROP5="hdformat mwformat cat"
+DROP5="hdformat mwformat cat scsiformat"
 
 medium="$1"
 image="$2"

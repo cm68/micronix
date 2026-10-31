@@ -212,6 +212,31 @@ putblk(bp, seg, off)
 }
 
 /*
+ * A hole in the file: a block the file does not own, which reads as zeros.
+ * The kernel's own image is written to a diskette through a writer that
+ * skips an all-zero block rather than spend a diskette block on it, and
+ * the module pages have such blocks - a page of driver code is rarely all
+ * nonzero, and the padding between pages always is not.  A hole is not a
+ * read failure: it is the zero half of a sparse file, and it goes into
+ * the page as zeros.
+ */
+static
+putzero(seg, off)
+    UINT seg, off;
+{
+    UINT8 save;
+    char *p;
+    UINT n;
+
+    save = OVLSEG;
+    map0[2 * OVLSEG] = (UINT8) seg;
+    p = (char *) OVLBASE + off;
+    for (n = 0; n < 512; n++)
+        *p++ = 0;
+    map0[2 * OVLSEG] = save;
+}
+
+/*
  * Place the driver modules that ride in the kernel's own file.
  *
  * The build appends one 4K page per driver past the object's own extent,
@@ -306,7 +331,11 @@ ovlplaceall()
         bad = 0;
         for (i = 1; i < PAGESZ / 512; i++) {
             bn = imap(ip, (UINT) (modbase >> 9) + n * 8 + i, &ra, IREAD);
-            if (bn == 0 || (bp = bread(bn, rootdev)) == 0) {    /* a short page is not a page */
+            if (bn == 0) {                  /* a hole reads as zeros */
+                putzero(seg, i * 512);
+                continue;
+            }
+            if ((bp = bread(bn, rootdev)) == 0) {   /* a real read failure */
                 bad = 1;
                 continue;
             }

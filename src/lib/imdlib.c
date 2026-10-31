@@ -710,6 +710,7 @@ imd_load(char *fname, int drive, int mode)
     struct imd_trk **tmp;
     int ntrk, nalloc, i;
     int cylhi = 0, prevcyl = -1;
+    long rec_off;
     int offset;
     int cyl;
     int head;
@@ -775,11 +776,17 @@ imd_load(char *fname, int drive, int mode)
     tmp = malloc(16 * sizeof(struct imd_trk *));
     ntrk = 0;
     nalloc = 16;
-    while ((tp = get_track(fd, imd_inplace(mode))) != 0) {
+    while ((rec_off = lseek(fd, 0, SEEK_CUR)) >= 0 &&
+        (tp = get_track(fd, imd_inplace(mode))) != 0) {
         if (ntrk == nalloc) {
             nalloc *= 2;
             tmp = realloc(tmp, nalloc * sizeof(struct imd_trk *));
         }
+        /*
+         * Where the record begins, so a format can rewrite it there
+         * instead of appending a second record for the same track.
+         */
+        tp->rec_off = rec_off;
         /*
          * The on-disk cylinder is one byte, and a drive of more than 256
          * cylinders wraps it.  Tracks come off the image in cylinder
@@ -1239,6 +1246,7 @@ imd_track(struct imd *ip, int cyl, int head)
         tp->fixed.cyl = cyl;
         tp->fixed.head = head;
         tp->head = head;
+        tp->rec_off = -1;       /* no record on the image yet */
         ip->tracks[trk] = tp;
     }
     return tp;
@@ -1296,12 +1304,78 @@ write_track(struct imd *ip, struct imd_trk *tp, int fill)
     return 0;
 }
 
+/*
+ * Lay one track's record down in an in-place image and fill its sectors.
+ * off is where the record goes; -1 appends a new one, for a track a blank
+ * disk has grown.  A rewrite at an existing offset keeps every sector's
+ * data run where it is, so the image does not grow and the offsets the
+ * reads already use stay valid; the format's fill goes into those runs.
+ * The layout is the reader's: the header and maps, then each sector's
+ * code immediately followed by its data run.  Returns the record's file
+ * offset, or -1.
+ */
+static long
+put_track(struct imd *ip, struct imd_trk *tp, int fill, long off)
+{
+    unsigned char hdr[5];
+    unsigned char code;
+    char fb[MAXSECSIZE];
+    long rec;
+    int i;
+
+    if (tp->secsize > (int) sizeof(fb))
+        return -1;
+    memset(fb, fill, tp->secsize);
+
+    if (off >= 0)
+        rec = off;
+    else
+        rec = lseek(ip->fd, 0, SEEK_END);
+    if (rec < 0 || lseek(ip->fd, rec, SEEK_SET) < 0)
+        return -1;
+
+    hdr[0] = tp->fixed.mode;
+    hdr[1] = tp->fixed.cyl & 0xff;
+    hdr[2] = tp->fixed.head;
+    hdr[3] = tp->fixed.nsec;
+    hdr[4] = tp->fixed.size;
+    if (write(ip->fd, hdr, 5) != 5 ||
+        write(ip->fd, tp->secmap, tp->fixed.nsec) != tp->fixed.nsec)
+        return -1;
+    if ((tp->fixed.head & 0x80) &&
+        write(ip->fd, tp->cylmap, tp->fixed.nsec) != tp->fixed.nsec)
+        return -1;
+    if ((tp->fixed.head & 0x40) &&
+        write(ip->fd, tp->headmap, tp->fixed.nsec) != tp->fixed.nsec)
+        return -1;
+
+    for (i = 0; i < tp->fixed.nsec; i++) {
+        code = IMD_DATA;
+        if (write(ip->fd, &code, 1) != 1)
+            return -1;
+        if (off >= 0) {
+            /* the run is already on the image: fill it where it lies */
+            if (pwrite(ip->fd, fb, tp->secsize, tp->data_off[i]) !=
+                tp->secsize)
+                return -1;
+        } else {
+            tp->data_off[i] = lseek(ip->fd, 0, SEEK_CUR);
+            if (tp->data_off[i] < 0 ||
+                write(ip->fd, fb, tp->secsize) != tp->secsize)
+                return -1;
+        }
+    }
+    return rec;
+}
+
 int
 imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     int mode, int fill)
 {
     struct imd *ip = (struct imd *)vp;
     struct imd_trk *tp;
+    long rec_off, *old_off;
+    int old_nsec, old_secsize, reuse;
     int i, sbyte;
 
     tp = imd_track(ip, cyl, head);
@@ -1311,13 +1385,39 @@ imd_setfmt(void *vp, int cyl, int head, int firstsec, int secs, int secsize,
     for (sbyte = 0, i = 128; i < secsize; i <<= 1)
         sbyte++;
 
+    /*
+     * An in-place image already holds this track's data runs.  A format
+     * that keeps the track's shape rewrites the record where it lies and
+     * fills those runs in place.  Appending a second record for the same
+     * track instead - which is what this used to do - grows the image by
+     * a whole drive per format, and a reader that takes the first record
+     * of a track goes on seeing the data the format replaced.
+     */
+    rec_off = tp->rec_off;
+    old_nsec = tp->fixed.nsec;
+    old_secsize = tp->secsize;
+    old_off = tp->data_off;
+    reuse = ip->mode == IMD_INPLACE && rec_off >= 0 && old_off != 0 &&
+        old_nsec == secs && old_secsize == secsize;
+
+    if (!reuse && old_off) {
+        free(old_off);          /* replaced by a new record, not reused */
+        old_off = 0;
+    }
+    tp->data_off = 0;           /* apply_fmt must not free what we keep */
     apply_fmt(tp, secs, sbyte, mode, firstsec);
+    tp->data_off = old_off;
 
     if (ip->mode == IMD_INPLACE) {
-        /* the offset table; the data itself lives in the file's holes */
-        tp->data_off = malloc(sizeof(long) * secs);
-        if (ip->fd >= 0 && write_track(ip, tp, fill) < 0)
+        if (!tp->data_off &&
+            !(tp->data_off = malloc(sizeof(long) * secs)))
             return 0;
+        if (ip->fd < 0)
+            return 0;
+        rec_off = put_track(ip, tp, fill, reuse ? rec_off : -1);
+        if (rec_off < 0)
+            return 0;
+        tp->rec_off = rec_off;
         return 1;
     }
 

@@ -388,6 +388,29 @@ findlabel(char *p)
 }
 
 /*
+ * c1's statement-boundary contract, in the text: a trailing
+ * ";@dead a,f" on an unconditional jump says nothing in A or the flags
+ * is wanted past it (c1/parseast.c, deadnote).  The comment never
+ * reaches the key, because normalise stops at the semicolon, and the
+ * assembler strips it; only this scan reads it.  It is what lets a run
+ * of ld (ix+d),0 become xor a / ld (ix+d),a without following the jump
+ * to a target the window cannot see.  A function containing inline
+ * asm carries no such mark.
+ */
+static int
+deadmarked(int i)
+{
+	char *p;
+
+	if (!win[i].text)
+		return 0;
+	for (p = win[i].text; *p; p++)
+		if (*p == ';' && strncmp(p, ";@dead", 6) == 0)
+			return 1;
+	return 0;
+}
+
+/*
  * Is every bit of reg overwritten before any of it is read?
  *
  * Partial writes are why this accumulates rather than testing one
@@ -409,8 +432,18 @@ isdead(int reg, int from)
 	int i, got = 0;
 
 	for (i = from; i < nwin; i++) {
-		if (win[i].kind == L_LABEL)
+		if (win[i].kind == L_LABEL) {
+			/*
+			 * c1 marks the statement labels where A and the
+			 * flags are dead on every edge into them, so a
+			 * marked label is a dead end for a request inside
+			 * that set.  An unmarked label is still a join
+			 * this window cannot see into.
+			 */
+			if ((reg & ~(R_A | R_F)) == 0 && deadmarked(i))
+				return 1;
 			return 0;			/* a jump target: no idea what reaches it */
+		}
 		if (win[i].kind != L_INSN)
 			continue;
 		/*
@@ -421,6 +454,16 @@ isdead(int reg, int from)
 		 * says the same thing with an OR: adding the read bits to
 		 * got changes it exactly when such a bit exists.
 		 */
+		/*
+		 * c1's assertion is stronger than the conservative read
+		 * below: reads() says a jump wants the flags, which is
+		 * true of the conditional sibling and not of a marked
+		 * statement-boundary jump.  Trust the assertion for the
+		 * registers it names; anything else still has to prove
+		 * itself the ordinary way.
+		 */
+		if ((reg & ~(R_A | R_F)) == 0 && deadmarked(i))
+			return 1;
 		if (((reads(win[i].key) & reg) | got) != got)
 			return 0;
 		got |= writes(win[i].key);

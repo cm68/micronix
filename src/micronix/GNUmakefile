@@ -482,10 +482,11 @@ footprint:
 #
 # The controller regression matrix: a floppy install, a hard disk boot,
 # and a native build - install, clobber, build again, verify - for each
-# of the disk controllers, preceded by a complete host rebuild.  The
-# script finds the tree from its own path, so it is invoked here by
-# path; -n skips the host rebuild, -d names the working directory and
-# -c restricts the controllers (see the script's usage).
+# of the disk controllers.  The script clobbers the tree and rebuilds
+# everything from source before it starts, so what is tested is this
+# tree and not whatever was left built.  It finds the tree from its own
+# path, so it is invoked here by path; -d names the working directory
+# and -c restricts the controllers (see the script's usage).
 #
 REGRESSION	= ../../disks/hdinstall/matrix_test
 REGRESSIONDIR	?= /tmp/matrix

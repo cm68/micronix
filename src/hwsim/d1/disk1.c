@@ -121,14 +121,14 @@ d1_intr(void)
     set_vi(disk1_vi_line, DISK1_CARDID, intr ? 1 : 0);
 }
 
-static int select_path(int id, char *path);
+static int select_path(int id, char *path, int ro);
 
 /* the media changer's end of the same thing: a path, not a name we made up */
 static int
-disk1_media_load(int unit, char *path)
+disk1_media_load(int unit, char *path, int ro)
 {
     bound[unit] = 1;            /* ours, so select_path does not report it */
-    if (select_path(unit, path) < 0)
+    if (select_path(unit, path, ro) < 0)
         return -1;
     fitted = 1;
     curcyl[unit] = 0;
@@ -157,12 +157,12 @@ static struct mediadev disk1_media = {
  * sectors land.
  */
 static int
-select_path(int id, char *path)
+select_path(int id, char *path, int ro)
 {
     void *np;
     int nsec, ss;
 
-    np = imd_load(path, id, IMD_DELTA);
+    np = imd_load(path, id, ro ? IMD_RO : IMD_DELTA);
     if (!np)
         return -1;
     if (handle[id])
@@ -191,7 +191,7 @@ select_drive(int id)
     if (bound[id])
         return -1;              /* the changer said what is here, and it is nothing */
     sprintf(drivename, "disk1-%d", id);
-    if (select_path(id, drive_resolve(drivename)) < 0) {
+    if (select_path(id, drive_resolve(drivename), 0) < 0) {
         printf("disk1: no drive %s, command refused\n", drivename);
         return -1;
     }

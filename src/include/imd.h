@@ -133,6 +133,9 @@ struct imd_trk {
     char *headmap;
     char **data;
     long *data_off;                 /* file offset of each sector's blob, in-place */
+    long rec_off;                   /* file offset of this track's record, -1 =
+                                     * not on the image yet (a track a blank
+                                     * disk grew as it was formatted) */
 };
 
 extern void imd_close(void *vp);

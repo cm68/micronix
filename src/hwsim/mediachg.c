@@ -315,7 +315,7 @@ bind_drive(struct mediadev_slot *d, int unit, char *src)
         }
     }
 
-    if (d->ops->load(unit, path) < 0) {
+    if (d->ops->load(unit, path, set >= 0) < 0) {
         free(path);
         stage_response("error ioerror");
         return;
@@ -342,7 +342,7 @@ next_drive(struct mediadev_slot *d, int unit)
         return;
     }
     path = drive_resolve(msets[set].vol[num]);
-    if (d->ops->load(unit, path) < 0) {
+    if (d->ops->load(unit, path, 1) < 0) {
         free(path);
         stage_response("error ioerror");
         return;

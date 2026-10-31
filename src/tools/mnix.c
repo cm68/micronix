@@ -1406,6 +1406,17 @@ struct medium {
     {"m32", "CMI",     "",       640, 6, 17, 0},
     {"m40", "Quantum", "Q540",   512, 8, 17, 0},
     {"m26", "",        "M26",    202, 8, 32, 1},
+    /*
+     * The big ones: a 1GB compact flash card and a 1GB Micropolis SCSI
+     * drive.  A filesystem block number is 16 bits, so no slice can hold
+     * more than 65535 blocks (32MB); the volume is the extent the full
+     * complement of slices fills - cylinder 0 for the boot, then a, b,
+     * d..h - and no larger.  Nothing is created past the last partition.
+     * The table arithmetic in label -w, mwformat and scsiformat gives
+     * 65 cylinders a slice at this geometry: 1 + 65 + 1 + 5*65 = 392.
+     */
+    {"cf1g",  "SanDisk",    "CF 1GB",   392, 16, 63, 0},
+    {"mps1g", "Micropolis", "1GB SCSI", 392, 16, 63, 0},
     /* Maxtor XT MFM drives: cylinders, heads, 17 sectors */
     {"xt1065", "Maxtor", "XT-1065", 918, 7, 17, 0},
     {"xt1085", "Maxtor", "XT-1085", 1024, 8, 17, 0},

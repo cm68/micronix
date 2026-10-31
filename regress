@@ -1,0 +1,130 @@
+#!/bin/sh
+#
+# regress - the whole controller regression matrix, in one command
+#
+#	./regress [-1] [-x] [-s] [-i] [-c "<controllers>"] [-d <dir>]
+#
+# Every argument goes to disks/hdinstall/matrix_test, which is the
+# matrix itself: "make clobber" at the top of the tree and a build from
+# source of the simulators, host tools, toolchain, userland, boot images
+# and distribution media, then for each hard disk controller - hdcdma,
+# hdca, ncr and ide by default - a pair of volumes made from scratch, an
+# install from the distribution diskettes, and the native build: make,
+# make install, make clobber, make, make verify.
+#
+# The controllers run at the same time by default; -1 runs them one at
+# a time.  Each leg is an independent machine, and the distribution sets
+# are read-only media every leg reads.
+#
+# Nothing is reused, and nothing old is tested: a regression against an
+# object file built before the change is a regression against the old
+# code, so the tree is clobbered and rebuilt at the start of every run.
+#
+# Each run gets its own work directory, /tmp/regress-<date>-<time>.
+# Nothing is reused: stopping the simulator is not a shutdown, the
+# superblock never reaches the disk, and a volume left by an earlier run
+# will either double-allocate a block or leak blocks.  matrix_test also
+# recreates each controller's volumes at the start of its leg, but the
+# logs live beside them, and a log from an earlier run is the wrong
+# thing to read after this one.
+#
+# -d names the work directory.  The rest are the matrix's own: -1 runs
+# the legs one at a time, -x stops at the first failure (and implies -1),
+# -s stops after the diskette and the volumes are made, -i stops after
+# the install boot.
+#
+# The console output is also kept in <dir>/run.log, and the verdict for
+# every stage in <dir>/summary.  Exit status is 0 only when every
+# controller passed every stage.
+#
+# This runs for hours - the native build is a two-pass compile of the
+# whole tree on a simulated Z80 - so start it in the background and
+# watch <dir>/run.log.
+#
+
+set -u
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+matrix="$here/disks/hdinstall/matrix_test"
+
+if [ ! -x "$matrix" ]; then
+	echo "$0: $matrix not found or not executable" >&2
+	exit 1
+fi
+
+#
+# -h is the matrix's usage, and it explains the flags better than this
+# header does.  Answer it before making a work directory for a run that
+# will not happen.
+#
+for a in "$@"; do
+	if [ "$a" = -h ]; then
+		exec "$matrix" -h
+	fi
+done
+
+#
+# The matrix needs a populated filesystem/ for the minimal install root
+# it builds each controller's volumes from.  A clobbered tree does not
+# have one; the distribution disks and the host tools do, so make it.
+#
+if [ ! -f "$here/filesystem/bin/sh" ]; then
+	echo "filesystem/ is empty; making it from the distribution disks"
+	( cd "$here" && make filesystem ) || exit 1
+fi
+
+#
+# A work directory of our own unless one was named, so that nothing -
+# volume, delta, lock or log - comes in from a previous run.
+#
+work=
+sawd=0
+for a in "$@"; do
+	if [ "$sawd" = 1 ]; then
+		work=$a
+		sawd=0
+		continue
+	fi
+	if [ "$a" = -d ]; then
+		sawd=1
+	fi
+done
+if [ -z "$work" ]; then
+	work="${WORK:-/tmp/regress-`date +%Y%m%d-%H%M%S`}"
+fi
+mkdir -p "$work" || exit 1
+
+log="$work/run.log"
+rcfile="$work/.rc"
+rm -f "$rcfile"
+
+echo "work directory: $work"
+echo "log:            $log"
+echo
+
+#
+# tee the run so the console has it live and the log has it after.  A
+# pipeline's exit status is tee's, so the matrix's status is written to
+# a file from inside the same subshell that ran it.
+#
+{
+	"$matrix" -d "$work" "$@"
+	echo $? > "$rcfile"
+} 2>&1 | tee "$log"
+
+if [ -f "$rcfile" ]; then
+	rc=`cat "$rcfile"`
+else
+	rc=1
+fi
+rm -f "$rcfile"
+
+echo
+if [ -f "$work/summary" ]; then
+	echo "===== matrix summary ====="
+	cat "$work/summary"
+fi
+echo
+echo "log: $log"
+exit "$rc"
