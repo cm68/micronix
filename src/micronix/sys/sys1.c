@@ -147,10 +147,19 @@ dup()
  * way every descriptor-taking call passes its first; fd2 goes back
  * the same way.  dup2(fd, fd) is a successful no-op, and an invalid
  * fd is refused before fd2 is touched.
+ *
+ * fd2 is a word and not the UINT8 the descriptor is: docall() reaches
+ * every syscall through the table's untyped int (*)(), with the argument
+ * words in arg[].  A byte first parameter makes the compiler pass it in
+ * A (the .abi marker's SF_ARG8) and nothing on that path has put it
+ * there - fd2 arrived in a register's worth of whatever was last in A,
+ * so every dup2 failed and a login shell's Ldup fell back to stdin.
+ * The descriptor is a byte from the comparison and the olist index down;
+ * the call boundary is words.
  */
 void
 dup2(fd2)
-    UINT8 fd2;
+    UINT fd2;
 {
     register struct file *fp;
     UINT8 fd;

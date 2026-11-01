@@ -182,6 +182,15 @@ docall(addr, direct)
     }
     if (trace && call)
         pr(" %d:%d ", procid(u.p), call);
+    /*
+     * The table's pointers are untyped, so every entry is called with
+     * word arguments.  A syscall must therefore not declare an 8-bit
+     * first parameter: c1 marks such a definition SF_ARG8 and passes it
+     * in A, and nothing on this path puts it there.  dup2 did, and every
+     * dup2 got a register's worth of garbage - the login shell's Ldup
+     * onto fd 0 failed and it read stdin instead of .login.  Declare the
+     * parameter UINT and narrow it inside the call.
+     */
     (*syssw[call].call) (arg[0], arg[1], arg[2]);
 }
 

@@ -2596,7 +2596,19 @@ rewrite1(Expr *e)
 	 * constant right operand, which needs no register and which
 	 * nothing would materialise if it were pushed and popped around.
 	 */
-	if (e->regs >= 3 && e->left && e->right && e->op != ASSIGN &&
+	/*
+	 * A bitfield extract on the right is a call to bfext, and bfext's
+	 * value comes back in HL: it has to be worked out after the left
+	 * is out of the way, whatever the register estimate says.  The
+	 * estimate scored it like a load (one), so two of them made two
+	 * and this path was not taken; the left stayed in HL while the
+	 * right's bfext overwrote it, the operator was handed a value
+	 * against itself, and no rule builds (HL) op (HL) - "p->a +
+	 * p->b" and "x + p->b" did not compile at all.  Park the left,
+	 * as the call it is.
+	 */
+	if ((e->regs >= 3 || (e->right && e->right->op == BFEXTRACT)) &&
+	    e->left && e->right && e->op != ASSIGN &&
 	    e->right->op != NUMBER) {
 		/* Evaluate left subtree (result in HL) */
 		e->left = rewrite1(e->left);

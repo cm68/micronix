@@ -24,7 +24,15 @@ typedef unsigned long dword;
 #define STRBUFSIZE 128         // string/symbol/identifier buffer
 #define MAXSYMLEN 32           // maximum symbol/identifier length
 #define PSIZE 80               // max string containing bitdefs
-#define MAXBITS 32             // maximum size of bitfield
+/*
+ * The info byte bfins/bfext take (lib/libc/bitfield.s) is four bits of
+ * width and four of offset.  This was 32, and a field of 16..32 bits
+ * was accepted and encoded as (offset<<4)|width with the width spilling
+ * into the offset nibble: width 16 became offset 1 / width 0 (a field
+ * that stores nothing), 17 became a one-bit field one bit along, and 32
+ * another dead one - silently.  Fifteen is what the encoding holds.
+ */
+#define MAXBITS 15             // maximum size of bitfield
 #define MAX_COUNTS 256         // pre-computed counts for streaming AST
 #define MAXDIM 6               // dimensions in one array declarator
 
