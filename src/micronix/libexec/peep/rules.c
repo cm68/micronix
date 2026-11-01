@@ -49,6 +49,7 @@ int n_exx = 0;
 int n_reload = 0;
 int n_constdup = 0;
 int n_orclr = 0;
+int n_masknoop = 0;
 int n_reuse = 0;
 int n_pushsrc = 0;
 int n_ptrload = 0;
@@ -1227,6 +1228,48 @@ is_zerostore(int i)
 }
 
 /*
+ * The same zero fill through a pointer: ld (hl),0 with an inc hl
+ * between stores, which is how a run of bytes reached through a
+ * pointer is cleared.  A is the only register that can be stored
+ * through (hl) without disturbing the pointer, so the stores retarget
+ * to it as they do for the frame slots.  Two differences: the inc hl
+ * lines stay, so a store is one byte shorter, not the two the frame
+ * form saves; and when the value state already knows A is zero the xor
+ * is not needed at all - then even a single store pays, with no
+ * liveness proof, because nothing about A or the flags moves.
+ */
+int
+r_hlzero(void)
+{
+	int n = 0, i, j, last, z;
+
+	if (!is(0, "ld (hl),0"))
+		return 0;
+	for (i = 0; ; i += 2) {
+		n++;
+		if (!is(i + 1, "inc hl") || !is(i + 2, "ld (hl),0"))
+			break;
+	}
+	last = i;
+	z = viszero(&vbase, VA);
+	if (!z) {
+		if (n < 2)
+			return 0;
+		if (!isdead(R_A | R_F, last + 1))
+			return 0;
+	}
+	for (j = last; j >= 0; j -= 2) {
+		delline(j, 1);
+		insline(j, "\tld (hl),a\n");
+	}
+	if (!z)
+		insline(0, "\txor a\n");
+	n_autozero++;
+	saved += z ? n : n - 1;
+	return 1;
+}
+
+/*
  * A run of autos initialised to zero - "int a,b,c,d;" - is emitted as
  * one "ld (iy+d),0" per byte, four bytes each.  Load A with zero once
  * and store it instead: "xor a" and one "ld (iy+d),a" per byte, three
@@ -1451,6 +1494,46 @@ r_orclr(void)
 
 
 /*
+ * A constant mask that cannot change the value.
+ *
+ * A is eight bits, so "and 255" leaves it alone; the only thing the
+ * instruction still does is set the flags, and it goes when nothing
+ * wants them.  Its H bit differs from "or a", which is why it is not
+ * replaced when the flags are live.
+ *
+ * "or 0" and "xor 0" come from a bitwise OR with a small constant:
+ * c1 splits the word into byte operations and the high byte's OR is
+ * against zero.  They leave A alone and set exactly the flags "or a"
+ * sets - H is clear in both, and no DAA is ever emitted - so they
+ * shrink to "or a" when the flags are wanted, and go entirely when
+ * they are not.
+ */
+int
+r_masknoop(void)
+{
+	if (is(0, "and 255")) {
+		if (!isdead(R_F, 1))
+			return 0;
+		delline(0, 1);
+		n_masknoop++;
+		saved += 2;
+		return 1;
+	}
+	if (is(0, "or 0") || is(0, "xor 0")) {
+		if (isdead(R_F, 1)) {
+			delline(0, 1);
+			saved += 2;
+		} else {
+			replace(1, "\tor a\n");
+			saved += 1;
+		}
+		n_masknoop++;
+		return 1;
+	}
+	return 0;
+}
+
+/*
  * A shift by eight or more.  c1 spells a constant count out one bit at
  * a time, and the first eight bits are a byte move: add hl,hl eight
  * times is ld h,l / ld l,0, and srl h / rr l eight times is ld l,h /
@@ -1587,14 +1670,20 @@ applyrules(void)
 			return 1;
 		return r_exde();
 	case 'a':
+		if (r_masknoop())
+			return 1;
 		return r_shiftrun();
 	case 'c':
 		return r_hlarg();
 	case 'i':
 		return r_incsp();
 	case 'o':
+		if (r_masknoop())
+			return 1;
 		return r_orclr();
 	case 'x':
+		if (r_masknoop())
+			return 1;
 		return r_xordup();
 	case 'p':
 		if (r_fenter())
@@ -1645,6 +1734,8 @@ applyrules(void)
 			return 1;
 		if (r_ixcopy())			/* ld c,ixl ; ld b,ixh -> push ix ; pop bc */
 			return 1;
+		if (r_hlzero())			/* ld (hl),0 ; inc hl ... -> ld (hl),a */
+			return 1;
 		if (r_autozero())		/* ld (iy+d),0 ... -> xor a ; ld (iy+d),a */
 			return 1;
 		if (r_reuse())			/* ld de,n ; add hl,de -> add hl,bc */
@@ -1680,6 +1771,7 @@ report(void)
 		"  shiftrun %d\n",
 		n_exde, n_ldazero, n_bitset, n_pushswap, n_pushsave,
 		n_bytestore, n_astore, n_reload, n_shiftrun);
+	fprintf(stderr, "peep: masknoop %d\n", n_masknoop);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

@@ -334,6 +334,33 @@ INSTALLMODE = @if [ -n "$(strip $(MODE))" ] ; then \
 %.o : %.s
 	$(CCC) $(CCFLAGS) -c $<
 
+#
+# THE ASSEMBLY ccc WOULD ASSEMBLE, FOR READING.  "make declare.s"
+# writes declare.s beside declare.c, peepholed exactly as ccc builds
+# the .o (-s is "compile only, keep the .s").  The output is the asz
+# dialect this tree's assembler reads, not the hand-written A-Natural
+# .s files that are sources in their own right (ASSRCS).
+#
+# A STATIC pattern rule, and that is the point.  An ordinary "%.s :
+# %.c" is an IMPLICIT rule, and make is free to chain implicit rules -
+# so a generated .s could become the source of a .o through "%.o :
+# %.s".  A static pattern rule is an EXPLICIT rule: make never
+# considers it while searching for a way to build something else.  The
+# .s is produced only when someone names it.  Nothing depends on these
+# files, so they are in no dependency list, and the compiler passes go
+# on compiling .c to .o as they always have.
+#
+# CSRCS is enumerated in every directory that has C sources (the same
+# list $(OBJS) is built from), so this covers the tree.  A generated
+# file that is deliberately not in CSRCS - c0's dbgtags.c - has no
+# rule, which is right: it is included, not compiled.  The hand-written
+# .s files are ASSRCS and are already there; they are not targets here.
+#
+ifneq ($(strip $(CSRCS)),)
+$(CSRCS:.c=.s): %.s : %.c
+	$(CCC) $(CCFLAGS) $(INC) -s $<
+endif
+
 ifneq ($(strip $(TARGET)),)
 ifeq ($(suffix $(TARGET)),.a)
 $(TARGET): $(OBJS)

@@ -28,7 +28,12 @@ struct mediadev {
     char *card;                 /* the name a command uses: "djdma" */
     int   instance;             /* which of that card; 0 unless there are two */
     int   nunits;               /* how many drives it offers */
-    int (*load)(int unit, char *path);  /* hold this image there; -1 refused */
+    int (*load)(int unit, char *path, int ro);  /* hold this image there;
+                                 * ro says the medium is read-only (a
+                                 * named set's volume, which is shared by
+                                 * every machine reading it) and must be
+                                 * opened without a lock or an overlay.
+                                 * -1 refused */
     void (*eject)(int unit);            /* let go of it: the drive goes not ready */
 };
 

@@ -74,8 +74,20 @@ dlook(ip, np)
     static char c, *p, *nambuf;
     static struct buf *b;
     static struct dir *d;
-    struct dir *place;
-    UINT slot, inum;
+    /*
+     * The place of an entry is its byte offset in the directory, not an
+     * address.  It used to be a struct dir * advanced alongside d, so
+     * that place++ carried the 16 bytes per entry for free; but a
+     * directory may be larger than the 16 bits such a pointer holds,
+     * and storing it in u.offset made the conversion of a pointer to
+     * the 32-bit offset depend on the compiler widening it.  Count the
+     * block and the entry instead: place is the offset of the block,
+     * and the entry's own offset is i entries of 16 bytes in.
+     */
+    UINT32 place;               /* byte offset of the block being read */
+    UINT32 slot;                /* byte offset of the first free entry */
+    UINT inum;
+    UINT i;
 
     nambuf = u.dir.name;
     copyin(*np, nambuf, 14);
@@ -96,8 +108,8 @@ dlook(ip, np)
     if (tail)
         nblks++;
     slot = 0;
-    place = 0;
     for (log = 0; log < nblks; log++) {
+        place = (UINT32) log << 9;      /* this block's byte offset */
         if ((phys = imap(ip, log, &dummy, IREAD)) == 0)
             continue;
         if ((b = bread(phys, ip->i_dev)) == 0)
@@ -110,12 +122,12 @@ dlook(ip, np)
          * the whole block was skipped.  The last block may be short.
          */
         nents = ((tail && log == nblks - 1) ? tail : 512) >> 4;   /* 16-byte entries */
-        for (; nents; nents--, d++, place++) {
+        for (i = 0; i < nents; i++, d++) {
             if (d->inum == 0) {
                 if (slot == 0)
-                    slot = place;
+                    slot = place + (i << 4);
             } else if (direqu(d->name, u.dir.name)) {
-                u.offset = place;
+                u.offset = place + (i << 4);
                 inum = d->inum;     /* read it before the window goes */
                 brel();
                 brelse(b);
@@ -128,7 +140,7 @@ dlook(ip, np)
     /*
      * Name not found.
      */
-    u.offset = (slot) ? slot : place;
+    u.offset = (slot) ? slot : ip->size;    /* a free slot, or the end */
     if (!u.error) {
         if (getbyte(*np) == '\0')
             u.error = ENOENT;

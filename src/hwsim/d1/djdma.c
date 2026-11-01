@@ -213,6 +213,7 @@ static int fmt_advance;         /* last exec was a format; this one advances */
  * with alternate sectoring, which is the driver's skew and not ours.
  */
 static void *imdp[8];
+static int rodrv[8];            // the medium there is read-only media
 #define FIVE    4               // first physical 5 1/4 inch drive
 
 /*
@@ -514,6 +515,15 @@ writesec()
     sec &= 0x7f;
     drive = physdrive(physread(channel + 3));
 
+    /*
+     * Read-only media: the status said wprot at open and the driver
+     * does not send this, but a raw command block can, so the card
+     * refuses it here too rather than let a write alter a distribution
+     * diskette the whole machine shares.
+     */
+    if (rodrv[drive])
+        return S_PROT;
+
     tracec(trace_bio|trace_djdma, "drive:%d cyl:%d sec:%d head:%d",
         drive, cyl, sec, head);
     dparams[drive].current = cyl;
@@ -658,6 +668,9 @@ sense()
     }
     if (dparams[drive].current == 0) {
         dsb |= SB3_TRK0;
+    }
+    if (rodrv[drive]) {
+        dsb |= SB3_WPROT;       /* read-only medium: the driver's F_WP */
     }
     physwrite(channel + 2, dcb);
     physwrite(channel + 3, slc);
@@ -1270,6 +1283,7 @@ eject_drive(int drive)
         imd_close(imdp[drive]);
         imdp[drive] = 0;
     }
+    rodrv[drive] = 0;
 }
 
 /*
@@ -1279,18 +1293,27 @@ eject_drive(int drive)
  * one's: by the time it gets here a blank has already been unlinked, and
  * imd_load's fallback is what makes it - it writes a bare IMD header and
  * the guest's format fills in the geometry.  So no access() here.
+ *
+ * ro is the changer's word that this is a named set's volume.  A
+ * distribution diskette is read-only media, shared by every machine
+ * reading the set, so it is opened with no lock and no write overlay,
+ * and the drive's status says so: the driver reads the write-protect
+ * bit at open and refuses a write open, which is the read-only bit a
+ * "mount -r" is meant to find there.  A path and a blank stay writable -
+ * a blank is how a diskette set is made.
  */
 static int
-load_drive(int drive, char *path)
+load_drive(int drive, char *path, int ro)
 {
     void *np;
 
-    np = imd_load(path, drive, 1);
+    np = imd_load(path, drive, ro ? IMD_RO : IMD_DELTA);
     if (!np)
         return -1;
     if (imdp[drive])
         imd_close(imdp[drive]);
     imdp[drive] = np;
+    rodrv[drive] = ro;
     return 0;
 }
 
@@ -1300,9 +1323,9 @@ load_drive(int drive, char *path)
  * and stops here, which is what keeps the 8/5 1/4 numbering in one place.
  */
 static int
-dj_media_load(int unit, char *path)
+dj_media_load(int unit, char *path, int ro)
 {
-    return load_drive(physdrive(unit), path);
+    return load_drive(physdrive(unit), path, ro);
 }
 
 static void

@@ -52,6 +52,7 @@ all:
 	cd bsh ; make all
 	cd cal ; make all
 	cd cat ; make all
+	cd cc ; make all
 	cd ccc ; make all
 	cd change ; make all
 	cd chg ; make all
@@ -196,6 +197,7 @@ install:
 	cd bsh ; make install
 	cd cal ; make install
 	cd cat ; make install
+	cd cc ; make install
 	cd ccc ; make install
 	cd chg ; make install
 	cd chgrp ; make install
@@ -339,6 +341,7 @@ clean:
 	cd bsh ; make clean
 	cd cal ; make clean
 	cd cat ; make clean
+	cd cc ; make clean
 	cd ccc ; make clean
 	cd change ; make clean
 	cd chg ; make clean
@@ -483,6 +486,7 @@ clobber:
 	cd bsh ; make clobber
 	cd cal ; make clobber
 	cd cat ; make clobber
+	cd cc ; make clobber
 	cd ccc ; make clobber
 	cd change ; make clobber
 	cd chg ; make clobber
@@ -630,6 +634,7 @@ verify:
 	cd bsh ; make verify
 	cd cal ; make verify
 	cd cat ; make verify
+	cd cc ; make verify
 	cd ccc ; make verify
 	cd chg ; make verify
 	cd chgrp ; make verify

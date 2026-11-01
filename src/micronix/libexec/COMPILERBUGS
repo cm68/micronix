@@ -5,11 +5,14 @@
 #
 # Every entry below was a defect in this tree's compiler - mxccc, over
 # the passes in libexec - found by porting a command and reduced to a
-# program small enough to run in a minute.  The five numbered entries
-# were fixed on 2026-09-30; the workaround each one recorded is now a
-# description of how the bug looked before the fix, kept because that is
-# the shape the tree's sources still avoid in the places the port worked
-# around them.  The sixth entry is not a miscompile and is left as it was.
+# program small enough to run in a minute.  The first five numbered
+# entries were fixed on 2026-09-30; the workaround each one recorded is
+# now a description of how the bug looked before the fix, kept because
+# that is the shape the tree's sources still avoid in the places the
+# port worked around them.  Entry 6 is open: the kernel code that found
+# it no longer asks for the conversion, the compiler still gets it
+# wrong.  The unnumbered section at the end is not a miscompile and is
+# left as it was.
 #
 # Each fix was checked with its repro and with a self-host pass - every
 # compiler source, host output and simulated output, byte-identical.
@@ -21,7 +24,7 @@
 # Probes were compiled as
 #
 #   mxccc -m micronix [-O] -i<tree>/lib/include -I<tree>/include \
-#         -o prog prog.c lib/libc/libc.a lib/libu/libu.a
+#         -o prog prog.c lib/libc/libc.a lib/libunix/libunix.a
 #
 # and run under the user-mode simulator.  Store a result in a variable
 # and print the variable - handing a call result or a folded constant
@@ -215,6 +218,52 @@
 # comes back is whatever the caller left in HL, so the exact numbers
 # depend on the surrounding code.  What matters is that A and C are not
 # 95 and that B and D are.
+
+# ---------------------------------------------------------------------
+# 6.  A POINTER ASSIGNED TO A LONG LEAVES THE HIGH WORD STALE      [OPEN]
+#
+# A 32-bit value lives in HL':HL, the high word in HL'.  Widening a
+# word to a long has to fill HL' in, and for an unsigned word that is a
+# zero: "UINT32 g; unsigned u; g = u;" emits ld hl,(_u); exx; ld hl,0.
+# emitOperand() in pass1 (c0/outast.c) skipped that conversion for
+# anything flagged TF_POINTER, so "g = p;" stored the pointer in the
+# low word and took the high word from HL' as it stood - whatever the
+# last 32-bit operation left there.
+#
+# The exclusion is there for arrays and functions, whose type size is
+# an element size and not the width of the value: an array member
+# returned from a function had picked up a SEXT of its first element.
+# An array carries TF_POINTER as well as TF_ARRAY (it decays to one),
+# so TF_ARRAY|TF_FUNC already keeps that case out.  A plain pointer's
+# size is the address size, and it has to widen like any other word.
+#
+# Found chasing a directory-size corruption in the kernel.  dlook() in
+# sys/name.c advanced a struct dir * alongside the entry pointer as an
+# entry counter - place++ carried the 16 bytes per entry for free - and
+# assigned it to the 32-bit u.offset.  The high word came out as
+# whatever the previous 32-bit operation left in HL' (0xfffc in that
+# run), iwrite() recorded it as the directory's size, and every create
+# in /tmp then failed EFBIG.  dlook() counts byte offsets now and the
+# kernel no longer asks for the conversion; the compiler still gets it
+# wrong.
+#
+#	#include <types.h>
+#	#include <stdio.h>
+#	UINT32 g;
+#	UINT32 l;
+#	char *p;
+#	main()
+#	{
+#		l = 0x34000000L;
+#		l = l >> 8;		/* leaves 0x0034 in HL' */
+#		p = (char *) 0x1234;
+#		g = p;			/* the high word must be zero */
+#		printf("%x %x\n", (UINT) (g >> 16), (UINT) (g & 0xffff));
+#	}
+#
+# The shift is only there to put a known value in HL'; the assignment
+# does not touch it.  A correct build prints "0 1234"; this one prints
+# "34 1234", with and without -O.
 
 # ---------------------------------------------------------------------
 # NOT A MISCOMPILE - a diagnostic that is missing

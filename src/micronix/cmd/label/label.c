@@ -355,9 +355,91 @@ dump()
  * for a disk with no label, so matching it means the disk maps the same
  * way after the label as it did before it.
  */
+/*
+ * The table a formatter leaves: the biggest filesystem that fits in one
+ * slice ('a'), a swap slice ('b', a megabyte of whole cylinders), then
+ * filesystems ('d' through 'h') until the drive runs out.  'c' is the
+ * whole disk and is never an entry.  This is mwformat's and scsiformat's
+ * arithmetic, and it is here because a drive with no formatter of its
+ * own - the ide card's - is labelled by this program, and the table it
+ * gets has to be the same one the drives that do have a formatter get.
+ *
+ * A block number is 16 bits, so a filesystem is at most 65535 blocks:
+ * this fills a slice to that bound and starts the next, which is why a
+ * large drive gets a full complement of slices rather than one huge one.
+ */
+static void
+protoslices(lp, cyl, heads, spt)
+	struct dlabel *lp;
+	UINT cyl, heads, spt;
+{
+	UINT spc, off, left, maxfs, bsz, sz;
+	int i;
+
+	spc = (UINT) heads * spt;
+	off = 1;			/* cylinder 0: the boot + label */
+	left = cyl - 1;
+	maxfs = 0xffff / spc;
+
+	bsz = (2048 + spc - 1) / spc;	/* b, the swap: 1M, whole cylinders */
+	if (bsz > left)
+		bsz = left;
+
+	if (left > bsz) {
+		sz = left - bsz;
+		if (maxfs < sz)
+			sz = maxfs;
+		lp->d_slice[0].d_off = off;
+		lp->d_slice[0].d_len = sz;
+		lp->d_slice[0].d_type = SL_FS;
+		off += sz;
+		left -= sz;
+	}
+
+	if (bsz) {
+		lp->d_slice[1].d_off = off;
+		lp->d_slice[1].d_len = bsz;
+		lp->d_slice[1].d_type = SL_SWAP;
+		off += bsz;
+		left -= bsz;
+	}
+
+	for (i = 3; i < NSLICE; i++) {
+		if (left == 0)
+			break;
+		sz = (maxfs < left) ? maxfs : left;
+		lp->d_slice[i].d_off = off;
+		lp->d_slice[i].d_len = sz;
+		lp->d_slice[i].d_type = SL_FS;
+		off += sz;
+		left -= sz;
+	}
+}
+
+/*
+ * Does the label carry a partition table at all?  The host's initialize
+ * writes a prototype label with the geometry and the whole-disk 'c'
+ * entry and nothing carved; a formatter writes the same label and then
+ * fills a, b and d through h.  A label with no carved slice is a drive
+ * described but not partitioned, and -w has to give it the table.
+ */
+static int
+carved(lp)
+	struct dlabel *lp;
+{
+	int i;
+
+	for (i = 0; i < NSLICE; i++)
+		if (i != DL_WHOLE && lp->d_slice[i].d_len)
+			return 1;
+	return 0;
+}
+
 writegeom()
 {
 	register struct dlabel *lp;
+	struct stat st;
+	int fresh;
 	int i;
 
 	lp = getlabel();
@@ -369,22 +451,46 @@ writegeom()
 		lp->d_version = DL_VERSION;
 		printf("%s: no label: writing %s version %u\n",
 			devname, DL_MAGIC, DL_VERSION);
+		fresh = 1;
+	} else if (!carved(lp)) {
+		printf("%s: no slices: writing the prototype table\n",
+			devname);
+		fresh = 1;
 	} else {
 		printf("%s: geometry %u/%u/%u, was %u/%u/%u, "
 			"table left alone\n", devname,
 			gtracks, gheads, gspt,
 			lp->d_tracks, lp->d_heads, lp->d_spt);
+		fresh = 0;
 	}
 	lp->d_tracks = gtracks;
 	lp->d_heads = gheads;
 	lp->d_spt = gspt;
+
 	/*
-	 * The HDCA numbers sectors from one (FORMATHD's skew table runs
-	 * 1..32), and the label has to say so or the driver maps every
-	 * block one place out.  The HD-DMA numbers from zero, but its label
-	 * is written by mwformat, not here; this labeler is the HDCA's.
+	 * A drive described for the first time gets the table a formatter
+	 * would have left, so that "label -w" on a card with no formatter
+	 * of its own gives it the same full complement of partitions.  A
+	 * drive that already has a table keeps it: its formatter put it
+	 * there and this is only correcting the geometry.
 	 */
-	lp->d_firstsec = 1;
+	if (fresh)
+		protoslices(lp, gtracks, gheads, gspt);
+	/*
+	 * The first sector number is the controller's, not the drive's.
+	 * The HDCA numbers sectors from one (FORMATHD's skew table runs
+	 * 1..32) and the label has to say so or the driver maps every
+	 * block one place out.  Every other block driver on this machine -
+	 * the HD-DMA, the IDE card, the 5380 and the floppy - numbers from
+	 * zero, and their formatters write that into the labels they
+	 * place.  This labeler is used for the drives whose formatter only
+	 * lays down a prototype, so it has to say the right one for the
+	 * card the whole-disk node it was handed belongs to.
+	 */
+	if (fstat(devfd, (char *) &st) == 0 && (st.st_addr[0] >> 8) == HDCAMAJ)
+		lp->d_firstsec = 1;
+	else
+		lp->d_firstsec = 0;
 }
 
 /*

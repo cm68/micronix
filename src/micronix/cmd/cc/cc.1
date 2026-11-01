@@ -24,8 +24,10 @@ DESCRIPTION
 .in +5
 .br
 Cc drives the original Whitesmiths toolchain: it preprocesses with
-cpp, parses with cp1, generates code with cp2, assembles with as and
+wpp, parses with cp1, generates code with cp2, assembles with as and
 links with link, so one command turns source into a running program.
+Wpp is the Whitesmiths preprocessor; it carries that name because cpp
+is now the tree's own preprocessor (see cpp (1)).
 A file ending in .c is compiled, one in .s is assembled, and .o and
 .a files are handed to the linker.  With no -c or -S the result is an
 executable called a.out, or the name given with -o.
@@ -90,4 +92,5 @@ libu.a and libm.a, so -lS need not be given for stdio.
 SEE ALSO
 .in +5
 .br
-cpp (1), cp1 (1), cp2 (1), as (1), link (1), lib (1), ccc (1)
+wpp (1), cp1 (1), cp2 (1), as (1), link (1), lib (1), ccc (1),
+cpp (1)

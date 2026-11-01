@@ -1044,9 +1044,23 @@ _rates:
 ; without this every number it prints after the first character of its
 ; format is read from wherever C happened to be.
 ;
+; Interrupts are off across the call, and that is not decoration: the
+; tty's output side sends its own characters from the transmit-ready
+; interrupt (ace_putc), and condrv polls for ready and then writes the
+; data register.  An ace_putc interrupt landing between that poll and
+; that write reselects the MultIO - select() writes the group select -
+; and condrv's byte then goes to whatever register is selected instead
+; of the console's data register.  console_log() tees a byte when it is
+; written to that register, so a lost character is a character that
+; never got there: that is how a halt line came out "0 dirty uffers".
+; ace_putc holds interrupts off for its own write for the same reason.
+; di()/ei() are the level-counting pair, so this is safe in an interrupt
+; handler too (intrupt leaves dicount at 1).
+;
 condrv=0x134		; the monitor's console driver, conram + 2
 
 _console:
+	call	_di		; the poll and the write are one step
 	ld	a,l		; a = c (arg0 in hl)
 	cp	'\n'
 	jp	nz,conso	; not newline: output it
@@ -1058,4 +1072,5 @@ conso:	push	bc		; save bc (callee-saved)
 	ld	c,l		; the character, where the driver wants it
 	call	condrv		; send it, and return to console's caller
 	pop	bc
+	call	_ei
 	ret

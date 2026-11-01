@@ -1339,9 +1339,18 @@ struct rule rules[] = {
 		"\tpush ix\n\tpop de\n" F_ADDHLDE, R_HL),
 
 	/* register base address calculations */
-	R(PLUS,INBC,P_NUM,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_LDLC F_LDHB F_LDDER F_ADDHLDE, R_HL),
+	/*
+	 * A constant added to a base in BC.  Put the constant in HL and
+	 * add BC; copying BC through HL and loading the constant into DE
+	 * is the same sum, two bytes and two instructions longer.
+	 */
+	R(PLUS,INBC,P_NUM,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_LDHLR "\tadd hl,bc\n", R_HL),
 	R(PLUS,INBC,P_SMALL,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_LDLC F_LDHB "%(\tinc hl\n)", R_HL),
-	R(PLUS,INDE,P_NUM,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_EXDEHL F_LDDER F_ADDHLDE, R_HL),
+	/*
+	 * The same with the base in DE: the constant goes into HL and DE
+	 * is added directly, so no exchange is needed either.
+	 */
+	R(PLUS,INDE,P_NUM,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_LDHLR F_ADDHLDE, R_HL),
 	R(PLUS,INDE,P_SMALL,0,0,0, PLUS, P_L, P_R, P_NONE, 0, F_EXDEHL "%(\tinc hl\n)", R_HL),
 
 	/* 16-bit binary arithmetic */

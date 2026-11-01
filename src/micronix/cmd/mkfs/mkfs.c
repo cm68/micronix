@@ -61,6 +61,51 @@ void wrblk(bn, buf)
         die("write");
 }
 
+/*
+ * Write the label's boot extent back into block 0 of the whole disk.
+ *
+ * The boot lives in the blocks below slice 'a' - the label command put
+ * the slice there - and the label records how many blocks that is
+ * (d_bootblks).  That is the one thing a filesystem can say that a bare
+ * label cannot, and the host's mnix says it through putlabel() when it
+ * makes a filesystem; a disk this program makes has to say it too, or
+ * the next boot finds a label with no boot in it and level 1 will not
+ * offer the disk.
+ *
+ * The label block is device block 0 of the whole-disk slice, which the
+ * slice device this is writing cannot reach - block 0 of 'a' is a
+ * cylinder into the drive - so a 'c' node is built the way labelgeom()
+ * builds one, and that sector is read, labelled and written back.
+ */
+static
+putboot(device)
+    char *device;
+{
+    static char path[] = "/tmp/mkfs.b";
+    struct stat sb;
+    char buf[BSIZE];
+    UINT major, minor;
+    int fd;
+
+    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
+        return;
+    major = sb.st_addr[0] >> 8;
+    minor = (sb.st_addr[0] & ~(7 << 5)) | (DL_WHOLE << 5);
+    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+        return;
+    if ((fd = open(path, 2)) < 0) {
+        unlink(path);
+        return;
+    }
+    if (lseek(fd, 0L, 0) >= 0 && read(fd, buf, BSIZE) == BSIZE) {
+        putlabel(buf);
+        if (lseek(fd, 0L, 0) < 0 || write(fd, buf, BSIZE) != BSIZE)
+            die("cannot write the label");
+    }
+    close(fd);
+    unlink(path);
+}
+
 void usage()
 {
     fprintf(stderr, "usage: %s [-i bootfile] device [size]\n",
@@ -219,14 +264,16 @@ main(argc, argv)
     printf("I-list: %u blocks, %u inodes\n", isize, isize * IPERBLK);
 
     /*
-     * The boot is not this program's to place: it is the device blocks
-     * below the filesystem, which the label's slice table already put in
-     * front of slice 'a'.  The worker builds only the filesystem.
+     * The boot code is not this program's to place: it is the device
+     * blocks below the filesystem, which the label's slice table already
+     * put in front of slice 'a'.  What this does place is the label's
+     * record of that extent, after the filesystem is built.
      */
     if ((dev = open(device, 2)) < 0)
         die("cannot open the device for writing");
 
     domkfs(fsize, isize, dsize, f);
+    putboot(device);
 
     close(dev);
     exit(0);

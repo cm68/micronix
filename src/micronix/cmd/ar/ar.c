@@ -85,6 +85,12 @@ char	tmp2nam[16]	=	"/tmp/v2XXXXXX";
 char	*tfnam;
 char	*tf1nam;
 char	*tf2nam;
+/*
+ * The archive-rewrite temporary, /tmp/sXXXXXX.  It is the one that
+ * outlives a write error, so done() has to know its name: a full /tmp
+ * makes the index write fail, and the temp was left behind every time.
+ */
+char	*idxnam;
 char	*file;
 char	name[16];
 int	af;
@@ -628,6 +634,8 @@ done(c)
 		unlink(tf1nam);
 	if(tf2nam)
 		unlink(tf2nam);
+	if(idxnam)
+		unlink(idxnam);
 	exit(c);
 }
 
@@ -890,9 +898,12 @@ ranlib()
 	strcpy(tmpl, tmpltnam[0] == '/' ? "/tmp/sXXXXXX" : "sXXXXXX");
 	tname = mktemp(tmpl);
 	close(creat(tname, 0600));
+	idxnam = tname;
 	if ((ofd = open(tname, 2)) < 0) {
 		fprintf(stderr, "ar: cannot create temp file\n");
 		close(fd);
+		unlink(tname);
+		idxnam = 0;
 		return;
 	}
 	putmag(ofd, ARMAG);
@@ -962,6 +973,7 @@ ranlib()
 		fprintf(stderr, "ar: cannot rewrite %s\n", arnam);
 		close(ofd);
 		unlink(tname);
+		idxnam = 0;
 		return;
 	}
 	lseek(ofd, 0L, 0);
@@ -971,6 +983,7 @@ ranlib()
 	close(fd);
 	close(ofd);
 	unlink(tname);
+	idxnam = 0;
 
 	if (flg['v'-'a'])
 		fprintf(stderr, "ar: %d symbols in %d members\n",

@@ -140,6 +140,7 @@ char *lookup(word v, int *flagsp);
 int tcmp();
 int instr(word addr, int size);
 int code_addr(int v);
+int byte_addr(int v);
 char *addr_name(word a);
 int find_symbol(char *ls);
 
@@ -1462,7 +1463,7 @@ int size;
 	address = addr;
 
 	if (in_code) {
-		if (jumped && !code_addr(addr)) {
+		if (byte_addr(addr) || (jumped && !code_addr(addr))) {
 			in_code = 0;
 		}
 	} else {
@@ -1734,7 +1735,24 @@ int v;
 
 	for (i = 0; i < ntarg; i++) {
 		if (targets[i].addr == v)
-			return(targets[i].flags & CODE);
+			/* an explicit byte range is data even if the
+			 * code trace reached it; that is what -d and
+			 * `bytes` mean */
+			return((targets[i].flags & CODE) &&
+			    !(targets[i].flags & BYTE));
+	}
+	return (0);
+}
+
+int
+byte_addr(v)
+int v;
+{
+	int i;
+
+	for (i = 0; i < ntarg; i++) {
+		if (targets[i].addr == v)
+			return(targets[i].flags & BYTE);
 	}
 	return (0);
 }

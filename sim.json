@@ -65,6 +65,27 @@
             { "path": "/.rhosts", "source": "src/micronix/rootfiles/rhosts-net" }
           ] }
       ]
+    },
+    "wsc": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "clock": "normal"
+      },
+      "wiring": "multio,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40", "image": "/tmp/wsc/hdcdma/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40", "image": "/tmp/wsc/hdcdma/usr.img" }
+      ]
     }
   },
   "mediasets": {
@@ -72,6 +93,12 @@
       "dist/mx2.0-8-1.IMD", "dist/mx2.0-8-2.IMD", "dist/mx2.0-8-3.IMD",
       "dist/mx2.0-8-4.IMD", "dist/mx2.0-8-5.IMD", "dist/mx2.0-8-6.IMD",
       "dist/mx2.0-8-7.IMD", "dist/mx2.0-8-8.IMD", "dist/mx2.0-8-9.IMD"
+    ] },
+    "dist8all": { "volumes": [
+      "dist/mx2.0-8-1.IMD", "dist/mx2.0-8-2.IMD", "dist/mx2.0-8-3.IMD",
+      "dist/mx2.0-8-4.IMD", "dist/mx2.0-8-5.IMD", "dist/mx2.0-8-6.IMD",
+      "dist/mx2.0-8-7.IMD", "dist/mx2.0-8-8.IMD", "dist/mx2.0-8-9.IMD",
+      "dist/mx2.0-8-10.IMD", "dist/mx2.0-8-11.IMD"
     ] },
     "dist5": { "volumes": [ "dist/mx2.0-5-1.IMD" ] }
   }

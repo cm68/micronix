@@ -113,7 +113,7 @@
  * a READ arrives after the seek.  SCSI's own answer is for the target to
  * disconnect and be reselected - and a reselect is an interrupt - but
  * that is a state machine this driver does not have, so the wait is the
- * bounded poll in scsibyte() and its bound is why it is bounded.
+ * bounded poll in scsiio() and its bound is why it is bounded.
  *
  * The line is discovered, not named: this driver's header gives the
  * probe and the handler, and the attach loop (sys/probe_init.c) tickles
@@ -334,10 +334,14 @@ static int scsireset(), scsiselect();
 
 /*
  * An interface: which ports the chip's registers answer at.  The four
- * calls are every way this driver touches the card, and a second adapter
- * design - one that maps the registers into memory instead of strobing
- * them, or holds the chip at another address - is another row in
- * boards[] rather than another driver.
+ * calls are how the command paths touch the card - but not the data
+ * phase: scsiio() moves the block with in() and out() at SCSIBASE
+ * directly, 512 times a sector, because a call through a pointer for
+ * each register of the handshake was most of what a transfer cost.  A
+ * second adapter design - one that maps the registers into memory
+ * instead of strobing them, or holds the chip at another address - is
+ * another row in boards[] rather than another driver, but that loop
+ * names the ports and would have to learn the new ones too.
  *
  * The members below the calls are the card's own state, which lives here
  * because there is one card and one command in flight on it at a time.
@@ -497,74 +501,69 @@ scsibsy(ip)
 }
 
 /*
- * One byte across the bus, one REQ/ACK round trip, in whichever direction
- * the phase says.
- *
- * This is the whole of the transfer machinery and it is deliberately
- * small, because it runs once per byte of every request.  The order of
- * the handshake is the bus's and not a choice: the target raises REQ when
- * it has a byte or wants one, the initiator moves the byte, the initiator
- * raises ACK, the target drops REQ, the initiator drops ACK.  Reading
- * before ACK on an input and driving before ACK on an output is what
- * keeps the byte on the wires while the target is looking at it.
- *
- * The poll is DRQ in the bus and status register - the chip's mirror of
- * REQ - and not REQ in the bus status register, because DRQ is the bit
- * the chip sets when it is ready for the cpu, which is what is being
- * asked.  Returns 0, or -1 if REQ never came.
- */
-static int
-scsibyte(ip, out, bp)
-    register struct scsiif *ip;
-    int out;
-    register char *bp;
-{
-    static UINT32 n;
-    static int st;
-
-    for (n = 0; n < SPIN; n++) {
-        st = (*ip->rd) (CSBS);
-        if (st & CSBS_REQ)
-            break;
-    }
-    if (!(st & CSBS_REQ))
-        return (-1);
-
-    if (out) {
-        (*ip->wr) (CSD, *bp);
-        (*ip->wr) (ICR, ICR_DATA);
-        (*ip->wr) (ICR, ICR_DATA | ICR_ACK);
-        (*ip->wr) (ICR, ICR_DATA);
-    } else {
-        *bp = (*ip->rd) (CSD);
-        (*ip->wr) (ICR, ICR_ACK);
-        (*ip->wr) (ICR, 0);
-    }
-
-    for (n = 0; n < SPIN; n++) {
-        st = (*ip->rd) (CSBS);
-        if (!(st & CSBS_REQ))
-            return (0);
-    }
-    return (-1);
-}
-
-/*
  * Move a run of bytes, all of them in the phase the target has put the
- * bus in.  Returns 0, or -1 at the first byte that never came.
+ * bus in - one REQ/ACK round trip each, and the handshake in the loop.
+ *
+ * The order of the handshake is the bus's and not a choice: the target
+ * raises REQ when it has a byte or wants one, the initiator moves the
+ * byte, the initiator raises ACK, the target drops REQ, the initiator
+ * drops ACK.  Reading before ACK on an input and driving before ACK on
+ * an output is what keeps the byte on the wires while the target is
+ * looking at it.
+ *
+ * Every register this touches is at a constant port - SCSIBASE plus its
+ * number - so the loop reaches them with in() and out() directly, the
+ * way ide.c's myxfer reaches the 8255, and not through the board's
+ * rd()/wr() calls.  That indirection was a function pointer and a C
+ * frame for each of the five accesses a byte needs, and the data phase
+ * is 512 bytes.  The DATA bit that lets the chip drive the bus is set
+ * once before the run and left on between bytes; the first byte's data
+ * register write replaces whatever was latched before ACK, so nothing
+ * has to write it again per byte.
+ *
+ * The poll is REQ in the bus and status register.  Returns 0, or -1 at
+ * the first byte that never came.
  */
 static int
-scsiio(ip, p, n, out)
-    register struct scsiif *ip;
+scsiio(p, n, snd)
     register char *p;
     UINT n;
-    int out;
+    int snd;
 {
-    static UINT i;
+    static UINT32 i, j;
+    static UINT8 st;
 
-    for (i = 0; i < n; i++)
-        if (scsibyte(ip, out, p + i) < 0)
+    if (snd && n != 0)
+        out(SCSIBASE + ICR, ICR_DATA);  /* our data drivers, for the run */
+
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < SPIN; j++) {
+            st = in(SCSIBASE + CSBS);
+            if (st & CSBS_REQ)
+                break;
+        }
+        if (j >= SPIN)
             return (-1);
+
+        if (snd) {
+            out(SCSIBASE + CSD, *p);
+            out(SCSIBASE + ICR, ICR_DATA | ICR_ACK);
+            out(SCSIBASE + ICR, ICR_DATA);
+        } else {
+            *p = in(SCSIBASE + CSD);
+            out(SCSIBASE + ICR, ICR_ACK);
+            out(SCSIBASE + ICR, 0);
+        }
+
+        for (j = 0; j < SPIN; j++) {
+            st = in(SCSIBASE + CSBS);
+            if (!(st & CSBS_REQ))
+                break;
+        }
+        if (j >= SPIN)
+            return (-1);
+        p++;
+    }
     return (0);
 }
 
@@ -635,7 +634,7 @@ static int
 scsicmd(ip)
     register struct scsiif *ip;
 {
-    return (scsiio(ip, ip->cdb, CDBLEN, 1));
+    return (scsiio(ip->cdb, CDBLEN, 1));
 }
 
 /*
@@ -799,13 +798,13 @@ scsifinish(ip, target)
     bad = 0;
 
     st = 0;
-    if (scsibyte(ip, 0, (char *)&st) < 0)
+    if (scsiio((char *)&st, 1, 0) < 0)
         bad = 1;
     else if (st & ST_CHECK)
         bad = 1;
 
     msg = 0;
-    if (scsibyte(ip, 0, (char *)&msg) < 0)
+    if (scsiio((char *)&msg, 1, 0) < 0)
         bad = 1;
     else if (msg == MSG_DISCONN)
         /*
@@ -1099,7 +1098,7 @@ ncrstrat(b)
      * - the two rules the window's discipline is made of (uio.c).
      */
     p = bhold(b);
-    if (scsiio(ip, p, 512, !(b->flags & BREAD)) < 0)
+    if (scsiio(p, 512, !(b->flags & BREAD)) < 0)
         ip->error = EIO;
     brel();
 
@@ -1157,7 +1156,7 @@ ncrioctl(dev, cmd, r, b)
 
     scsibegin(ip);
 
-    if (scsiselect(ip, dev & 7) < 0 || scsiio(ip, r->cmd, r->len, 1) < 0) {
+    if (scsiselect(ip, dev & 7) < 0 || scsiio(r->cmd, r->len, 1) < 0) {
         ip->busy = 0;
         wakeup(ip);
         u.error = EIO;
@@ -1166,7 +1165,7 @@ ncrioctl(dev, cmd, r, b)
 
     if (r->count) {
         p = bhold(b);
-        if (scsiio(ip, p, r->count, !(r->flags & CDB_IN)) < 0)
+        if (scsiio(p, r->count, !(r->flags & CDB_IN)) < 0)
             ip->error = EIO;
         brel();
     }

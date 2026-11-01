@@ -55,10 +55,18 @@ iread(ip, dev)
         if (u.error)
             break;
         nbytes = min(u.count, 512 - into);
-        if (phys == 0)          /* hole: zero-fill from zpage, no read */
+        /*
+         * A zero block number is a hole in a file - but not in an io
+         * node.  imap() hands an io node its own logical block back, so
+         * block 0 is a real block there: the label, the boot sector, the
+         * first sector of the drive.  Zero-filling it would make every
+         * raw read of block 0 answer with zeros.
+         */
+        if (phys == 0 && (ip->i_mode & IIO) == 0)
             iomove(READ, zpage, nbytes);
         else {
-            if (rahead != 0 && into + nbytes == 512)
+            if ((ip->i_mode & IIO) == 0 && rahead != 0 &&
+                into + nbytes == 512)
                 aread(rahead, dev);
             if ((bp = bread(phys, dev)) == 0)
                 break;

@@ -102,6 +102,7 @@ extern int ss1_uart_open();
 extern int ttypub();            /* publish the page's doors (sys/ttyres.c) */
 extern int ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
 extern int ttyin(), ttyout();   /* the line discipline, same page (sys/tty.c) */
+extern int outwait();           /* drain the output queue (sys/ttysys.c) */
 int mumint();                   /* below, and an entry point the resident half calls */
 
 /*
@@ -264,6 +265,19 @@ muclose(dev)
         }
     }
 
+    /*
+     * Let the transmitter finish before the tty goes.  The output queue is
+     * drained by the transmit-ready interrupt, and a close that returned
+     * with bytes still in it left them to be sent while the caller went
+     * on.  At shutdown that is exactly what happened: init's "Micronix is
+     * down." was still shifting out when reboot() printed the halt line
+     * straight to the console, and the two writers interleaved - and once
+     * raced, losing a character.  A stopped line is not waited for: its
+     * output will never drain until it is started again, and a close must
+     * not hang on one.
+     */
+    if (!(t->state & LOSTOP))
+        outwait(t, 0);
     ttyclose(t);
 }
 

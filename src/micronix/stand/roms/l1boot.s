@@ -321,16 +321,22 @@ ctask	equ	0006h		;current task, read by the trap handler
 ;****************************************************************
 ;* the disk label, in the boot sector's second half		*
 ;* (include/sys/dlabel.h).  It is the drive speaking, and the	*
-;* only thing in it level 1 cares about is that it is there at	*
-;* all: the magic, and a geometry that is not empty.  The	*
-;* version is deliberately not checked - the kernel does not	*
-;* check it either, and a labelled disk boots whatever it says.	*
+;* only things in it level 1 cares about are that it is there	*
+;* at all - the magic, and a geometry that is not empty - and	*
+;* that it names a boot: a label with d_bootblks zero is a disk	*
+;* with no boot on it, and there is nothing to offer.  A freshly	*
+;* initialized drive carries such a label, and so does every	*
+;* drive that has been formatted but not installed; neither is a	*
+;* boot device.  The version is deliberately not checked - the	*
+;* kernel does not check it either, and a labelled disk boots	*
+;* whatever it says.						*
 ;****************************************************************
 
 dl_off	equ	256		;into block 0: the second half
 dl_trk	equ	dl_off + 6	;d_tracks, a word
 dl_hds	equ	dl_off + 8	;d_heads
 dl_spt	equ	dl_off + 10	;d_spt, blocks per track
+dl_boot	equ	dl_off + 20	;d_bootblks, a word
 dl_mfg	equ	dl_off + 88	;d_mfg, sixteen bytes
 dl_mod	equ	dl_off + 104	;d_model, sixteen bytes
 
@@ -342,8 +348,8 @@ dl_mod	equ	dl_off + 104	;d_model, sixteen bytes
 ;* halt trap is live, which is what makes a halt here reach the	*
 ;* monitor rather than run off into nothing.			*
 ;*								*
-;* Pass 1 finds every disk that answers with a label on it and	*
-;* prints them; pass 2 boots the one chosen.			*
+;* Pass 1 finds every disk that answers with a label naming a	*
+;* boot and prints them; pass 2 boots the one chosen.		*
 ;****************************************************************
 
 entry:
@@ -491,6 +497,9 @@ rowmg:	ld	a,(de)
 	jr	z,rowno
 	call	nzw		;d_spt
 	jr	z,rowno
+	ld	hl,stg + dl_boot
+	call	nzw		;d_bootblks: a disk with no boot
+	jr	z,rowno		; is not a boot device
 rowok:	scf			;it is a disk
 	ret
 	;	A block with no label in it is not ours, but it is not
@@ -1448,13 +1457,17 @@ djrcp:	ldir				;from the window down to it
 djblock:
 	call	djask			;the sector the drive's medium
 	call	djopen			; starts at, and the window
-	ld	hl,wbase + 128		;a read shorter than the block
-	ld	de,wbase + 129		; leaves the rest of the staging
+	ld	hl,wbuf + 128		;a read shorter than the block
+	ld	de,wbuf + 129		; leaves the rest of the staging
 	ld	bc,383			; area as it was, which is the
 	ld	(hl),0			; last drive's block, label and
 	ldir				; all - so the label's own place
 					; is cleared before the read that
-					; looks for it there
+					; looks for it there.  Through the
+					; window and not wbase: that is
+					; the address the controllers
+					; stage at, and the one djlab
+					; and the copy out of here read
 	ld	a,(djfirst)
 	call	djone			;one sector, the medium's first
 	ret	nc			;the drive did not answer
@@ -1467,7 +1480,6 @@ djblock:
 	ld	c,3
 	call	djfm			;read the other three
 	ret	nc			;the drive stopped answering
-	ld	hl,wbase
 	call	djlab			;the label, in the whole block
 	ret	c			;it is there: a block of four
 	call	djcpm			;no label: a program or the fill

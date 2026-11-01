@@ -59,6 +59,7 @@ static char buf[64];
 /* Label generation */
 static int labelcnt;		/* per-function label counter */
 static int fnindex;		/* function index for unique labels */
+static int funchasasm;		/* an ASM statement here: no dead-A,F assertion */
 
 /* Current function state */
 /*
@@ -688,6 +689,41 @@ emitepilog(void)
 	}
 }
 
+/*
+ * THE STATEMENT-BOUNDARY CONTRACT
+ *
+ * A statement's value is discarded, so at a statement boundary nothing
+ * is wanted in A or the flags: on the statement-level unconditional
+ * jumps (the if/else join, a goto, the jump to the epilogue, and the
+ * switch's end and default jumps) and at the statement labels (the
+ * if/else labels, a goto's label, and the switch's case, default, end
+ * and no-match labels).  Say so where the peephole can read it and the
+ * assembler cannot: asz strips a ';' comment, and peep treats a marked
+ * line as defining A and F.  That is what lets a run of ld (ix+d),0
+ * become xor a / ld (ix+d),a without following a jump to a target
+ * outside the window, or across a label it cannot see into.
+ *
+ * The jumps that CARRY a value are not statement boundaries and must
+ * not be marked: the &&/|| join and the ?: join land an answer in A
+ * (or HL), the switch's jump over the bodies keeps its control there
+ * for the dispatch, and the dispatch label _D is where it arrives.
+ *
+ * Inline asm can leave anything live, so a function containing an asm
+ * statement gets no assertion - deadnote() is silent for it.
+ *
+ * label is non-zero when the line defines a label, whose colon this
+ * emits; a jump line carries the assertion on its own.
+ */
+static void
+deadnote(int label)
+{
+	if (label)
+		out(":");
+	if (!funchasasm)
+		out("\t;@dead a,f");
+	outc('\n');
+}
+
 void
 parseStmt(void)
 {
@@ -755,14 +791,17 @@ parseStmt(void)
 		hasel = read1();
 		if (hasel) {
 			/* Jump over else */
-			outf("\tjp no%d_%d\n", lbl + 1, fnindex);
+			outf("\tjp no%d_%d", lbl + 1, fnindex);
+			deadnote(0);
 		}
 		/* Emit false label */
-		outf("no%d_%d:\n", lbl, fnindex);
+		outf("no%d_%d", lbl, fnindex);
+		deadnote(1);
 		if (hasel) {
 			parseStmt();	/* else-body */
 			/* Emit end label */
-			outf("no%d_%d:\n", lbl + 1, fnindex);
+			outf("no%d_%d", lbl + 1, fnindex);
+			deadnote(1);
 		}
 		return;
 	}
@@ -843,7 +882,7 @@ parseStmt(void)
 		}
 		out("\tjp\tX");
 		out(funcname + 1);
-		outc('\n');
+		deadnote(0);
 		return;
 	case LABEL:
 		readS(buf, sizeof(buf));
@@ -864,7 +903,7 @@ parseStmt(void)
 		out(LBLPFX);
 		outd(fnindex);
 		out(namex(buf));
-		out(":\n");
+		deadnote(1);
 		return;
 	case GOTO:
 		readS(buf, sizeof(buf));
@@ -876,7 +915,7 @@ parseStmt(void)
 		out(LBLPFX);
 		outd(fnindex);
 		out(namex(buf));
-		outc('\n');
+		deadnote(0);
 		return;
 	case SWITCH: {
 		struct swctx *sw;
@@ -951,7 +990,7 @@ parseStmt(void)
 		/* the last body must not fall into the comparisons */
 		out("\tjp ");
 		swlabel('X', sw->id, -1);
-		outc('\n');
+		deadnote(0);
 
 		swlabel('D', sw->id, -1);
 		out(":\n");
@@ -978,14 +1017,14 @@ parseStmt(void)
 		 * byte arrives here too.  Both helpers fall out of their
 		 * table onto this label rather than storing its address */
 		swlabel('N', sw->id, -1);
-		out(":\n");
+		deadnote(1);
 		if (sw->hasdef) {
 			out("\tjp ");
 			swlabel('F', sw->id, -1);
-			outc('\n');
+			deadnote(0);
 		}
 		swlabel('X', sw->id, -1);
-		out(":\n");
+		deadnote(1);
 		/* give this switch's values back to the pool; an
 		 * enclosing switch resumes where they started */
 		swused = (int)(sw->val - swvals);
@@ -1098,7 +1137,7 @@ parseStmt(void)
 					swused++;
 				}
 				swlabel('K', sw->id, sw->ncase);
-				out(":\n");
+				deadnote(1);
 				sw->ncase++;
 			}
 		}
@@ -1121,7 +1160,7 @@ parseStmt(void)
 		if (sw) {
 			sw->hasdef = 1;
 			swlabel('F', sw->id, -1);
-			out(":\n");
+			deadnote(1);
 		}
 		++n;
 		while (--n)
@@ -1131,6 +1170,7 @@ parseStmt(void)
 	case ASM: {
 		/* Inline asm - copy the text through verbatim */
 		unsigned short len = read2();
+		funchasasm = 1;
 #ifdef DEBUG
 		if (VERBOSE(V_STMT))
 			fprintf(stderr, "  ASM len=%d\n", len);
@@ -1195,6 +1235,7 @@ parse(void)
 			nidxp(funcname, sizeof(funcname));	/* the label wants the spelling */
 			labelcnt = 0;
 			fnindex++;
+			funchasasm = 0;
 #ifdef DEBUG
 			if (VERBOSE(V_PARSE))
 				fprintf(stderr, "parse: FUNC %s type=%c\n", funcname, t);
