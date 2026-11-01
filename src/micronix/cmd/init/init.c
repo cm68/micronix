@@ -1024,6 +1024,14 @@ shutdown()
 	close(swapfd);
 	sync();
 	write(i, downmsg, strlen(downmsg));
+	/*
+	 * Close the console before halting: the close drains the tty's
+	 * output queue (muclose, sys/multio.c), so the message has actually
+	 * gone out before reboot() starts printing the halt line straight
+	 * to the console.  Without it the two writers overlapped and the
+	 * shutdown lines interleaved - and could lose a character.
+	 */
+	close(i);
 	sync();
 
 	reboot(RB_HALT);
