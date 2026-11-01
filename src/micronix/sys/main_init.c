@@ -436,7 +436,12 @@ pcon()
         panic("Not enough memory to run");
 }
 
-#define ADDR	(*(UINT8*)0x1000)
+/*
+ * The probe byte at 0x1000.  It is signed on purpose: after a zero is
+ * written, the predecrement below has to read back as -1, which is how
+ * the probe tells a page that answered from open bus.
+ */
+#define ADDR	(*(INT8*)0x1000)
 
 /*
  * Find out how much memory is present.
