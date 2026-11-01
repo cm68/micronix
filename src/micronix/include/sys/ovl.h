@@ -152,15 +152,15 @@
 #define PROBE_TICKLE 1
 
 struct ovlhdr {
-    UINT major;                 /* block major, 0 for none */
-    int (*init) ();             /* init(seg), once, before it is reachable */
-    int (*tick) ();             /* tick(), once a second, 0 for none */
-    char *data;                 /* the driver's data, in its own segment */
+    UINT16 major;                 /* block major, 0 for none */
+    INT16 (*init) ();             /* init(seg), once, before it is reachable */
+    INT16 (*tick) ();             /* tick(), once a second, 0 for none */
+    UINT8 *data;                 /* the driver's data, in its own segment */
     struct biovec *bvec;        /* its block entries, 0 for none */
     struct ciovec *cvec;        /* its character entries, 0 for none */
-    int (*probe) ();            /* probe(mode): clear or raise the interrupt */
-    int (*intr) ();             /* the interrupt handler, 0 for none */
-    char name[12];              /* what devname reports for the major */
+    INT16 (*probe) ();            /* probe(mode): clear or raise the interrupt */
+    INT16 (*intr) ();             /* the interrupt handler, 0 for none */
+    UINT8 name[12];              /* what devname reports for the major */
     UINT8 ndrv;                 /* how many drives, enumerated at signon */
     UINT8 cmajor;               /* char major, 0 for none */
 };
@@ -173,7 +173,7 @@ struct ovlhdr {
  * leaves whatever was there before, so callers that can mean "none"
  * check first.
  */
-#define devname ((char *)(OVLBASE + 0x10))
+#define devname ((UINT8 *)(OVLBASE + 0x10))
 
 /*
  * The resident half, in sys/ovl.c.  These tables and maps are written
@@ -186,13 +186,13 @@ extern struct ovlhdr *ovlbmap(); /* ovlbmap(major): map that block module */
 extern struct ovlhdr *ovlcmap(); /* ovlcmap(major): map that char module */
 extern struct biovec ovlbvec[]; /* entries the block modules registered */
 extern void ovlremap();          /* ovlremap(): put this process's driver back */
-extern char *ovldata();         /* ovldata(major): the driver's data, or 0;
+extern UINT8 *ovldata();         /* ovldata(major): the driver's data, or 0;
                                  * block first, then char */
-extern unsigned char ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
-extern int ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
-extern char ovlattach(UINT);     /* ovlattach(seg): place a module, run its init */
-extern int ovlstart();          /* place the driver stamped into the slot */
-extern unsigned char ovlntr();            /* ovlntr(line): call the handler on a line */
-extern char intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
-extern int intrline();          /* intrline(fn, seg): the line a handler was wired to */
-extern unsigned char intr_attach();       /* intr_attach(): tickle each card, wire ovlint */
+extern UINT8 ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
+extern INT16 ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
+extern INT8 ovlattach(UINT16);     /* ovlattach(seg): place a module, run its init */
+extern INT16 ovlstart();          /* place the driver stamped into the slot */
+extern UINT8 ovlntr();            /* ovlntr(line): call the handler on a line */
+extern INT8 intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
+extern INT16 intrline();          /* intrline(fn, seg): the line a handler was wired to */
+extern UINT8 intr_attach();       /* intr_attach(): tickle each card, wire ovlint */

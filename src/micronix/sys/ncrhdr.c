@@ -37,9 +37,9 @@
 #include <sys/ncr.h>
 #include <sys/ovl.h>
 
-extern int ncropen();
+extern INT16 ncropen();
 extern void ncrclose(), ncrstrat();
-extern int ncrinit(), ncrprobe();
+extern INT16 ncrinit(), ncrprobe();
 extern void ncrint();
 extern struct biovec ncrbvec;
 

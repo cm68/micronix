@@ -11,20 +11,20 @@
 #include <sys/con.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern unsigned char block();
+extern UINT8 block();
 extern void sleep();
 extern void send();
 extern void pr();
 extern void sfree();
 extern void bwait();
 extern void brelse();
-extern unsigned char swapin();
-extern unsigned char swapout();
-extern unsigned char mget();
+extern UINT8 swapin();
+extern UINT8 swapout();
+extern UINT8 mget();
 
-char memwant = 0;              /* someone wants memory, so look for a
+UINT8 memwant = 0;              /* someone wants memory, so look for a
                                  * swapout */
-char swapping = 0;             /* run status of swap process */
+UINT8 swapping = 0;             /* run status of swap process */
 
 /*
  * Swap other processes between core and disk. After
@@ -70,7 +70,7 @@ swap()
 /*
  * Find a process that needs to be swapped in.
  */
-int
+INT16
 findin()
 {
     struct proc *p, *n;
@@ -90,7 +90,7 @@ findin()
 /*
  * Find someone to swap out
  */
-int
+INT16
 findout()
 {
     struct proc *p, *n;
@@ -116,7 +116,7 @@ findout()
  * Swap out process p. Called from swap() above and from fork().
  */
 
-unsigned char
+UINT8
 swapout(p)
     register struct proc *p;
 {
@@ -137,7 +137,7 @@ swapout(p)
  * Swap in process p.
  */
 
-unsigned char
+UINT8
 swapin(p)
     register struct proc *p;
 {
@@ -165,12 +165,13 @@ struct buf swab[17] = 0, lock = 0;
  * Read or write core to swap space.
  */
 
+INT16
 swapio(flag, p)
-    int flag;
+    INT16 flag;
     register struct proc *p;
 {
     UINT8 i, j, success;
-    UINT blk;
+    UINT16 blk;
     struct buf *b;
 
     while (!(block(&lock)))
@@ -198,7 +199,7 @@ swapio(flag, p)
          * a pass while xmem names the segment.
          */
         b->xmem = p->mem[i].seg;
-        b->data = (char *) BUFWIN;
+        b->data = (UINT8 *) BUFWIN;
         b->error = 0;
         for (j = 0; j < 8; j++) {
             b->flags &= ~(BREAD | BDONE | BSYNC | BERROR);

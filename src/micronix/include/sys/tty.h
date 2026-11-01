@@ -33,7 +33,7 @@
  */
 struct cblock {
     struct cblock *next;
-    char block[14];
+    UINT8 block[14];
 };
 
 /*
@@ -41,8 +41,8 @@ struct cblock {
  */
 struct que {
     UINT8 count;
-    char *first;
-    char *last;
+    UINT8 *first;
+    UINT8 *last;
 };
 
 /*
@@ -71,7 +71,7 @@ struct que {
  * by pic_init, which is the same probe that plants the console.  Minor 0
  * aliases to it.
  */
-extern UINT console_minor;
+extern UINT16 console_minor;
 
 /*
  * Terminal control structure. The first 6 bytes are used by stty/gtty. The
@@ -82,15 +82,15 @@ struct tty {
     UINT8 ospeed;               /* output baud rate */
     UINT8 erase;                /* erase character */
     UINT8 kill;                 /* kill character */
-    UINT mode;                  /* see below */
+    UINT16 mode;                  /* see below */
     UINT8 state;                /* see below */
     UINT8 col;                  /* printhead waiting */
-    UINT dev;                   /* device number, tty + 8 */
+    UINT16 dev;                   /* device number, tty + 8 */
     UINT8 line;                 /* first line after a return is 0 */
-    int (*start) ();            /* enable output interrupt */
-    int (*stop) ();             /* disable output interrupt */
-    int (*put) ();              /* print a character */
-    int (*set) ();              /* set new baud rate */
+    INT16 (*start) ();            /* enable output interrupt */
+    INT16 (*stop) ();             /* disable output interrupt */
+    INT16 (*put) ();              /* print a character */
+    INT16 (*set) ();              /* set new baud rate */
     UINT8 nextc;                /* for tab and newline expansion */
     UINT8 nbreak;
     struct que rawque;          /* raw input queue */

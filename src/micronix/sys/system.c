@@ -29,21 +29,21 @@ extern void snooze();
 extern void pr();
 extern void send();
 
-extern char resched;
+extern UINT8 resched;
 
 /*
  * extern struct proc * hier; 
  */
 extern void nulldev();
 
-char trace = 0;                 /* debugging switch */
+UINT8 trace = 0;                 /* debugging switch */
 
 /*
  * System call branch table structure.
  */
 struct syscall
 {
-    char nbytes;                /* no. of bytes in arguments */
+    UINT8 nbytes;                /* no. of bytes in arguments */
     void (*call)();             /* address of system call */
 };
 
@@ -97,7 +97,7 @@ extern void r_pipe(), r_seek(), r_ftruncate(), r_time();
  * is what lets this file compile; it does not make them exist, and the
  * link will say so.
  */
-extern int r_lock(), r_unlock();
+extern INT16 r_lock(), r_unlock();
 
        /*
         * System call branch table. Arguments from registers,
@@ -108,8 +108,8 @@ extern int r_lock(), r_unlock();
  * table is read-only so a per-process copy is harmless.
  */
 extern struct syscall syssw[];
-extern int ncalls;
-extern unsigned char valid();             /* sys/malloc.c: make the page grown */
+extern INT16 ncalls;
+extern UINT8 valid();             /* sys/malloc.c: make the page grown */
 
 /*
  * Entry point for system calls. A typical call:
@@ -152,19 +152,20 @@ system()
  * Arguments for use by register-passing functions
  * in reg.c
  */
-int arg[4] = 0;
+INT16 arg[4] = 0;
 
 /*
  * Get the arguments and do the call. On a direct call,
  * update the pc and save the frame pointer so that a
  * signal can abort from this level.
  */
+INT16
 docall(addr, direct)
-    register char *addr;
+    register UINT8 *addr;
     UINT8 direct;
 {
     register UINT8 call, nbytes;
-    int dummy;
+    INT16 dummy;
 
     if (direct)
         call = getbyte(addr++);
@@ -189,7 +190,7 @@ docall(addr, direct)
      * in A, and nothing on this path puts it there.  dup2 did, and every
      * dup2 got a register's worth of garbage - the login shell's Ldup
      * onto fd 0 failed and it read stdin instead of .login.  Declare the
-     * parameter UINT and narrow it inside the call.
+     * parameter UINT16 and narrow it inside the call.
      */
     (*syssw[call].call) (arg[0], arg[1], arg[2]);
 }
@@ -199,7 +200,7 @@ docall(addr, direct)
  */
 void
 indir(addr)
-    char *addr;
+    UINT8 *addr;
 {
     docall(addr, 0);
 }

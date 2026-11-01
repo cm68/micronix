@@ -47,14 +47,14 @@
 extern void wakeup();
 extern void sleep();
 
-extern int ttyread();
+extern INT16 ttyread();
 extern void ttywrite(), ttymode(), ttyopen(), ttyclose();
 extern void cstart(), ustart(), drainques(), qinit(), sendque();
 extern void pty_start(), pty_put();
 extern void nulldev();          /* the kernel's empty entry */
 extern void ptyioctl();
 extern void ptyhang();            /* the process-table walk, resident */
-extern int selectchan;          /* select(2): a reader may be watching */
+extern INT16 selectchan;          /* select(2): a reader may be watching */
 
 /*
  * Put one end of a pair in the state a fresh terminal has.  The two
@@ -64,7 +64,7 @@ extern int selectchan;          /* select(2): a reader may be watching */
 void
 ttyinit1(t, dev, mode, ms)
     register struct tty *t;
-    int dev;
+    INT16 dev;
     UINT8 mode;         /* RAW or COOKED */
     UINT8 ms;
 {
@@ -96,7 +96,7 @@ ttyinit1(t, dev, mode, ms)
  */
 void
 ptyinit(i)
-    int i;
+    INT16 i;
 {
     ttyinit1(SLAVE(i), (PTYMAJ << 8) | (PTYSLV + i),
         ECHO | MAPCR | XTABS, 0);
@@ -106,9 +106,10 @@ ptyinit(i)
 
 void
 ptyopen(dev, mode)
-    int dev;
+    INT16 dev;
+    INT16 mode;
 {
-    register int i;
+    register INT16 i;
     register struct ptyinfo *p;
     register struct tty *s, *m;
 
@@ -169,9 +170,10 @@ ptyopen(dev, mode)
 
 void
 ptyclose(dev, mode)
-    int dev;
+    INT16 dev;
+    INT16 mode;
 {
-    register int i;
+    register INT16 i;
     register struct ptyinfo *p;
     register struct tty *s, *m;
 
@@ -219,11 +221,12 @@ ptyclose(dev, mode)
  * control input gate must not apply to the process holding the master.
  * When input has been taken, the slave's output queue has room to drain.
  */
+INT16
 ptyread(dev)
-    int dev;
+    INT16 dev;
 {
-    register int i;
-    register UINT want;
+    register INT16 i;
+    register UINT16 want;
     register struct ptyinfo *p;
     register struct tty *s, *m;
 
@@ -275,9 +278,9 @@ ptyread(dev)
  */
 void
 ptywrite(dev)
-    int dev;
+    INT16 dev;
 {
-    register int i;
+    register INT16 i;
     register struct ptyinfo *p;
     register struct tty *s;
 

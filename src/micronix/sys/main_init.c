@@ -27,7 +27,7 @@
 #include <sys/ovl.h>
 
 #include "build.h"
-extern char ovlattach();
+extern INT8 ovlattach();
 extern void pr();
 extern void brelse();
 extern void cus();
@@ -40,26 +40,26 @@ extern void bopen();
 extern void panic();
 extern void irelse();
 extern void ovlplaceall();
-extern unsigned char intr_attach();
+extern UINT8 intr_attach();
 
 /*
  * resident data, defined in main_data.c (and malloc.c / con.c)
  */
 extern struct proc *swapproc;
 extern struct inode *rootdir;
-extern UINT nbuf;
-extern UINT totmem;
+extern UINT16 nbuf;
+extern UINT16 totmem;
 extern struct buf *btop;
 extern UINT8 map0[];
-extern char lowbss[];           /* uhdr.s's _lowbss: the freed low memory */
+extern UINT8 lowbss[];           /* uhdr.s's _lowbss: the freed low memory */
 extern UINT8 nmtab;             /* uhdr.s's _nmtab: the published count */
 extern UINT8 segmap[];          /* malloc.c */
-extern UINT nsegs;
-extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
-extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
+extern UINT16 nsegs;
+extern UINT16 lastseg;            /* uhdr.s's _lastseg: the allocator hint */
+extern UINT8 segalloc();    /* malloc.c: a segment is a byte */
 extern void swapinit();          /* malloc.c */
 extern void nodev();             /* con.c */
-extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
+extern UINT16 kino;               /* uhdr.s's _kino: the inode we booted from */
 
 /*
  * A module page.  setdev.c has its own copy of these two numbers for the
@@ -81,14 +81,14 @@ extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
 static void
 drvprobe(major, name, ndrv)
     UINT8 major;        /* < NBDEV (10) and < NCDEV (13) */
-    char *name;
+    UINT8 *name;
     UINT8 ndrv;
 {
     struct dlgeom g;
     struct buf *b;
     struct dlabel *lp;
-    char *p;
-    UINT dev, unit, mb;
+    UINT8 *p;
+    UINT16 dev, unit, mb;
 
     for (unit = 0; unit < ndrv; unit++) {
         dev = (major << 8) | (DL_WHOLE << 5) | unit;
@@ -100,7 +100,7 @@ drvprobe(major, name, ndrv)
             continue;
         p = bhold(b);
         lp = (struct dlabel *) &p[DL_OFFSET];
-        mb = (UINT) ((UINT32) g.tracks * g.heads * g.sectors >> 11);
+        mb = (UINT16) ((UINT32) g.tracks * g.heads * g.sectors >> 11);
         pr("%s%d: %s %s, %d MB\n", name, unit, lp->d_mfg, lp->d_model, mb);
         brel();
         brelse(b);
@@ -113,7 +113,7 @@ drvprobe(major, name, ndrv)
 void
 main()
 {
-    char ronly = 0;
+    UINT8 ronly = 0;
 
     cus();                      /* custom hardware */
     zero(lowbss, 416);          /* clear the freed low-memory bss */
@@ -153,8 +153,8 @@ main()
      */
     {
         struct ovlhdr *h;
-        char i, j;
-        char nm[12];
+        UINT8 i, j;
+        UINT8 nm[12];
 
         for (i = 1; i < nbdev; i++)
             if (biosw[i].strat != &nodev && bdevseg[i]) {
@@ -217,13 +217,13 @@ void
 putblk(bp, seg, off)
     struct buf *bp;
     UINT8 seg;
-    UINT off;
+    UINT16 off;
 {
     UINT8 save;
 
     save = OVLSEG;              /* the slot's identity page */
     map0[2 * OVLSEG] = (UINT8) seg;
-    copy(bhold(bp), (char *) OVLBASE + off, 512);
+    copy(bhold(bp), (UINT8 *) OVLBASE + off, 512);
     brel();
     map0[2 * OVLSEG] = save;
 }
@@ -240,15 +240,15 @@ putblk(bp, seg, off)
 static
 void
 putzero(seg, off)
-    UINT seg, off;
+    UINT16 seg, off;
 {
     UINT8 save;
-    char *p;
-    UINT n;
+    UINT8 *p;
+    UINT16 n;
 
     save = OVLSEG;
     map0[2 * OVLSEG] = (UINT8) seg;
-    p = (char *) OVLBASE + off;
+    p = (UINT8 *) OVLBASE + off;
     for (n = 0; n < 512; n++)
         *p++ = 0;
     map0[2 * OVLSEG] = save;
@@ -278,12 +278,12 @@ ovlplaceall()
 {
     struct obj hdr;
     struct inode *ip;
-    long modbase;
-    UINT nmod, n, i, ra, bn;
+    INT32 modbase;
+    UINT16 nmod, n, i, ra, bn;
     UINT8 seg, bmaj, cmaj;      /* segment and majors are bytes */
-    int bad;
+    INT16 bad;
     struct buf *bp;
-    char *s;
+    UINT8 *s;
 
     if (kino == 0)              /* the loader did not say: nothing to read */
         return;
@@ -292,7 +292,7 @@ ovlplaceall()
 
     u.offset = 0;
     u.segflg = KSEG;
-    if (nread(ip, (char *) &hdr, sizeof(hdr)) < 0) {
+    if (nread(ip, (UINT8 *) &hdr, sizeof(hdr)) < 0) {
         irelse(ip);
         return;
     }
@@ -304,13 +304,13 @@ ovlplaceall()
      * been written.  The shifts are qshl/qshr, which are in the u page
      * and linked either way.
      */
-    modbase = (long) sizeof(hdr) + hdr.table + hdr.text + hdr.data;
+    modbase = (INT32) sizeof(hdr) + hdr.table + hdr.text + hdr.data;
     modbase = ((modbase + PAGESZ - 1) >> PAGESHIFT) << PAGESHIFT;
-    if (modbase >= (long) ip->i_size) {     /* nothing was appended */
+    if (modbase >= (INT32) ip->i_size) {     /* nothing was appended */
         irelse(ip);
         return;
     }
-    nmod = (UINT) ((ip->i_size - modbase) >> PAGESHIFT);
+    nmod = (UINT16) ((ip->i_size - modbase) >> PAGESHIFT);
 
     for (n = 0; n < nmod; n++) {
         /*
@@ -331,7 +331,7 @@ ovlplaceall()
          * answers for itself: a char major does not hide a block major
          * with the same number, or the reverse.
          */
-        bn = imap(ip, (UINT) (modbase >> 9) + n * 8, &ra, IREAD);
+        bn = imap(ip, (UINT16) (modbase >> 9) + n * 8, &ra, IREAD);
         if (bn == 0 || (bp = bread(bn, rootdev)) == 0) {
             pr("ovl: page %d will not read\n", n);
             continue;
@@ -350,7 +350,7 @@ ovlplaceall()
         brelse(bp);
         bad = 0;
         for (i = 1; i < PAGESZ / 512; i++) {
-            bn = imap(ip, (UINT) (modbase >> 9) + n * 8 + i, &ra, IREAD);
+            bn = imap(ip, (UINT16) (modbase >> 9) + n * 8 + i, &ra, IREAD);
             if (bn == 0) {                  /* a hole reads as zeros */
                 putzero(seg, i * 512);
                 continue;
@@ -393,7 +393,7 @@ pinit()
      * swapper is given below.  Nothing reaches a user page before then,
      * but a zero here would point segment 0 into the window if it did.
      */
-    curmem = (char *) u.p->mem;
+    curmem = (UINT8 *) u.p->mem;
     u.p->mode = ALLOC | ALIVE | AWAKE | LOADED | LOCKED | SYS;
     u.p->pri = PRISWAP;
     u.p->nice = 128;
@@ -436,7 +436,7 @@ pcon()
         panic("Not enough memory to run");
 }
 
-#define ADDR	(*(char*)0x1000)
+#define ADDR	(*(UINT8*)0x1000)
 
 /*
  * Find out how much memory is present.
@@ -457,7 +457,7 @@ pcon()
 void
 meminit()
 {
-    int n;
+    INT16 n;
 
     di();
     nsegs = MAXSEG - 16;
@@ -485,7 +485,7 @@ void
 binit()
 {
     struct buf *b;
-    unsigned char seg;
+    UINT8 seg;
 
     /*
      * Seed the 8 boot buffers from one 4K segment.  Buffer data now lives
@@ -500,7 +500,7 @@ binit()
     btop = blist + nbuf;
     for (b = blist; b < btop; b++) {
         zero(b, sizeof(*b));
-        b->data = (char *)BUFWIN + ((b - blist) & 7) * 512;
+        b->data = (UINT8 *)BUFWIN + ((b - blist) & 7) * 512;
         b->xmem = seg;
     }
 }

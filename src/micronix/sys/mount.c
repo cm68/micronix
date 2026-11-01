@@ -13,7 +13,7 @@
 #include <sys/buf.h>
 #include <errno.h>
 #include <sys/pic8259.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void irelse();
 extern void bopen();
 extern void bdwrite();
@@ -23,9 +23,9 @@ extern void iflush();
 extern void iclose();
 extern void idec();
 
-extern int rootdev;
-extern long seconds;
-extern int copyin();
+extern INT16 rootdev;
+extern INT32 seconds;
+extern INT16 copyin();
 extern struct inode ilist[];
 
 /*
@@ -33,12 +33,12 @@ extern struct inode ilist[];
  */
 void
 mount(ioname, dname, ronly)
-    char *ioname, *dname;
+    UINT8 *ioname, *dname;
     UINT8 ronly;
 {
     register struct inode *io, *id;
     struct mount *m;
-    int dev, idev, inum;
+    INT16 dev, idev, inum;
 
     if (!super())
         return;
@@ -83,7 +83,7 @@ mount(ioname, dname, ronly)
  */
 struct mount *
 mlook(dev)
-    int dev;
+    INT16 dev;
 {
     register struct mount *m;
 
@@ -122,11 +122,12 @@ syncsuper()
 /*
  * Make an entry in the mount table.
  */
+INT16
 tmount(dev, ip, ronly, dname)
-    int dev;
+    INT16 dev;
     UINT8 ronly;
     struct inode *ip;
-    char *dname;
+    UINT8 *dname;
 {
     register struct mount *m;
     register struct buf *sb;
@@ -183,13 +184,13 @@ tmount(dev, ip, ronly, dname)
  */
 void
 umount(ioname)
-    char *ioname;
+    UINT8 *ioname;
 {
     register struct inode *io, *ip;
     struct mount *m;
     struct buf *sb;
     struct super *sp;
-    int dev;
+    INT16 dev;
 
     if (!super())
         return;

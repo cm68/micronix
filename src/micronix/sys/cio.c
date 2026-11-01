@@ -14,7 +14,7 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern unsigned char valid();
+extern UINT8 valid();
 
 extern struct file *falloc();   /* open.c */
 
@@ -23,7 +23,7 @@ extern struct file *falloc();   /* open.c */
  */
 void
 copen(dev, mode)
-    int dev;
+    INT16 dev;
     UINT8 mode;
 {
     (*ciosw[cmajor(dev)].open) (dev, mode);
@@ -34,7 +34,7 @@ copen(dev, mode)
  */
 void
 cclose(dev, mode)
-    int dev;
+    INT16 dev;
     UINT8 mode;
 {
     (*ciosw[cmajor(dev)].close) (dev, mode);
@@ -45,7 +45,7 @@ cclose(dev, mode)
  */
 void
 cread(dev)
-    int dev;
+    INT16 dev;
 {
     (*ciosw[cmajor(dev)].read) (dev);
 }
@@ -55,7 +55,7 @@ cread(dev)
  */
 void
 cwrite(dev)
-    int dev;
+    INT16 dev;
 {
     (*ciosw[cmajor(dev)].write) (dev);
 }
@@ -66,10 +66,10 @@ cwrite(dev)
  * the parent's descriptor is still the listener.
  */
 static
-char
+INT8
 cioswap(fd, fp, dev)
     UINT8 fd;
-    int dev;
+    INT16 dev;
     register struct file *fp;
 {
     register struct file *nf;
@@ -96,15 +96,15 @@ cioswap(fd, fp, dev)
  * A driver that changes u.fdev is handing the descriptor a different
  * device - a clone's accept - and cioswap()s this process's file to it.
  */
-char
+INT8
 cioctl(fd, cmd, arg)
     UINT8 fd;
-    int cmd;
-    char *arg;
+    INT16 cmd;
+    UINT8 *arg;
 {
     struct file *fp;
     struct inode *ip;
-    int dev;
+    INT16 dev;
 
     if ((fp = ofile(fd)) == 0)
         return (-1);            /* ofile set u.error */
@@ -139,7 +139,7 @@ cioctl(fd, cmd, arg)
  */
 void
 s_gtty(addr)
-    char *addr;
+    UINT8 *addr;
 {
     if (u.error) {
         u.af |= ERRBIT;
@@ -150,7 +150,7 @@ s_gtty(addr)
 
 void
 s_stty(addr)
-    char *addr;
+    UINT8 *addr;
 {
     if (u.error) {
         u.af |= ERRBIT;
@@ -162,8 +162,9 @@ s_stty(addr)
 /*
  * Extract the major device number
  */
+INT16
 cmajor(dev)
-    unsigned dev;
+    UINT16 dev;
 {
     if ((dev >>= 8) >= ncdev)
         return (0);             /* nodev sets u.error = ENXIO */

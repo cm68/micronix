@@ -52,6 +52,6 @@ extern struct tty *ptyslave[], *ptymaster[];
  */
 #define PEER(t)	(((t)->dev & 0377) < PTYSLV ? (t) - 1 : (t) + 1)
 
-extern int ptyidx();
+extern INT16 ptyidx();
 
 #endif

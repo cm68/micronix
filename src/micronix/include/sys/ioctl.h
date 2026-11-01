@@ -73,12 +73,12 @@
  * spoken for.
  */
 struct cdb {
-    char cmd[16];               /* the command block, the bus's own format */
-    int len;                    /* how many of those bytes are the block */
-    int count;                  /* data phase, in bytes; 0 if there is none */
-    int flags;                  /* CDB_IN if the data comes back */
-    char *buf;                  /* the caller's buffer for that data */
-    int hole;                   /* where in cmd[] its address goes; -1 none */
+    UINT8 cmd[16];               /* the command block, the bus's own format */
+    INT16 len;                    /* how many of those bytes are the block */
+    INT16 count;                  /* data phase, in bytes; 0 if there is none */
+    INT16 flags;                  /* CDB_IN if the data comes back */
+    UINT8 *buf;                  /* the caller's buffer for that data */
+    INT16 hole;                   /* where in cmd[] its address goes; -1 none */
 };
 
 #define CDBMAX  16              /* the widest command block there is */

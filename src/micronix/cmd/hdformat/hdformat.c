@@ -131,7 +131,7 @@ run(op, head, track, sector, count, flags, buf)
 	r.len = HDLEN;
 	r.count = count;
 	r.flags = flags;
-	r.buf = buf;
+	r.buf = (UINT8 *) buf;
 	r.hole = -1;
 
 	if (ioctl(devfd, CDBCMD, &r) < 0)

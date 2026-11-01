@@ -24,15 +24,15 @@ extern void iclose();
 extern void bflush();
 extern void bclose();
 extern void idec();
-extern unsigned char access();
+extern UINT8 access();
 
 /*
  * A descriptor is one byte, and ERROR is -1 - the same byte as 0xff.
  * char is signed in this compiler, so a char holds either a descriptor
  * (0..15) or ERROR, and a failed allocation is tested as -1.
  */
-extern char oalloc();           /* a descriptor, or ERROR */
-char iopen();                   /* the same */
+extern INT8 oalloc();           /* a descriptor, or ERROR */
+INT8 iopen();                   /* the same */
 
 /*
  * Open system call.
@@ -45,8 +45,8 @@ char iopen();                   /* the same */
  */
 void
 open(name, flags)
-    char *name;
-    unsigned int flags;
+    UINT8 *name;
+    UINT16 flags;
 {
     register struct inode *ip;
     register UINT8 mode;
@@ -69,11 +69,11 @@ open(name, flags)
  */
 void
 pipe(vec)
-    int *vec;
+    INT16 *vec;
 {
     register struct inode *ip;
     register struct file *rf, *wf;
-    char rd, wd;                /* the descriptors, or ERROR */
+    INT8 rd, wd;                /* the descriptors, or ERROR */
 
     vec[0] = vec[1] = -1;
     if ((rf = falloc()) == 0 || (rd = oalloc()) == ERROR)
@@ -103,15 +103,15 @@ pipe(vec)
  * Open a file from its inode.
  * Called from open and create.
  */
-char
+INT8
 iopen(ip, mode)
     struct inode *ip;
-    int mode;
+    INT16 mode;
 {
     register struct file *fp;
-    register int dev;
-    char fd;                    /* a descriptor, or ERROR */
-    static char writ;
+    register INT16 dev;
+    INT8 fd;                    /* a descriptor, or ERROR */
+    static UINT8 writ;
 
     writ = mode & IWRITE;
     if (writ && (ip->i_mode & ISVTX))
@@ -211,7 +211,7 @@ void
 iclose(ip, writ, dev)
     register struct inode *ip;
     UINT8 writ;
-    UINT dev;
+    UINT16 dev;
 {
     if (--ip->count <= 0) {
         ilock(ip);
@@ -247,7 +247,7 @@ falloc()
 /*
  * Allocate an open file slot
  */
-char
+INT8
 oalloc()
 {
     register struct file **op, **otop;
@@ -279,8 +279,9 @@ ofile(fd)
  * Translate a user-provided mode (from open)
  * to a mode for inodes and file structures.
  */
+INT16
 imode(m)
-    int m;
+    INT16 m;
 {
     switch (m) {
     case 0:

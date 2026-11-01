@@ -108,7 +108,7 @@ run(cmd, len, buf, count, flags, hole)
     r.len = len;
     r.count = count;
     r.flags = flags;
-    r.buf = buf;
+    r.buf = (UINT8 *) buf;
     r.hole = hole;
     if (ioctl(fd, CDBCMD, &r) < 0)
         return -1;

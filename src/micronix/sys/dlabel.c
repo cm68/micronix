@@ -24,7 +24,7 @@ extern void brelse();
  * is in is held by the caller.  Returns 1 for a readable label, else 0.
  */
 static
-unsigned char
+UINT8
 dlabel_decode(lp, g, table, tm)
     struct dlabel *lp;
     struct dlgeom *g;
@@ -57,18 +57,18 @@ dlabel_decode(lp, g, table, tm)
     return (1);
 }
 
-int
+INT16
 dllabel(cdev, sl, g, table, tm)
-    UINT cdev;                  /* the drive's own 'c' device number */
-    UINT sl;                    /* the slice this open is bound to */
+    UINT16 cdev;                  /* the drive's own 'c' device number */
+    UINT16 sl;                    /* the slice this open is bound to */
     register struct dlgeom *g;
     struct slicemap *table;     /* cached slice map, or 0 for none */
     struct dltiming *tm;        /* timing out, or 0 to drop it */
 {
     static struct buf *b;
     static struct dlabel *lp;
-    static UINT off, len;
-    static UINT otracks, oroll;
+    static UINT16 off, len;
+    static UINT16 otracks, oroll;
     static UINT8 oheads, osectors;
     static UINT8 got;
 
@@ -184,14 +184,14 @@ dllabel(cdev, sl, g, table, tm)
  * dllabel() cached.  Returns 0, or ENXIO for a slice that is not carved
  * or runs off the drive.
  */
-unsigned char
+UINT8
 dlslice(g, table, sl, offp, rollp, lenp, maxblkp)
     register struct dlgeom *g;
     struct slicemap *table;
-    UINT sl;
-    UINT *offp, *rollp, *lenp, *maxblkp;
+    UINT16 sl;
+    UINT16 *offp, *rollp, *lenp, *maxblkp;
 {
-    static UINT off, len, roll, maxblk;
+    static UINT16 off, len, roll, maxblk;
 
     if (sl == DL_WHOLE) {
         off = 0;
@@ -223,7 +223,7 @@ dlslice(g, table, sl, offp, rollp, lenp, maxblkp)
  * than as a copy in each driver's strategy routine.  Returns 1 when the
  * buffer carried a readable label, 0 otherwise.
  */
-int
+INT16
 dlreload(b, g, table, tm)
     struct buf *b;
     struct dlgeom *g;
@@ -231,7 +231,7 @@ dlreload(b, g, table, tm)
     struct dltiming *tm;
 {
     struct dlabel *lp;
-    int got;
+    INT16 got;
 
     lp = (struct dlabel *)(bhold(b) + DL_OFFSET);
     got = dlabel_decode(lp, g, table, tm);

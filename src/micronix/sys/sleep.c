@@ -7,13 +7,13 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
-extern unsigned char next();
+extern UINT8 next();
 extern void run();
 extern void panic();
 extern void abort();
 extern void newmap();
 
-extern char memwant, swapping;
+extern UINT8 memwant, swapping;
 extern struct proc *swapproc;
 extern UINT8 bholdn;            /* buffer holds up; uio.c */
 
@@ -22,7 +22,7 @@ extern UINT8 bholdn;            /* buffer holds up; uio.c */
  * opportunity. Set by run (below), tested in trap (trap.c),
  * and reset in next (below).
  */
-char resched = 0;
+UINT8 resched = 0;
 
 /*
  * Hier to the run-time throne.
@@ -44,7 +44,7 @@ char resched = 0;
  */
 void
 wakeup(event)
-    int event;
+    INT16 event;
 {
     struct proc *p;
 
@@ -86,7 +86,7 @@ run(p)
  */
 void
 sleep(event, pri)
-    register int event;
+    register INT16 event;
     register UINT8 pri;
 {
     register struct proc *p;
@@ -119,12 +119,12 @@ sleep(event, pri)
  * enables fork to distinguish between parent and child.
  * Warning: this is intimately connected with C's stack framing.
  */
-unsigned char
+UINT8
 next(dummy)
-    int dummy;      /* unused: forces a 1-argument frame, see setframe in sub8.s */
+    INT16 dummy;      /* unused: forces a 1-argument frame, see setframe in sub8.s */
 {
     register struct proc *n;        /* force stacking of reg variables */
-    static int temp[12];        /* for use while changing stacks */
+    static INT16 temp[12];        /* for use while changing stacks */
     /*
      * ccc compiles a leaf function with no stack locals to a bare
      * "pop ix; ret" epilogue that resumes through SP.  The context
@@ -133,7 +133,7 @@ next(dummy)
      * the top of its stack - so force a real frame.  The variable is
      * never read; it only buys the IY-based fexit epilogue.
      */
-    volatile int force_frame;
+    volatile INT16 force_frame;
 
     if ((n = sched()) != u.p) {
         saveframe(&u.p->frmptr, &u.p->stkptr);
@@ -150,6 +150,7 @@ next(dummy)
 /*
  * Find the next runnable in-core process.
  */
+INT16
 sched()
 {
     register struct proc *next, *p;

@@ -21,20 +21,20 @@ extern void itrunc();
 extern void ifree();
 extern void indfree();
 extern void bfree();
-extern unsigned char ifill();
+extern UINT8 ifill();
 
-extern char *swin(UINT8);       /* uio.c: the scratch window */
+extern UINT8 *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
 extern struct inode ilist[];
 
-extern long seconds;
+extern INT32 seconds;
 
 /*
  * Low water mark block number for the circular search 
  * algorithm in ifill ()
  */
 
-static unsigned lastiblock = 2;
+static UINT16 lastiblock = 2;
 
 /*
  * Is this inode allocated in core?  A disk inode's image can lag what
@@ -46,9 +46,9 @@ static unsigned lastiblock = 2;
  * to release it.  In core is the truth; never offer a number the kernel
  * already owns.
  */
-static unsigned char
+static UINT8
 iincore(inum, dev)
-    int inum, dev;
+    INT16 inum, dev;
 {
     register struct inode *ip;
 
@@ -71,12 +71,12 @@ iincore(inum, dev)
  */
 struct inode *
 ialloc(dev)
-    int dev;
+    INT16 dev;
 {
     register struct buf *sb;
     register struct super *sup;
     register struct inode *ip;
-    register int inum;
+    register INT16 inum;
 
     sb = getsb(dev);
 
@@ -138,20 +138,20 @@ ialloc(dev)
 /*
  * Put some inumbers in the superblock's inode freelist
  */
-unsigned char
+UINT8
 ifill(sb, dev)
     struct buf *sb;
-    int dev;
+    INT16 dev;
 {
-    register int inum;
-    register n, limit;
-    unsigned itop;
-    register unsigned iblk;
+    register INT16 inum;
+    register INT16 n, limit;
+    UINT16 itop;
+    register UINT16 iblk;
     static struct buf *bp;
     static struct dsknod *dp;
     static struct inode *ip;
     register struct super *sup;
-    char *chunk;
+    UINT8 *chunk;
     UINT8 chunkseg;
 
     /*
@@ -189,7 +189,7 @@ ifill(sb, dev)
         chunk = bp->data;
         chunkseg = bp->xmem;
         swin(chunkseg);
-        dp = (struct dsknod *) ((char *) SCRWIN + (chunk & 0xfff));
+        dp = (struct dsknod *) ((UINT8 *) SCRWIN + (chunk & 0xfff));
         inum = 16 * iblk - 31;
         for (n = 16; n; n--, dp++, inum++)
             if ((dp->d_mode & IALLOC) == 0 && !iincore(inum, dev))
@@ -257,7 +257,7 @@ ifree(ip)
     if (sup->s_ninode < 100) {    /* Fit in super block free list ? */
         sup->s_inode[sup->s_ninode++] = ip->i_inum;
     } else {
-        unsigned new;
+        UINT16 new;
 
         /*
          * record new low water mark for ifill ()
@@ -283,7 +283,7 @@ void
 itrunc(ip)
     register struct inode *ip;
 {
-    register int n, dev;
+    register INT16 n, dev;
 
     if (ip->i_mode & IIO)
         return;
@@ -309,11 +309,11 @@ itrunc(ip)
  */
 void
 indfree(ind, level, dev)
-    UINT ind;
-    int dev;
+    UINT16 ind;
+    INT16 dev;
     register UINT8 level;
 {
-    register UINT *p;
+    register UINT16 *p;
     register struct buf *bp;
 
     if (ind == 0)
@@ -330,8 +330,8 @@ indfree(ind, level, dev)
          */
         return;
     }
-    for (p = (UINT *)&bp->data[510]; p >= (UINT *)bp->data; p--) {
-        UINT bn;
+    for (p = (UINT16 *)&bp->data[510]; p >= (UINT16 *)bp->data; p--) {
+        UINT16 bn;
 
         /*
          * Read the entry under a hold and give the window back before the
@@ -357,20 +357,20 @@ indfree(ind, level, dev)
  */
 void
 indfreetail(ind, level, start, dev)
-    UINT ind;
+    UINT16 ind;
     UINT8 level;
-    UINT start;
-    int dev;
+    UINT16 start;
+    INT16 dev;
 {
     register struct buf *bp;
-    register UINT *p;
-    UINT bn;
+    register UINT16 *p;
+    UINT16 bn;
 
     if (ind == 0)
         return;
     if ((bp = bread(ind, dev)) == 0)
         return;
-    for (p = (UINT *)&bp->data[510]; p >= (UINT *)&bp->data[start * 2]; p--) {
+    for (p = (UINT16 *)&bp->data[510]; p >= (UINT16 *)&bp->data[start * 2]; p--) {
         bhold(bp);
         bn = *p;
         *p = 0;
@@ -396,9 +396,9 @@ itruncat(ip, length)
     register struct inode *ip;
     UINT32 length;
 {
-    register int n, dev;
-    UINT nblk;
-    int index;
+    register INT16 n, dev;
+    UINT16 nblk;
+    INT16 index;
 
     if (ip->i_mode & IIO)
         return;
@@ -424,14 +424,14 @@ itruncat(ip, length)
              * whole of it goes.
              */
             struct buf *bp;
-            UINT *p;
-            UINT containing, bn;
+            UINT16 *p;
+            UINT16 containing, bn;
             UINT8 entry = index - 7;
             UINT8 empty = 0;
 
             if ((bp = bread(ip->i_addr[7], dev)) == 0)
                 return;
-            p = (UINT *)bp->data;
+            p = (UINT16 *)bp->data;
             containing = p[entry];
             for (n = 255; n > entry; n--) {
                 bhold(bp);

@@ -35,25 +35,25 @@
 #include <sys/pic.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern unsigned char pic_mask();
-extern unsigned char inton();
+extern UINT8 pic_mask();
+extern UINT8 inton();
 
-extern int in(), out();
-extern int copyin(), copyout(); /* mem.s: the user side */
-extern unsigned char valid();             /* malloc.c: is this user page there? */
+extern INT16 in(), out();
+extern INT16 copyin(), copyout(); /* mem.s: the user side */
+extern UINT8 valid();             /* malloc.c: is this user page there? */
 extern void sleep(), wakeup();
-extern int di(), ei();
-extern UINT netline;            /* resident: select(2) reopens the line */
-extern int selectchan;          /* resident: select(2)'s event */
-extern int netchan;             /* resident: the command/event wait */
-extern int netlock;             /* resident: one command on the wire */
+extern INT16 di(), ei();
+extern UINT16 netline;            /* resident: select(2) reopens the line */
+extern INT16 selectchan;          /* resident: select(2)'s event */
+extern INT16 netchan;             /* resident: the command/event wait */
+extern INT16 netlock;             /* resident: one command on the wire */
 extern UINT8 netready[];        /* resident: a socket has something */
 
 #define NETPAY 128              /* the most one request or pull moves; the
                                  * module page is the budget, and a chunk
                                  * this size still keeps the wire busy */
 
-static UINT netseg;             /* this module's segment */
+static UINT16 netseg;             /* this module's segment */
 static UINT8 netpresent;        /* the card answered its probe */
 static UINT8 netbuf[NETPAY];    /* one frame's payload */
 
@@ -69,9 +69,9 @@ static UINT8 delivered[8];      /* a LISTEN already returned it */
  * which is what the handler and the wait name when they look the line up
  * with intrline().  There is no hardware bring-up beyond that.
  */
-int
+INT16
 netstart(seg)
-    UINT seg;
+    UINT16 seg;
 {
     netseg = seg;
     return (0);
@@ -89,6 +89,7 @@ netstart(seg)
 #define NETRING      8192
 
 static
+INT16
 netcard()
 {
     return ((in(NETSTAT_PORT) & 0xf8) == 0);
@@ -99,7 +100,7 @@ void
 netput(b)
     UINT8 b;
 {
-    register UINT n;
+    register UINT16 n;
 
     for (n = 0; n < NETPROBEWAIT; n++)
         if (in(NETSTAT_PORT) & NETSTAT_TXRDY)
@@ -107,11 +108,11 @@ netput(b)
     out(NETDATA_PORT, b);
 }
 
-int
+INT16
 netprobe(mode)
-    int mode;
+    INT16 mode;
 {
-    register UINT n;
+    register UINT16 n;
 
     if (!netcard())
         return (0);
@@ -137,10 +138,10 @@ netprobe(mode)
 /*
  * The handler: mask the still-low line, then wake the callers.
  */
-int
+INT16
 netint()
 {
-    register int l;
+    register INT16 l;
 
     l = intrline(netint, netseg);
     if (l >= 0) {
@@ -157,7 +158,7 @@ netint()
  * is the clock for that: once a second, whether or not anything is
  * waiting, and the woken request looks again.
  */
-int
+INT16
 nettick()
 {
     wakeup(&netchan);
@@ -171,11 +172,11 @@ nettick()
  * us.  -1 means the card never attached.
  */
 static
-char
+INT8
 netwait()
 {
-    register int l;
-    register UINT n;
+    register INT16 l;
+    register UINT16 n;
 
     l = intrline(netint, netseg);
     if (l < 0) {
@@ -207,7 +208,7 @@ netwait()
  * card without a working interrupt route, and the driver moves frames
  * perfectly well by polling NETSTAT.
  */
-int
+INT16
 netattached()
 {
     return (netpresent);
@@ -244,10 +245,10 @@ netlockoff()
 static
 void
 netframe(type, sock, p, len)
-    int type, sock, len;
+    INT16 type, sock, len;
     UINT8 *p;
 {
-    register int i;
+    register INT16 i;
 
     netput((UINT8) type);
     netput((UINT8) sock);
@@ -262,12 +263,13 @@ netframe(type, sock, p, len)
  * Returns the payload length; bytes past cap are discarded.
  */
 static
+INT16
 netrecv(hdr, buf, cap)
     UINT8 *hdr;
     UINT8 *buf;
-    int cap;
+    INT16 cap;
 {
-    register int len, i, n;
+    register INT16 len, i, n;
 
     if (netwait() < 0)
         return (-1);
@@ -295,10 +297,10 @@ netrecv(hdr, buf, cap)
 static
 void
 netstash(sock, p, len)
-    int sock, len;
+    INT16 sock, len;
     UINT8 *p;
 {
-    register int i;
+    register INT16 i;
 
     if (sock >= 8 || len < 1)
         return;
@@ -324,7 +326,7 @@ void
 netdrain()
 {
     UINT8 hdr[4];
-    int n;
+    INT16 n;
 
     while (in(NETSTAT_PORT) & NETSTAT_RXRDY) {
         n = netrecv(hdr, netbuf, NETPAY);
@@ -341,16 +343,16 @@ netdrain()
  * length, and the payload lands in rbuf.  Returns 0 or -1.
  */
 static
-char
+INT8
 netcmd(op, sock, p, len, rtype, rsock, rbuf, rcap, rlen)
-    int op, sock, len;
+    INT16 op, sock, len;
     UINT8 *p;
-    int *rtype, *rsock;
+    INT16 *rtype, *rsock;
     UINT8 *rbuf;
-    int rcap, *rlen;
+    INT16 rcap, *rlen;
 {
     UINT8 hdr[4];
-    int n;
+    INT16 n;
 
     netframe(op, sock, p, len);
     for (;;) {
@@ -373,11 +375,12 @@ netcmd(op, sock, p, len, rtype, rsock, rbuf, rcap, rlen)
  * with u.error set.
  */
 static
+INT16
 netcall(op, sock, p, len)
-    int op, sock, len;
+    INT16 op, sock, len;
     UINT8 *p;
 {
-    int rt, rs, n, st;
+    INT16 rt, rs, n, st;
 
     netlockon();
     if (netcmd(op, sock, p, len, &rt, &rs, netbuf, NETPAY, &n) < 0) {
@@ -391,9 +394,10 @@ netcall(op, sock, p, len)
 }
 
 static
+INT16
 netfree()
 {
-    register int i;
+    register INT16 i;
 
     for (i = 0; i < 8; i++)
         if (!nfused[i])
@@ -408,9 +412,9 @@ netfree()
  */
 void
 netopen(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
-    int slot, st;
+    INT16 slot, st;
     UINT8 tcp;
 
     if (minor(dev) != 0) {
@@ -440,9 +444,9 @@ netopen(dev, mode)
 
 void
 netclose(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
-    int slot;
+    INT16 slot;
 
     slot = minor(dev) - 1;
     if (slot < 0 || slot >= 8)
@@ -461,10 +465,10 @@ netclose(dev, mode)
  */
 void
 netread(dev)
-    UINT dev;
+    UINT16 dev;
 {
     UINT8 p[2];
-    int slot, rt, rs, n, cap, st;
+    INT16 slot, rt, rs, n, cap, st;
 
     slot = minor(dev) - 1;
     if (slot < 0 || slot >= 8 || !nfused[slot]) {
@@ -522,9 +526,9 @@ netread(dev)
  */
 void
 netwrite(dev)
-    UINT dev;
+    UINT16 dev;
 {
-    int slot, st, len;
+    INT16 slot, st, len;
 
     slot = minor(dev) - 1;
     if (slot < 0 || slot >= 8 || !nfused[slot]) {
@@ -552,11 +556,12 @@ netwrite(dev)
  * tick wakes it when the card has no interrupt line.
  */
 static
+INT16
 netawait(fn, slot)
-    int (*fn) ();
-    int slot;
+    INT16 (*fn) ();
+    INT16 slot;
 {
-    register int r;
+    register INT16 r;
 
     for (;;) {
         netlockon();
@@ -570,8 +575,9 @@ netawait(fn, slot)
 }
 
 static
+INT16
 waitconnect(slot)
-    int slot;
+    INT16 slot;
 {
     if (evcode[slot] == N_EV_CONNECTED) {
         evcode[slot] = 0;
@@ -587,8 +593,9 @@ waitconnect(slot)
 }
 
 static
+INT16
 waitlisten(slot)
-    int slot;
+    INT16 slot;
 {
     if (pend[slot] && !delivered[slot]) {
         delivered[slot] = 1;
@@ -603,13 +610,13 @@ waitlisten(slot)
  * socket, so no request carries a socket number; the request code says
  * the operation and the argument is only what that operation needs.
  */
-int
+INT16
 netioctl(dev, cmd, arg)
-    UINT dev, cmd;
-    char *arg;
+    UINT16 dev, cmd;
+    UINT8 *arg;
 {
     UINT8 p[8];
-    int slot, rt, rs, n, st, i;
+    INT16 slot, rt, rs, n, st, i;
 
     slot = minor(dev) - 1;
     if (slot < 0 || slot >= 8 || !nfused[slot]) {

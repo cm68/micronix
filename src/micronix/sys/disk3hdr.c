@@ -38,9 +38,9 @@
 #include <sys/disk3.h>
 #include <sys/ovl.h>
 
-extern int disk3open();
+extern INT16 disk3open();
 extern void disk3close(), disk3strat();
-extern int disk3init(), disk3probe();
+extern INT16 disk3init(), disk3probe();
 extern void disk3int(), disk3check();
 extern struct biovec disk3bvec;
 

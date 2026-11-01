@@ -32,7 +32,7 @@ extern void ss1_txline(), ss1_uart_init();
 #define TXEN    0x01
 #define RXEN    0x04
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * Send a character.  The transmitter is the only buffering, and the
@@ -53,6 +53,7 @@ ss1_putc(tty, c)
  * sends one queued character each time, until the queue empties and
  * ttyout calls ss1_stop.
  */
+INT16
 ss1_start(tty)
     struct tty *tty;
 {
@@ -65,13 +66,16 @@ ss1_start(tty)
  * the monitor sends polled through the same chip, and the keyboard still
  * has to be heard.  There is no baud rate to set.
  */
+INT16
 ss1_stop(tty, flag)
     struct tty *tty;
+    INT16 flag;
 {
     ss1_txline(0);
     return (0);
 }
 
+INT16
 ss1_set(tty)
     struct tty *tty;
 {
@@ -85,7 +89,8 @@ ss1_set(tty)
  */
 void
 ss1_uart_open(dev, mode)
-    register dev;
+    register INT16 dev;
+    INT16 mode;
 {
     struct tty *tty;
 

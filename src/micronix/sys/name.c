@@ -15,8 +15,8 @@
 extern void ilock();
 extern void irelse();
 extern void brelse();
-extern unsigned char direqu();
-extern unsigned char access();
+extern UINT8 direqu();
+extern UINT8 access();
 
 extern struct inode *rootdir;
 
@@ -27,10 +27,10 @@ extern struct inode *rootdir;
  */
 struct inode *
 iname(name)
-    char *name;
+    UINT8 *name;
 {
     register struct inode *ip, *parent;
-    register int inum;
+    register INT16 inum;
 
     u.iparent = 0;
     for (ip = u.cdir; getbyte(name) == '/'; name++)
@@ -69,14 +69,15 @@ iname(name)
  * If not found: leave u.offset at a free slot or at the end,
  * and return 0.
  */
+INT16
 dlook(ip, np)
     struct inode *ip;
-    char **np;
+    UINT8 **np;
 {
-    register UINT nblks, tail, log;
-    static UINT phys, end, dummy;
+    register UINT16 nblks, tail, log;
+    static UINT16 phys, end, dummy;
     static UINT8 nents;
-    static char c, *p, *nambuf;
+    static UINT8 c, *p, *nambuf;
     static struct buf *b;
     static struct dir *d;
     /*
@@ -91,8 +92,8 @@ dlook(ip, np)
      */
     UINT32 place;               /* byte offset of the block being read */
     UINT32 slot;                /* byte offset of the first free entry */
-    UINT inum;
-    UINT i;
+    UINT16 inum;
+    UINT16 i;
 
     nambuf = u.dir.name;
     copyin(*np, nambuf, 14);
@@ -158,11 +159,11 @@ dlook(ip, np)
 /*
  * Check equality of two directory entries
  */
-unsigned char
+UINT8
 direqu(a, b)
-    char *a, *b;
+    UINT8 *a, *b;
 {
-    static char *x, *y;
+    static UINT8 *x, *y;
     static UINT8 i;
 
     x = a;

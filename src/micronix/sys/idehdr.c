@@ -30,10 +30,10 @@
 #include <sys/ide.h>
 #include <sys/ovl.h>
 
-extern int ideopen();
+extern INT16 ideopen();
 extern void ideclose(), idestrat();
 extern void ideint();
-extern int ideprobe();
+extern INT16 ideprobe();
 extern struct biovec idebvec;
 
 struct ovlhdr idehdr = { 4, 0, 0, 0, &idebvec, 0, &ideprobe, &ideint,

@@ -18,7 +18,7 @@
 #define CC_SET      0x08            /* shift register -> clock */
 #define CC_32HZ     0x1c            /* the periodic output, 32 Hz */
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * Program the uPD1990's periodic output - the heartbeat.  32 Hz, which

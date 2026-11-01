@@ -217,7 +217,7 @@ else do
 	for(i=0; i<nread; ++i)
 		if(entry[i].d_ino!= 0)
 			{
-			p1 = entry[i].d_name;
+			p1 = (char *) entry[i].d_name;
 			p2 = n15;
 			while( (p2<n15end) &&
 			  (*p2++ = *p1++)!='\0' );

@@ -21,7 +21,7 @@
 #include <sys/ovl.h>
 
 extern struct ciovec ttycvec;
-extern int ttyinit();
+extern INT16 ttyinit();
 
 struct ovlhdr ttyhdr = { 0, &ttyinit, 0, 0, 0, &ttycvec, 0, 0,
 	{ 't', 't', 'y' }, 0, 1 };

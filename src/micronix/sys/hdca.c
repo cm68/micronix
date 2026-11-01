@@ -31,28 +31,28 @@
 extern void iodone();
 extern void wakeup();
 extern void sleep();
-static char exclude();
-extern unsigned char inton();
-extern unsigned char dlslice();
+static INT8 exclude();
+extern UINT8 inton();
+extern UINT8 dlslice();
 
-extern int in(), out();
+extern INT16 in(), out();
 extern void timeout();
-extern unsigned char inton();
+extern UINT8 inton();
 
 struct hd hdinfo[NHD];
 
 /* the slice table off each drive's label, cached at open */
 static struct slicemap hdslice[NHD][NSLICE];
 
-static int hdmutex;		/* the controller, 0 = free */
-static int (*hdintr) ();	/* the phase the op-done interrupt resumes */
+static INT16 hdmutex;		/* the controller, 0 = free */
+static INT16 (*hdintr) ();	/* the phase the op-done interrupt resumes */
 static struct hd *hdintarg;	/* its argument */
-static int (*hdseekintr) ();	/* the phase the seek-done interrupt resumes */
+static INT16 (*hdseekintr) ();	/* the phase the seek-done interrupt resumes */
 static struct hd *hdseekarg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
 static struct hd *hdactive;	/* the drive owning the controller */
 static UINT8 hddead;		/* seconds the request has been in flight */
-static int hdioctl;		/* the ioctl sleep channel */
+static INT16 hdioctl;		/* the ioctl sleep channel */
 
 static void phase00(), phase01(), phase02(), phase03(), phase04(),
     phase06(), phase08(), phase09(), phase11(), phase12(), arrive();
@@ -158,10 +158,10 @@ hdhdr(head, track, sector)
  * area's four bytes are head, track, sector, key; the track is the
  * second.
  */
-static UINT
+static UINT16
 hdtrk()
 {
-	UINT v;
+	UINT16 v;
 
 	out(HDCA_CMD, CMD_RAMHDR);
 	(void)hdin();		/* head */
@@ -175,7 +175,7 @@ hdtrk()
  */
 static void
 hdhdrrd(p)
-	register char *p;
+	register UINT8 *p;
 {
 	UINT8 i;
 
@@ -189,7 +189,7 @@ hdhdrrd(p)
  */
 static void
 hdhdrwr(p)
-	register char *p;
+	register UINT8 *p;
 {
 	UINT8 i;
 
@@ -208,9 +208,9 @@ hdhdrwr(p)
  */
 static void
 hdrdat(p)
-	register char *p;
+	register UINT8 *p;
 {
-	register UINT n;
+	register UINT16 n;
 
 	out(HDCA_CMD, CMD_RAMDATA);
 	(void)hdin();
@@ -222,9 +222,9 @@ hdrdat(p)
 
 static void
 hdwdat(p)
-	register char *p;
+	register UINT8 *p;
 {
-	register UINT n;
+	register UINT16 n;
 
 	out(HDCA_CMD, CMD_RAMDATA);
 	n = 512;
@@ -237,7 +237,7 @@ hdwdat(p)
  */
 static struct hd *
 getinfo(dev)
-	UINT dev;
+	UINT16 dev;
 {
 	return (&hdinfo[dev & 3]);
 }
@@ -249,11 +249,11 @@ getinfo(dev)
  * head is what is left divided by the sectors per track and the sector
  * is the remainder.
  */
-static UINT
+static UINT16
 gettrk(blk, spc, cylstart, roll, len)
-	UINT blk, spc, cylstart, roll, len;
+	UINT16 blk, spc, cylstart, roll, len;
 {
-	UINT cyl;
+	UINT16 cyl;
 
 	cyl = blk / spc + roll;
 	if (cyl >= len)
@@ -263,7 +263,7 @@ gettrk(blk, spc, cylstart, roll, len)
 
 static UINT8
 gethed(blk, hp)
-	UINT blk;
+	UINT16 blk;
 	struct hd *hp;
 {
 	return ((blk % hp->h_spc) / hp->h_sectors);
@@ -271,7 +271,7 @@ gethed(blk, hp)
 
 static UINT8
 getsec(blk, hp)
-	UINT blk;
+	UINT16 blk;
 	struct hd *hp;
 {
 	return ((blk % hp->h_sectors) + hp->h_firstsec);
@@ -282,7 +282,7 @@ getsec(blk, hp)
  * request that finds it busy is queued on its drive's h_next.  phase00()
  * below is called with the controller free.
  */
-static char
+static INT8
 exclude(hp)
 	struct hd *hp;
 {
@@ -330,7 +330,7 @@ release(hp)
  * only way it ever ends.  Normal requests finish in milliseconds, so the
  * counter only reaches the deadline when the drive is wedged.
  */
-int
+INT16
 hdtick()
 {
 	if (!hdmutex)
@@ -358,13 +358,13 @@ hdtick()
  * controller is free the arm starts moving toward it; the interrupts
  * carry it the rest of the way.
  */
-int
+INT16
 hdstrat(b)
 	struct buf *b;
 {
 	struct hd *hp;
-	UINT cyl, head, sector;
-	UINT sl, off, roll, len, maxblk;
+	UINT16 cyl, head, sector;
+	UINT16 sl, off, roll, len, maxblk;
 
 	hp = getinfo(b->dev);
 	hp->h_drive = b->dev & 3;
@@ -521,7 +521,7 @@ static void
 phase04(hp)
 	struct hd *hp;
 {
-	char *p;
+	UINT8 *p;
 
 	if (hdproc()) {
 		phase11(hp, EIO);
@@ -545,7 +545,7 @@ static void
 phase08(hp)
 	struct hd *hp;
 {
-	char *p;
+	UINT8 *p;
 
 	hdselect(hp->h_drive, hp->h_head);
 	p = bhold(hp->h_cur);
@@ -587,7 +587,7 @@ phase09(hp)
 static void
 phase11(hp, err)
 	struct hd *hp;
-	int err;
+	INT16 err;
 {
 	hp->h_flags |= HDERROR;
 	hp->h_stat = err;
@@ -620,7 +620,7 @@ phase12(hp)
  * phase; INT_B (seek done) resumes the armed seek phase.  A primary
  * status of 0xff is not our card.
  */
-int
+INT16
 hdint()
 {
 	UINT8 psr, ssr;
@@ -653,9 +653,9 @@ hdint()
  * Open a drive: read the disk label for its geometry, as every other
  * disk driver does.  The drive number is the low two bits of the minor.
  */
-int
+INT16
 hdopen(dev, mode)
-	UINT dev, mode;
+	UINT16 dev, mode;
 {
 	struct hd *hp;
 	UINT8 drive;       /* drive = dev & 3 */
@@ -704,9 +704,9 @@ hdopen(dev, mode)
 /*
  * Close a drive: wait for any I/O to drain, then drop the open flag.
  */
-int
+INT16
 hdclose(dev)
-	UINT dev;
+	UINT16 dev;
 {
 	struct hd *hp;
 
@@ -725,19 +725,19 @@ hdclose(dev)
  * polled to completion with interrupts off; a wedge here hangs, which is
  * what the original formatter did.
  */
-static char
+static INT8
 hdfmt(hp, c, b, drive)
 	struct hd *hp;
 	struct hdca_cmd *c;
 	struct buf *b;
 	UINT8 drive;       /* drive = dev & 3 */
 {
-	int spt = c->sector;		/* the sector field carries the count */
-	int head = c->head;
-	int track = c->track;
-	char hdr[128];
-	char *p;
-	int i, delta, dir, n;
+	INT16 spt = c->sector;		/* the sector field carries the count */
+	INT16 head = c->head;
+	INT16 track = c->track;
+	UINT8 hdr[128];
+	UINT8 *p;
+	INT16 i, delta, dir, n;
 
 	if (spt < 1 || spt > 32 || !b) {
 		u.error = EINVAL;
@@ -807,9 +807,9 @@ hdfmt(hp, c, b, drive)
  * the op-done interrupt wakes it through phase12() - and the completion
  * status comes back in the byte after the block, cmd[HDLEN].
  */
-int
+INT16
 hdcioctl(dev, cmd, r, b)
-	UINT dev, cmd;
+	UINT16 dev, cmd;
 	struct cdb *r;
 	struct buf *b;
 {
@@ -886,10 +886,11 @@ struct biovec hdbvec = { &hdopen, &hdclose, &hdstrat, &hdcioctl };
  * card's interrupts, so a line the boot's reads left standing is quieted
  * before the tickle and after it.
  */
+INT16
 hdprobe(mode)
-	int mode;
+	INT16 mode;
 {
-	register int n;
+	register INT16 n;
 
 	if (mode == PROBE_CLEAR) {
 		out(HDCA_CMD, CMD_RAMDATA);	/* acknowledge op-done */

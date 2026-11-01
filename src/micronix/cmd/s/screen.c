@@ -61,6 +61,7 @@
 #include <stdio.h>
 
 #ifdef __unix__
+#include <types.h>
 #include <sys/ioctl.h>
 #include <sys/termios.h>
 #endif

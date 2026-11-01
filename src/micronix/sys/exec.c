@@ -23,14 +23,14 @@ extern void send();
 extern void argfree();
 extern void irelse();
 extern void wakeup();
-extern unsigned char valid();
-extern unsigned char argbuild();
-extern unsigned char argalloc();
-extern unsigned char argscan();
-extern unsigned char fit();
-extern unsigned char rdhdr();
-extern unsigned char xchk();
-extern unsigned char access();
+extern UINT8 valid();
+extern UINT8 argbuild();
+extern UINT8 argalloc();
+extern UINT8 argscan();
+extern UINT8 fit();
+extern UINT8 rdhdr();
+extern UINT8 xchk();
+extern UINT8 access();
 
 #define HALT	0x76            /* system call trap */
 
@@ -62,10 +62,10 @@ struct obj cpmhdr = {
 };
 
 static struct inode *ip = 0;
-static UINT nargs = 0;
-static UINT nenv = 0;
-static UINT nbytes = 0;         /* the strings, nulls included */
-static UINT argsize = 0;        /* strings + vectors + argc and terminators */
+static UINT16 nargs = 0;
+static UINT16 nenv = 0;
+static UINT16 nbytes = 0;         /* the strings, nulls included */
+static UINT16 argsize = 0;        /* strings + vectors + argc and terminators */
 
 /*
  * The stack pages the block lives in, by page.  A zero entry is free;
@@ -83,16 +83,16 @@ static UINT8 argpage;           /* the page in the buffer window, 0xff none */
  */
 static struct buf argbuf;
 
-extern int zerouser();
-extern int out();
-extern int getbyte(), getword();
-extern unsigned char segalloc();
-extern void segfree(unsigned);
+extern INT16 zerouser();
+extern INT16 out();
+extern INT16 getbyte(), getword();
+extern UINT8 segalloc();
+extern void segfree(UINT16);
 extern void newmap(), taskload();
-extern UINT nsegs;              /* free 4K segments (malloc.c) */
+extern UINT16 nsegs;              /* free 4K segments (malloc.c) */
 
 static struct obj hdr = 0;
-char zpage[512] = 0;   /* zero page for clearing bss */
+UINT8 zpage[512] = 0;   /* zero page for clearing bss */
 
 /*
  * The worker for both entries: execve(name, args, env) and exec(name,
@@ -106,9 +106,9 @@ char zpage[512] = 0;   /* zero page for clearing bss */
  */
 void
 doexec(name, args, env)
-    char *name, **args, **env;
+    UINT8 *name, **args, **env;
 {
-    static char execing = 0;
+    static UINT8 execing = 0;
 
     while (execing)
         sleep(&execing, PRIWAIT);
@@ -125,7 +125,7 @@ doexec(name, args, env)
          */
         out(0xd1, u.task);                     /* user task id */
         {
-            char *p;
+            UINT8 *p;
             for (p = name; ; p++) {
                 UINT8 c = getbyte(p);
                 out(0xd1, c);
@@ -163,14 +163,14 @@ doexec(name, args, env)
  */
 void
 exec(name, args)
-    char *name, **args;
+    UINT8 *name, **args;
 {
     doexec(name, args, 0);
 }
 
 void
 execve(name, args, env)
-    char *name, **args, **env;
+    UINT8 *name, **args, **env;
 {
     doexec(name, args, env);
 }
@@ -178,9 +178,9 @@ execve(name, args, env)
 /*
  * Get the inode and check access.
  */
-unsigned char
+UINT8
 xchk(name)
-    char *name;
+    UINT8 *name;
 {
     if ((ip = iname(name)) != 0) {
         /*
@@ -207,7 +207,7 @@ xchk(name)
 /*
  * Read the header
  */
-unsigned char
+UINT8
 rdhdr()
 {
     u.offset = 0;
@@ -230,10 +230,10 @@ rdhdr()
  * that wraps would look small and let an image run past the end of
  * user memory.
  */
-unsigned char
+UINT8
 fit()
 {
-    UINT brake, tbrake, sp;
+    UINT16 brake, tbrake, sp;
 
     if (hdr.dataoff > MAXMEM - hdr.data) {
         u.error = ENOMEM;
@@ -264,7 +264,7 @@ fit()
         u.error = ENOMEM;
         return 0;
     }
-    u.brake = (char *) brake;
+    u.brake = (UINT8 *) brake;
     return 1;
 }
 
@@ -273,11 +273,11 @@ fit()
  * address space through the 0xc000 window; the bound keeps an
  * unterminated string from walking the machine.
  */
-static UINT
+static UINT16
 ulen(s)
-    UINT s;
+    UINT16 s;
 {
-    UINT n;
+    UINT16 n;
 
     for (n = 0; n < MAXMEM; n++)
         if (getbyte(s + n) == 0)
@@ -297,11 +297,11 @@ ulen(s)
  * argsize is argc (2) + the two null terminators (4) + a pointer for
  * every string + the strings themselves.
  */
-unsigned char
+UINT8
 argscan(args, env)
-    char **args, **env;
+    UINT8 **args, **env;
 {
-    UINT i, s, len, need;
+    UINT16 i, s, len, need;
 
     nargs = nenv = nbytes = 0;
     argsize = 6;                /* argc, and the argv/envp terminators */
@@ -359,12 +359,12 @@ argscan(args, env)
  * through the other window (0xc000), which is what lets the old image
  * and the new stack be touched at the same time.
  */
-static char *
+static UINT8 *
 argwin(page)
-    UINT page;
+    UINT16 page;
 {
     argbuf.xmem = argseg[page];
-    argbuf.data = (char *) BUFWIN;
+    argbuf.data = (UINT8 *) BUFWIN;
     argheld = 1;
     return (bhold(&argbuf));
 }
@@ -381,7 +381,7 @@ argrel()
 
 static void
 argmap(page)
-    UINT page;
+    UINT16 page;
 {
     if (argheld && page == argpage)
         return;
@@ -392,7 +392,7 @@ argmap(page)
 
 static void
 argput(addr, c)
-    UINT addr; UINT8 c;
+    UINT16 addr; UINT8 c;
 {
     argmap(addr >> 12);
     ((UINT8 *) BUFWIN)[addr & 0xFFF] = c;
@@ -400,7 +400,7 @@ argput(addr, c)
 
 static UINT8
 argget(addr)
-    UINT addr;
+    UINT16 addr;
 {
     argmap(addr >> 12);
     return (((UINT8 *) BUFWIN)[addr & 0xFFF]);
@@ -408,7 +408,7 @@ argget(addr)
 
 static void
 argputw(addr, v)
-    UINT addr, v;
+    UINT16 addr, v;
 {
     argput(addr, (UINT8) v);
     argput(addr + 1, (UINT8) (v >> 8));
@@ -419,12 +419,12 @@ argputw(addr, v)
  * page; running out before the null means the list does not fit, which
  * is E2BIG rather than a write off the end.
  */
-static unsigned char
+static UINT8
 argcopy(s, dp, roomp)
-    UINT s; UINT *dp, *roomp;
+    UINT16 s; UINT16 *dp, *roomp;
 {
     UINT8 c;
-    UINT d, room;
+    UINT16 d, room;
 
     d = *dp;
     room = *roomp;
@@ -449,10 +449,10 @@ argcopy(s, dp, roomp)
  * Check the free count first and answer ENOMEM rather than panicking in
  * segalloc().
  */
-unsigned char
+UINT8
 argalloc()
 {
-    UINT p, n;
+    UINT16 p, n;
 
     argfirst = (0xFFFF - argsize + 1) >> 12;
     n = 16 - argfirst;
@@ -473,16 +473,16 @@ argalloc()
  * argsize and everything below it is left to the image.  The strings
  * are copied once here; argscan() has already measured them.
  */
-unsigned char
+UINT8
 argbuild(args, env)
-    char **args, **env;
+    UINT8 **args, **env;
 {
-    UINT i, s, d, room, sp, av, a;
+    UINT16 i, s, d, room, sp, av, a;
 
     sp = 0xFFFF - argsize + 1;
     av = sp + 2;
     a = av + 2 * (nargs + nenv + 2);   /* the string area; 0 if no strings */
-    u.sp = (UINT *) sp;
+    u.sp = (UINT16 *) sp;
 
     argheld = 0;
     argpage = 0xff;
@@ -535,7 +535,7 @@ big:
 void
 arginstall()
 {
-    UINT p, n;
+    UINT16 p, n;
     UINT8 old, grow;
 
     old = u.p->mem[15].seg;
@@ -561,7 +561,7 @@ arginstall()
 void
 argfree()
 {
-    UINT p;
+    UINT16 p;
 
     argrel();
     for (p = 0; p < 16; p++) {
@@ -579,7 +579,7 @@ argfree()
 void
 setusr()
 {
-    static int *sp, *st;
+    static INT16 *sp, *st;
 
     u.pc = hdr.textoff;
     u.u_euid = (ip->i_mode & ISUID) ? (ip->i_uid) : (u.u_uid);
@@ -595,7 +595,7 @@ setusr()
 void
 readin()
 {
-    extern char rst1[];
+    extern UINT8 rst1[];
 
     u.segflg = USEG;
     u.p->mode |= LOCKED;
@@ -614,7 +614,7 @@ readin()
      * zero page into the region.
      */
     valid(hdr.dataoff + hdr.data, hdr.bss);
-    zerouser((char *) (hdr.dataoff + hdr.data), hdr.bss);
+    zerouser((UINT8 *) (hdr.dataoff + hdr.data), hdr.bss);
 
     u.p->mode &= ~LOCKED;       /* no core lock across exec */
 }

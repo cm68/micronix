@@ -8,9 +8,11 @@
  * sys/consts.c
  */
 
+#include <types.h>
+
 struct syscall
 {
-    char nbytes;                /* no. of bytes in arguments */
+    UINT8 nbytes;                /* no. of bytes in arguments */
     void (*call)();             /* address of system call */
 };
 
@@ -85,13 +87,12 @@ struct syscall syssw[] = {
     0, &select,                 /* 58 select(mask in hl) */
 };
 
-int ncalls = sizeof(syssw) / sizeof(struct syscall);
+INT16 ncalls = sizeof(syssw) / sizeof(struct syscall);
 
 /*
  * Device switch tables, from con.c.  struct biovec/ciovec and the
  * array declarations come from sys/con.h.
  */
-#include <types.h>
 #include <sys/con.h>
 #include <sys/ovl.h>
 extern void exit();
@@ -142,8 +143,8 @@ extern void signal();
 
 extern void nodev(), nulldev(), nullwrite();
 extern void memread(), memwrite();
-extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
-extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();
+extern INT16 ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
+extern INT16 ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();
 
 /* Device 0 must be nodev.  The disk rows point at the module trampolines
  * (sys/ovl.c), not at drivers: the kernel has no djopen, mwstrat or
@@ -195,5 +196,5 @@ struct ciovec ciosw[] = {
     &nodev, &nodev, &nodev, &nodev, &nodev,             /* 12 */
 };
 
-UINT nbdev = sizeof(biosw) / sizeof(struct biovec);
-UINT ncdev = sizeof(ciosw) / sizeof(struct ciovec);
+UINT16 nbdev = sizeof(biosw) / sizeof(struct biovec);
+UINT16 ncdev = sizeof(ciosw) / sizeof(struct ciovec);

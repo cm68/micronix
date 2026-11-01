@@ -24,7 +24,7 @@ extern void wakeup();
 
 struct inode ilist[];
 
-extern unsigned char iio(unsigned char, struct inode *);	/* below; flag is a byte */
+extern UINT8 iio(UINT8, struct inode *);	/* below; flag is a byte */
 
 /*
  * Return a pointer to a locked inode.
@@ -32,7 +32,7 @@ extern unsigned char iio(unsigned char, struct inode *);	/* below; flag is a byt
  */
 struct inode *
 iget(num, dev)
-    int num, dev;
+    INT16 num, dev;
 {
     register struct inode *i, *f;
 
@@ -94,12 +94,12 @@ ilock(ip)
  * Read or write the inode.
  * Inode should be busy.
  */
-unsigned char
+UINT8
 iio(flag, ip)
     UINT8 flag;
     register struct inode *ip;
 {
-    register unsigned int inum, i;
+    register UINT16 inum, i;
     static struct mount *m;
     static struct buf *bp;
     static struct dsknod *dp;
@@ -153,9 +153,10 @@ irelse(i)
 /*
  * Maintain a reference "time" for inodes
  */
+INT16
 itime()
 {
-    static UINT count = 0;
+    static UINT16 count = 0;
     struct inode *i;
 
     di();
@@ -172,7 +173,7 @@ itime()
  */
 void
 iflush(dev)
-    int dev;
+    INT16 dev;
 {
     register struct inode *ip;
 

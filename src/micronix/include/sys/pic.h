@@ -13,12 +13,12 @@
  * one S-100 vectored interrupt line (VI0..).  Which line lands on which
  * 8259 and which of its IR inputs is discovered, not compiled in.
  */
-extern unsigned char pic_init();          /* bring the PIC(s) up, every line masked */
-extern unsigned char inton();             /* inton(line): unmask a line */
-extern unsigned char intoff();            /* intoff(line): mask a line (init only) */
-extern unsigned char pic_mask();          /* pic_mask(line): mask a line, resident */
-extern int pic_irr();           /* which lines are pending, as a bit mask */
-extern unsigned char pic_eoi();           /* pic_eoi(line): end of interrupt on a line */
+extern UINT8 pic_init();          /* bring the PIC(s) up, every line masked */
+extern UINT8 inton();             /* inton(line): unmask a line */
+extern UINT8 intoff();            /* intoff(line): mask a line (init only) */
+extern UINT8 pic_mask();          /* pic_mask(line): mask a line, resident */
+extern INT16 pic_irr();           /* which lines are pending, as a bit mask */
+extern UINT8 pic_eoi();           /* pic_eoi(line): end of interrupt on a line */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -1,4 +1,3 @@
-extern unsigned char ovlcall();
 /*
  * The DMA bus lock, shared by the disk drivers.
  *
@@ -90,19 +89,20 @@ extern unsigned char ovlcall();
 #include <sys/sys.h>
 #include <sys/ovl.h>
 #include <sys/proc.h>
+extern UINT8 ovlcall();
 
-extern int (*busmaster) ();	/* the words are in sys/ovl.c: one per machine */
-extern UINT busmasterseg;
-extern int (*busheir) ();
-extern UINT busheirseg;
+extern INT16 (*busmaster) ();	/* the words are in sys/ovl.c: one per machine */
+extern UINT16 busmasterseg;
+extern INT16 (*busheir) ();
+extern UINT16 busheirseg;
 
 /*
  * Take the bus for func, or register it as the heir if someone else has
  * it.  Returns whether the bus was got.
  */
-unsigned char
+UINT8
 busget(func)
-    int *(func) ();
+    INT16 *(func) ();
 {
     di();
     if (busmaster != 0 && busmaster != func) {  /* someone else has it */
@@ -125,9 +125,9 @@ busget(func)
  * taken; a caller that gets 1 has been replaced and should stop driving
  * the bus, because the heir was called from here and is using it now.
  */
-unsigned char
+UINT8
 busgive(func)
-    int *(func) ();
+    INT16 *(func) ();
 {
     di();
     if (busheir) {              /* there is an heir */

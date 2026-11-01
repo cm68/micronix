@@ -22,8 +22,8 @@
 #define NBDEV	10
 #define NCDEV	13
 
-extern UINT bdevseg[NBDEV];	/* block major -> module segment, 0 = none */
-extern UINT cdevseg[NCDEV];	/* char major -> module segment, 0 = none */
+extern UINT16 bdevseg[NBDEV];	/* block major -> module segment, 0 = none */
+extern UINT16 cdevseg[NCDEV];	/* char major -> module segment, 0 = none */
 
 /*
  * Where the low page publishes its sizes (uhdr.s): a byte at each fixed

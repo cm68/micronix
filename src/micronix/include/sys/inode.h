@@ -14,7 +14,7 @@ struct inode {
     UINT8 count;                /* count of in-core references */
     struct mount *mount;        /* mounted on this inode */
     UINT32 size;                /* for computational convenience */
-    UINT time;                  /* "time" of last reference */
+    UINT16 time;                  /* "time" of last reference */
 };
 
 /*

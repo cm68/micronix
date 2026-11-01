@@ -8,9 +8,9 @@
 struct sgtty {
     UINT8 ispeed;
     UINT8 ospeed;
-    char erase;
-    char kill;
-    UINT mode;
+    UINT8 erase;
+    UINT8 kill;
+    UINT16 mode;
 };
 
 #define B50 	 1
@@ -36,8 +36,8 @@ struct sgtty {
 #define TIOCGETA 0x7401         /* get the six-byte status */
 #define TIOCSETA 0x7402         /* set it */
 
-extern int ioctl();
-extern int stty(), gtty();      /* the library wrappers, lib/libc */
+extern INT16 ioctl();
+extern INT16 stty(), gtty();      /* the library wrappers, lib/libc */
 
 /*
  * tty mode bits - note that micronix does not use most of this, and in

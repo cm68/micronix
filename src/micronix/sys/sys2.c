@@ -13,14 +13,14 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <sys/pic8259.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void istat();
 extern void ilock();
 extern void irelse();
 extern void sleep();
-extern unsigned char valid();
+extern UINT8 valid();
 
-extern long seconds;
+extern INT32 seconds;
 extern void itruncat();
 
 /*
@@ -28,7 +28,7 @@ extern void itruncat();
  */
 void
 stat(name, buf)
-    char *name, *buf;
+    UINT8 *name, *buf;
 {
     register struct inode *ip;
 
@@ -42,7 +42,7 @@ stat(name, buf)
  */
 void
 fstat(buf)
-    char *buf;
+    UINT8 *buf;
 {
     register struct file *fp;
 
@@ -58,7 +58,7 @@ fstat(buf)
 void
 istat(ip, buf)
     struct inode *ip;
-    int *buf;
+    INT16 *buf;
 {
     if (!valid(buf, 36))
         return;
@@ -90,7 +90,7 @@ stime()
      * `u.hl << 16` is a qshl loop of sixteen shifts for a word move.
      */
     {
-        union { long l; UINT w[2]; } t;
+        union { INT32 l; UINT16 w[2]; } t;
 
         t.w[0] = u.hl;
         t.w[1] = u.de;
@@ -114,7 +114,7 @@ stime()
 UINT32
 seek(fd, disp, from)
     UINT8 fd;
-    register UINT disp;         /* block numbers are unsigned short */
+    register UINT16 disp;         /* block numbers are unsigned short */
     register UINT8 from;
 {
     struct file *fp;
@@ -177,7 +177,7 @@ seek(fd, disp, from)
  * Shrinks only: a length at or past the current size is a no-op.  The
  * file must be open for writing and be a regular file.
  */
-char
+INT8
 ftruncate(fd, length)
     UINT8 fd;
     UINT32 length;
@@ -212,9 +212,9 @@ ftruncate(fd, length)
 void
 snooze()
 {
-    register unsigned int secs;
-    long waketime;
-    extern int revel;
+    register UINT16 secs;
+    INT32 waketime;
+    extern INT16 revel;
 
     secs = u.hl;
     di();
@@ -240,7 +240,7 @@ snooze()
 void
 alarm()
 {
-    static UINT old;
+    static UINT16 old;
 
     old = u.p->alarm;
     u.p->alarm = u.hl;

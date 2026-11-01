@@ -12,22 +12,22 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void irelse();
 extern void ilink();
 extern void ilock();
 extern void idec();
-extern unsigned char access();
+extern UINT8 access();
 
 /*
  * Link system call
  */
 void
 link(old, new)
-    char *old, *new;
+    UINT8 *old, *new;
 {
     register struct inode *ip;
-    register int inum, dev;
+    register INT16 inum, dev;
 
     if ((ip = iname(old)) == 0)
         return;
@@ -76,9 +76,9 @@ link(old, new)
  */
 void
 ilink(inum)
-    int inum;
+    INT16 inum;
 {
-    char *p;
+    UINT8 *p;
 
     for (p = u.dir.name; p < &u.dir.name[14]; p++)
         if (*p == 0) {
@@ -97,7 +97,7 @@ ilink(inum)
  */
 void
 unlink(name)
-    char *name;
+    UINT8 *name;
 {
     register struct inode *ip, *parent;
 

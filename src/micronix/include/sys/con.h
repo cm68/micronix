@@ -20,10 +20,10 @@
  * anything.
  */
 struct biovec {
-    int (*open) ();
-    int (*close) ();
-    int (*strat) ();
-    int (*ioctl) ();
+    INT16 (*open) ();
+    INT16 (*close) ();
+    INT16 (*strat) ();
+    INT16 (*ioctl) ();
 } biosw[];
 
 /*
@@ -35,11 +35,11 @@ struct biovec {
  * Character device switch
  */
 struct ciovec {
-    int (*open) ();
-    int (*close) ();
-    int (*read) ();
-    int (*write) ();
-    int (*ioctl) ();            /* the terminal's requests live here:
+    INT16 (*open) ();
+    INT16 (*close) ();
+    INT16 (*read) ();
+    INT16 (*write) ();
+    INT16 (*ioctl) ();            /* the terminal's requests live here:
                                  * stty/gtty are TIOCSETA/TIOCGETA rather
                                  * than a hook of their own */
 } ciosw[];
@@ -65,12 +65,12 @@ struct ciovec {
 /*
  * Globals initialized in con.c
  */
-extern UINT nbdev;              /* number of block devices */
-extern UINT ncdev;              /* number of character devices */
-extern UINT rootdev;            /* device number of root device */
-extern UINT swapdev;            /* device number of swap device */
-extern UINT swapsize;           /* number of swap blocks */
-extern UINT swapaddr;           /* number of first swap block */
+extern UINT16 nbdev;              /* number of block devices */
+extern UINT16 ncdev;              /* number of character devices */
+extern UINT16 rootdev;            /* device number of root device */
+extern UINT16 swapdev;            /* device number of swap device */
+extern UINT16 swapsize;           /* number of swap blocks */
+extern UINT16 swapaddr;           /* number of first swap block */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

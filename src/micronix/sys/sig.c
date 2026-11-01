@@ -10,14 +10,14 @@
 #include <sys/tty.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void killall();
 extern void send();
 extern void run();
 extern void drainall();
 extern void write();
 extern void close();
-extern unsigned char valid();
+extern UINT8 valid();
 
 #define TERMIN	0               /* code for terminate */
 #define IGNORE	1               /* code for ignore */
@@ -27,10 +27,10 @@ extern unsigned char valid();
  */
 void
 signal(sig, func)
-    int sig;
-    register int (*func) ();
+    INT16 sig;
+    register INT16 (*func) ();
 {
-    register int old;
+    register INT16 old;
 
     if (sig >= NSIG || sig == SIGKILL || sig == 0) {
         u.error = EINVAL;
@@ -50,10 +50,10 @@ signal(sig, func)
  */
 void
 kill(sig)
-    int sig;
+    INT16 sig;
 {
     register struct proc *p;
-    int pid;
+    INT16 pid;
 
     pid = u.hl;
     if (pid == 0) {
@@ -125,7 +125,7 @@ void
 setback(p)
     register struct proc *p;
 {
-    register int i;
+    register INT16 i;
 
     p->mode |= BACK;
     for (i = 0; i < NSIG; i++)
@@ -143,10 +143,11 @@ setback(p)
  * the clock interrupt might never return, which complicates
  * the handling of that interrupt.
  */
+INT16
 sig()
 {
-    register char s;
-    register int func;
+    register UINT8 s;
+    register INT16 func;
 
     s = u.p->slist[0];
 
@@ -187,9 +188,10 @@ sig()
  * Create a core image file in the current directory
  * Called by exit().
  */
+INT16
 core()
 {
-    register int fd;
+    register INT16 fd;
 
 #define UADDR 9
 #define K32 0x8000
@@ -214,10 +216,10 @@ core()
  */
 void
 abort(dummy)
-    int dummy;      /* unused: forces a 1-argument frame, see setframe */
+    INT16 dummy;      /* unused: forces a 1-argument frame, see setframe */
 {
-    char s;
-    volatile int force_frame;   /* force an IY-based exit, like next() */
+    UINT8 s;
+    volatile INT16 force_frame;   /* force an IY-based exit, like next() */
 
     if ((s = sig()) == 0 || s == SIGTINT)
         return;

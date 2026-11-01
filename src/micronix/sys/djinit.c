@@ -36,17 +36,18 @@
 #include <sys/con.h>
 #include <sys/dj.h>
 #include <sys/ovl.h>
-extern unsigned char inton();
+extern UINT8 inton();
 
 extern UINT8 map0[];
-extern int out();
-extern unsigned char inton();
+extern INT16 out();
+extern UINT8 inton();
 
+INT16
 djinit(seg)
-    UINT seg;
+    UINT16 seg;
 {
-    static char *p, i;
-    char *d;
+    static UINT8 *p, i;
+    UINT8 *d;
     UINT32 chan;
 
     /*
@@ -68,9 +69,9 @@ djinit(seg)
      * the first unknown code without writing a status.
      */
     if (seg == 0)
-        chan = (unsigned) d;
+        chan = (UINT16) d;
     else
-        chan = ((UINT32) seg << 12) | ((unsigned) d & 0xfff);
+        chan = ((UINT32) seg << 12) | ((UINT16) d & 0xfff);
 
     p = DEFCHAN + 0x1000;
 

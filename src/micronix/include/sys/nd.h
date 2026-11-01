@@ -49,7 +49,7 @@ struct nd {
 	UINT8	n_stat;		/* the ioctl's result */
 	struct buf *n_buf;	/* the request */
 	struct buf *n_cur;	/* the request to iodone */
-	int	(*n_intr)();	/* op-done continuation */
+	INT16	(*n_intr)();	/* op-done continuation */
 	struct nd *n_intarg;	/* its argument */
 	struct buf *n_next;	/* queued request */
 };

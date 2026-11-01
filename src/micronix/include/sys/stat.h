@@ -27,9 +27,9 @@ struct stat {
             UINT8 minor_b;
             UINT8 major_b;
         }      dev_b;
-        UINT dev_s;
+        UINT16 dev_s;
     }     dev_u;
-    UINT ino;
+    UINT16 ino;
     struct dsknod d;
 };
 

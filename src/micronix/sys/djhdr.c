@@ -39,14 +39,14 @@
 #include <sys/dj.h>
 #include <sys/ovl.h>
 
-extern int djopen(), djioctl();
+extern INT16 djopen(), djioctl();
 extern void djclose(), djstrat();
-extern int djinit(), djtick(), djprobe();
+extern INT16 djinit(), djtick(), djprobe();
 extern void djint();
-extern unsigned char djcomm[];
+extern UINT8 djcomm[];
 extern struct biovec djbvec;
 
-struct ovlhdr djhdr = { 2, &djinit, &djtick, (char *) djcomm,
+struct ovlhdr djhdr = { 2, &djinit, &djtick, (UINT8 *) djcomm,
 	&djbvec, 0, &djprobe, &djint, { 'd', 'j', 'd', 'm', 'a' } };
 
 /*

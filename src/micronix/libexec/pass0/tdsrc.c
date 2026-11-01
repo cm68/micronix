@@ -185,6 +185,8 @@ static struct tdent *tdefs;
  * One set of split arrays per live expansion.  Depth grows only
  * through a typedef inside a declarator of another typedef's use,
  * and one more for the K&R parameter line a terminator can begin.
+ * A typedef met after a comma at the same level is a sibling, not a
+ * nested use, and expand() loops over it rather than recursing.
  */
 #define MAXDEPTH 3
 static struct tokarray pres[MAXDEPTH], posts[MAXDEPTH];
@@ -543,8 +545,18 @@ expand(struct tdent *e, struct token *t, struct tokarray *sink)
 				have = 1;
 				continue;
 			}
-			expand(e2, t, sink);
-			break;
+			/*
+			 * Another typedef's declarators at the same
+			 * level, not a nested use: "UINT8 a, UINT16 b"
+			 * is one declaration, and a typedef name is only
+			 * syntax that expands away here.  Switch the
+			 * active entry and keep looping instead of
+			 * recursing, so a prototype's parameter list can
+			 * name as many typedef'd types as it has room for.
+			 */
+			e = e2;
+			sinkn(sink, e->spec, e->nspec);
+			continue;
 		}
 		/* a type keyword or anything else: not our list */
 		sink1(sink, t);

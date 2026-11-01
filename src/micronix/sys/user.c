@@ -38,7 +38,7 @@
  * page ever has to get smaller.
  */
 
-char ustack[512];               /* the system stack, just below u */
+UINT8 ustack[512];               /* the system stack, just below u */
 
 struct user u;
 
@@ -56,7 +56,7 @@ struct user u;
  * main would return into the swapper's proc->mem.  Above u the loader's
  * stack still runs over it, so task0_body() zeroes it with u.
  */
-extern char *curmem;            /* uhdr.s's _curmem: mem.s's user-page lookup */
+extern UINT8 *curmem;            /* uhdr.s's _curmem: mem.s's user-page lookup */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

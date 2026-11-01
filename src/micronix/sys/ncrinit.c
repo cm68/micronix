@@ -39,10 +39,11 @@
 #include <types.h>
 #include <sys/ncr.h>
 
-extern int in(), out();
+extern INT16 in(), out();
 
+INT16
 ncrinit(seg)
-    UINT seg;
+    UINT16 seg;
 {
     /*
      * Leave the card with every command line deasserted: RST, ACK, BSY,

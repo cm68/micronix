@@ -33,9 +33,9 @@ extern void wakeup();
 extern void outwait();
 
 extern void fillque(), cstart(), sendque(), killfg(), drain(), sleep(), wakeup();
-extern int cookin();
-extern void iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
-extern int selectchan;          /* select(2)'s event, sys/select.c */
+extern INT16 cookin();
+extern void iomove(UINT8, UINT8 *, INT16);	/* fio.c: flag is a byte */
+extern INT16 selectchan;          /* select(2)'s event, sys/select.c */
 
 /*
  * Open a tty. Called by the device open routine.
@@ -92,6 +92,7 @@ ttywrite(tty)
  * High level input.
  * Read characters from the terminal
  */
+INT16
 ttyread(tty)
     register struct tty *tty;
 {
@@ -159,7 +160,7 @@ ttymode(tty, flag)
 void
 outwait(tty, count)
     register struct tty *tty;
-    register int count;
+    register INT16 count;
 {
     register struct que *out;
 

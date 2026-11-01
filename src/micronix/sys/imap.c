@@ -28,15 +28,15 @@ extern void brelse();
  * Bugs: should check validity of block numbers,
  * in case the disk goes bad.
  */
-UINT
+UINT16
 imap(ip, log, rap, rw)
     register struct inode *ip;
-    register UINT log;
-    register UINT *rap;
+    register UINT16 log;
+    register UINT16 *rap;
     UINT8 rw;
 {
-    UINT bn, ind;
-    UINT8 index; int dev;
+    UINT16 bn, ind;
+    UINT8 index; INT16 dev;
     struct buf *bp;
 
     *rap = 0;
@@ -82,19 +82,19 @@ imap(ip, log, rap, rw)
  * allocates a new block and installs its number; a read returns 0
  * (a hole).
  */
-UINT
+UINT16
 imapi(ip, n, rap, rw)
     register struct inode *ip;
-    int n;
-    UINT *rap;
+    INT16 n;
+    UINT16 *rap;
     UINT8 rw;
 {
-    register UINT *p;
-    UINT bn;
+    register UINT16 *p;
+    UINT16 bn;
 
     *rap = 0;
     /*
-     * i_addr is UINT[8] on disk - see d_addr in sys/fs.h - and this
+     * i_addr is UINT16[8] on disk - see d_addr in sys/fs.h - and this
      * walks it as its own type.  *p is the block number; the entry
      * after it is the read-ahead hint.
      */
@@ -117,23 +117,23 @@ imapi(ip, n, rap, rw)
  * and return the number at block[n]. If necessary, install
  * a new number.
  */
-UINT
+UINT16
 imapb(ind, n, dev, rap, rw)
-    UINT ind;
-    int n, dev;
-    UINT *rap;
+    UINT16 ind;
+    INT16 n, dev;
+    UINT16 *rap;
     UINT8 rw;
 {
     register struct buf *bp;
-    register UINT *p;
-    UINT bn;
+    register UINT16 *p;
+    UINT16 bn;
 
     *rap = 0;
     if (ind == 0)
         return (0);
     if ((bp = bread(ind, dev)) == 0)
         return (0);
-    p = (UINT *)(bhold(bp) + n * sizeof(UINT));
+    p = (UINT16 *)(bhold(bp) + n * sizeof(UINT16));
     if (*p == 0) {
         if (rw == IREAD) {      /* a hole reads as zeros, no alloc */
             brel();
@@ -145,7 +145,7 @@ imapb(ind, n, dev, rap, rw)
             brelse(bp);
             return (0);
         }
-        p = (UINT *)(bhold(bp) + n * sizeof(UINT));
+        p = (UINT16 *)(bhold(bp) + n * sizeof(UINT16));
         *p = bn;
         bdwrite(bp);
     } else
@@ -163,9 +163,9 @@ imapb(ind, n, dev, rap, rw)
  * balloc() remaps the BUFSEG window, so nothing here may dereference a
  * buffer address across that call.
  */
-UINT
+UINT16
 plug(dev)
-    int dev;
+    INT16 dev;
 {
     return balloc(dev);
 }

@@ -25,8 +25,8 @@
  * lands on the definition, a page away from the call that caused it.
  */
 static void cinit(), hdinit();
-extern unsigned char pic_init();          /* sys/pic_init.c: probe the PICs at boot */
-extern unsigned char intr_attach();       /* sys/probe_init.c */
+extern UINT8 pic_init();          /* sys/pic_init.c: probe the PICs at boot */
+extern UINT8 intr_attach();       /* sys/probe_init.c */
 
 void
 cus()
@@ -73,14 +73,14 @@ static
 void
 cinit()
 {
-    extern char clist[];
+    extern UINT8 clist[];
     extern struct cblock *cfree;
 
-    static char *p, *top;
+    static UINT8 *p, *top;
     static struct cblock *b;
 
     p = clist;
-    p = (int) p & ~15;
+    p = (INT16) p & ~15;
 
     if (p < clist)
         p += 16;

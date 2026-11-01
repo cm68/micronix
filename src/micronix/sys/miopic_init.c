@@ -15,11 +15,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char intoff();
-extern unsigned char pic_init();
+extern UINT8 intoff();
+extern UINT8 pic_init();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 #define MBASE    0x48
 #define MSELECT  (MBASE + 7)    /* the group select: PENABLE picks the PIC */
@@ -36,8 +36,8 @@ extern int di(), ei();
 
 #define CASCADE_IR 6            /* the master IR the slave's INT is wired to */
 
-extern char vectors[];          /* sys/intrpt.s: the master table + slack */
-extern int vecalign();          /* sys/picvec.c */
+extern UINT8 vectors[];          /* sys/intrpt.s: the master table + slack */
+extern INT16 vecalign();          /* sys/picvec.c */
 
 /*
  * Bring both 8259s up, every VI line masked.  The master is level
@@ -47,10 +47,10 @@ extern int vecalign();          /* sys/picvec.c */
  * polled, a zero vector base.  The clock (IR7) and cascade (IR6) are left
  * unmasked; the attach loop opens the VI lines.
  */
-unsigned char
+UINT8
 pic_init()
 {
-    register int base;
+    register INT16 base;
 
     /* the master */
     base = vecalign(vectors);
@@ -84,8 +84,9 @@ pic_init()
     return (0);
 }
 
-unsigned char
+UINT8
 intoff(a)
+    INT16 a;
 {
     di();
     if (a >= 3) {
@@ -104,9 +105,10 @@ intoff(a)
  * read-register); the master's IR0-2 are lines 0-2, the slave's IR0-2
  * lines 3-5.
  */
+INT16
 pic_irr()
 {
-    register int mask;
+    register INT16 mask;
 
     out(MSELECT, PENABLE);
     out(PIC0, 0x0a);                    /* OCW3: read the master's IRR */

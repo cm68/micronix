@@ -34,7 +34,7 @@ extern void wakeup();
 
 extern UINT8 map0[];
 extern void drainques();
-extern int selectchan;          /* select(2): a hung-up tty reads EOF */
+extern INT16 selectchan;          /* select(2): a hung-up tty reads EOF */
 
 /*
  * The terminals on the MultIO/SS1 boards.  One object for the whole
@@ -51,7 +51,7 @@ struct tty mttys[TTY_SLOTS] = { 0 };
  * here rather than duplicated in each page.  cookin() never sleeps while
  * holding it, so one buffer serves every tty, exactly as the static did.
  */
-char ttycbuf[TTYHOG];
+UINT8 ttycbuf[TTYHOG];
 
 /*
  * Signal the processes on a terminal that are in its foreground job.
@@ -98,7 +98,7 @@ ttynotify(tty)
 
     for (p = plist; p < plist + NPROC; p++)
         if (p->tty == tty && (p->mode & ALIVE) && !(p->mode & AWAKE) &&
-            p->event == (UINT) p && p->slist[SIGBACK] > 1)
+            p->event == (UINT16) p && p->slist[SIGBACK] > 1)
             break;
 
     if (p >= plist + NPROC)
@@ -121,7 +121,7 @@ ttynotify(tty)
  */
 void
 ptyhang(i)
-    int i;
+    INT16 i;
 {
     register struct tty *s, *m;
     register struct proc *pr;
@@ -210,17 +210,17 @@ static UINT8 ttyseg;            /* a segment number: 0..15 */
  * ttyout and mumint take a struct tty *, so their parameters are words
  * either way.
  */
-static int (*ttyin_m) (UINT8, struct tty *);
-static int (*ttyout_m) (struct tty *);
-static int (*mumint_m) (struct tty *);
-static UINT ttyready;           /* the console tty is initialized and open */
+static INT16 (*ttyin_m) (UINT8, struct tty *);
+static INT16 (*ttyout_m) (struct tty *);
+static INT16 (*mumint_m) (struct tty *);
+static UINT16 ttyready;           /* the console tty is initialized and open */
 
-unsigned char
+UINT8
 ttypub(seg, in, out, mum)
-    UINT seg;
-    int (*in) (UINT8, struct tty *);
-    int (*out) (struct tty *);
-    int (*mum) (struct tty *);
+    UINT16 seg;
+    INT16 (*in) (UINT8, struct tty *);
+    INT16 (*out) (struct tty *);
+    INT16 (*mum) (struct tty *);
 {
     ttyseg = seg;
     ttyin_m = in;
@@ -240,13 +240,13 @@ ttypub(seg, in, out, mum)
  * an mttys[] that ttinit() has not filled in.  A shut door drops the
  * character, which is what a port nobody has opened hears.
  */
-int
+INT16
 ttyin(c, tty)
     register UINT8 c;
     register struct tty *tty;
 {
     UINT8 drv;
-    int r;
+    INT16 r;
 
     if (!ttyready || ttyseg == 0 || ttyin_m == 0)
         return (0);
@@ -259,7 +259,7 @@ ttyin(c, tty)
     return (r);
 }
 
-int
+INT16
 ttyout(tty)
     register struct tty *tty;
 {
@@ -276,7 +276,7 @@ ttyout(tty)
     return (0);
 }
 
-int
+INT16
 mumint(tty)
     register struct tty *tty;
 {
@@ -299,10 +299,11 @@ mumint(tty)
  * direct call into it: ciosw[1].open is the char trampoline, which maps
  * the module and runs its open.
  */
+INT16
 console_open(dev)
-    register dev;
+    register INT16 dev;
 {
-    int r;
+    INT16 r;
 
     r = (*ciosw[1].open) (dev, 0);
     ttyready = 1;

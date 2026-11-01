@@ -17,21 +17,21 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 #include <sys/tty.h>
-extern unsigned char intoff();
-extern unsigned char pic_init();
+extern UINT8 intoff();
+extern UINT8 pic_init();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 /*
  * The vector stubs the tables jump to.  There is no source table and no
  * copy: the vector setting code writes the four bytes of each entry at
  * its home in low memory, where the 8259 will fetch it.
  */
-extern int int0(), int1(), int2(), int3(), int4(), int5(), int6(), int7();
-extern int sint0(), sint1(), sint2();
-extern int ovlint5(), ovlint6(), ovlint7();
-extern int spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
+extern INT16 int0(), int1(), int2(), int3(), int4(), int5(), int6(), int7();
+extern INT16 sint0(), sint1(), sint2();
+extern INT16 ovlint5(), ovlint6(), ovlint7();
+extern INT16 spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
 
 /*
  * Write one vector entry: jp <fn>, padded to the 8259's four bytes.
@@ -39,15 +39,15 @@ extern int spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
 static
 void
 vecset(v, fn)
-    UINT v;
-    int (*fn) ();
+    UINT16 v;
+    INT16 (*fn) ();
 {
-    register unsigned char *p;
+    register UINT8 *p;
 
-    p = (unsigned char *) v;
+    p = (UINT8 *) v;
     *p++ = 0xC3;
-    *p++ = (unsigned char) ((unsigned int) fn);
-    *p++ = (unsigned char) ((unsigned int) fn >> 8);
+    *p++ = (UINT8) ((UINT16) fn);
+    *p++ = (UINT8) ((UINT16) fn >> 8);
     *p++ = 0;
 }
 
@@ -106,13 +106,13 @@ ss1_svec()
 }
 
 /* the two clock boards' entry points (ss1_clock*.c, upd1990*.c) */
-extern int ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
-extern int upd_clockinit(), upd_rtcinit(), upd_rtcwrite();
+extern INT16 ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
+extern INT16 upd_clockinit(), upd_rtcinit(), upd_rtcwrite();
 
 /* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
 extern void ss1_putc(), ss1_uart_init();
-extern int ss1_start(), ss1_stop(), ss1_set();
-extern int ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
+extern INT16 ss1_start(), ss1_stop(), ss1_set();
+extern INT16 ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
 
 /* the CompuPro SS1's two CAS-cascaded 8259s */
 #define SS1MPIC0 0x70
@@ -153,6 +153,7 @@ picselect(p)
  * bus - the same value whatever is written - so both have to round-trip.
  */
 static
+INT16
 picprobe(p)
     struct pic8259 *p;
 {
@@ -175,10 +176,10 @@ picprobe(p)
  * base.  The clock (IR7) and, with a slave, the cascade (IR2) are left
  * unmasked; the attach loop opens the VI lines.
  */
-unsigned char
+UINT8
 pic_init()
 {
-    register int base;
+    register INT16 base;
     UINT8 i;
 
     /*
@@ -314,9 +315,9 @@ pic_init()
 /*
  * Mask line a.
  */
-unsigned char
+UINT8
 intoff(a)
-    UINT a;
+    UINT16 a;
 {
     struct pic8259 *p;
     UINT8 m;
@@ -335,10 +336,11 @@ intoff(a)
  * each line's bit in.  The output bit walks with a variable rather than
  * (1 << l), which c1 would emit nothing for.
  */
+INT16
 pic_irr()
 {
     register UINT8 i, l;
-    register int mask, irr, bit;
+    register INT16 mask, irr, bit;
 
     mask = 0;
     for (i = 0; i < npics; i++) {

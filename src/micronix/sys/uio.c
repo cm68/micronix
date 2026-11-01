@@ -15,7 +15,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-extern unsigned char block();
+extern UINT8 block();
 extern void bwrite();
 extern void sleep();
 extern void strat();
@@ -28,14 +28,14 @@ extern void prdev();
 extern void bzero();
 extern void panic();
 
-extern long seconds;            /* see clock.c */
-extern UINT nbuf;                /* initialized in binit(), main.c */
+extern INT32 seconds;            /* see clock.c */
+extern UINT16 nbuf;                /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
 extern UINT8 map0[];   /* MMU map registers (uhdr.s) */
-extern int copy();               /* leaf mem.s: kernel-to-kernel copy */
+extern INT16 copy();               /* leaf mem.s: kernel-to-kernel copy */
 
 UINT8 bufseg = BUFSEG;          /* the buffer window's current segment */
-extern int copyin(), copyout();  /* leaf mem.s: the user side of it */
+extern INT16 copyin(), copyout();  /* leaf mem.s: the user side of it */
 
 /*
  * Hash the (dev, blk) pair into a bucket.  Consecutive block numbers have
@@ -46,9 +46,9 @@ extern int copyin(), copyout();  /* leaf mem.s: the user side of it */
 
 static struct buf *bhash[NHASH];
 
-static int
+static INT16
 hash(blk, dev)
-    UINT blk, dev;
+    UINT16 blk, dev;
 {
     return ((blk ^ dev) & (NHASH - 1));
 }
@@ -78,7 +78,7 @@ unhash(b)
  */
 struct buf *
 bget(blk, dev)
-    UINT blk, dev;
+    UINT16 blk, dev;
 {
     register struct buf *b, *f;
     UINT8 h;
@@ -131,7 +131,7 @@ bget(blk, dev)
 /*
  * Lock a block if possible.
  */
-unsigned char
+UINT8
 block(b)
     struct buf *b;
 {
@@ -151,7 +151,7 @@ block(b)
  */
 struct buf *
 bread(blk, dev)
-    UINT blk, dev;
+    UINT16 blk, dev;
 {
     register struct buf *b;
 
@@ -176,7 +176,7 @@ bread(blk, dev)
  */
 void
 aread(blk, dev)
-    UINT blk, dev;
+    UINT16 blk, dev;
 {
     register struct buf *b;
 
@@ -216,7 +216,7 @@ aread(blk, dev)
  */
 struct buf *
 getsb(dev)
-    UINT dev;
+    UINT16 dev;
 {
     return (bread(1, dev));
 }
@@ -286,10 +286,10 @@ brelse(b)
  * Called from brelse. When the count recycles, reset all
  * buffer times to zero.
  */
-unsigned
+UINT16
 btime()
 {
-    static UINT count = 0;
+    static UINT16 count = 0;
     struct buf *b;
 
     di();
@@ -304,7 +304,7 @@ btime()
 /*
  * Report the max block io queue length. Debugging.
  */
-char quelen = 0;
+UINT8 quelen = 0;
 
 /*
  * Sort a queue of block I/O requests into a reasonable order.
@@ -315,8 +315,8 @@ bsort(h, b)
     struct buf *h, *b;
 {
     struct buf *p, *f;
-    UINT bc, pc, fc;
-    char n;
+    UINT16 bc, pc, fc;
+    UINT8 n;
 
     bc = b->cyl;
     n = 1;
@@ -356,7 +356,7 @@ strat(bp)
  */
 void
 bopen(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     (*biosw[bmajor(dev)].open) (dev, mode);
 }
@@ -366,7 +366,7 @@ bopen(dev, mode)
  */
 void
 bclose(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     (*biosw[bmajor(dev)].close) (dev, mode);
 }
@@ -411,18 +411,18 @@ bclose(dev, mode)
  * scratch window may not, because mem.s borrows that one for the copies
  * themselves.
  */
-char
+INT8
 bioctl(fd, cmd, arg)
     UINT8 fd;
-    UINT cmd;
-    char *arg;
+    UINT16 cmd;
+    UINT8 *arg;
 {
     struct cdb r;
     register struct buf *b;
     register struct file *fp;
     register struct inode *ip;
-    UINT dev;
-    UINT8 maj; int err;
+    UINT16 dev;
+    UINT8 maj; INT16 err;
 
     if (cmd != CDBCMD) {
         u.error = EINVAL;
@@ -442,7 +442,7 @@ bioctl(fd, cmd, arg)
         return (-1);
     }
 
-    copyin(arg, (char *) &r, sizeof r);
+    copyin(arg, (UINT8 *) &r, sizeof r);
     if (r.len < 1 || r.len > CDBMAX || r.count < 0 || r.count > CDBDATA) {
         u.error = EINVAL;
         return (-1);
@@ -480,7 +480,7 @@ bioctl(fd, cmd, arg)
      * has no other way to be heard, and this costs a caller who set
      * nothing the same bytes it sent.
      */
-    copyout((char *) &r, arg, sizeof r);
+    copyout((UINT8 *) &r, arg, sizeof r);
 
     if (err) {
         if (u.error == 0)
@@ -493,11 +493,11 @@ bioctl(fd, cmd, arg)
 /*
  * Return the major device number.
  */
-unsigned
+UINT16
 bmajor(dev)
-    UINT dev;
+    UINT16 dev;
 {
-    UINT maj;
+    UINT16 maj;
 
     if ((maj = dev >> 8) >= nbdev)
         maj = 0;                /* nodev, sets b->error = ENXIO */
@@ -514,7 +514,7 @@ iodone(bp)
     struct buf *bp;
 {
     struct buf *b;
-    UINT dev;
+    UINT16 dev;
 
     b = bp;
     dev = b->dev;
@@ -562,6 +562,7 @@ bwait(b)
 /*
  * Set u.error from the buffer
  */
+INT16
 geterror(b)
     struct buf *b;
 {
@@ -577,7 +578,7 @@ geterror(b)
  */
 void
 bflush(dev)
-    UINT dev;
+    UINT16 dev;
 {
     register struct buf *b;
 
@@ -610,7 +611,7 @@ void
 bzero(b)
     struct buf *b;
 {
-    char *data;
+    UINT8 *data;
     UINT8 xmem;
 
     unhash(b);
@@ -654,11 +655,11 @@ bsync()
  * dirty list.  A busy buffer is being written, not waiting, so only the
  * not-busy delayed-write buffers count, as in bsync().
  */
-int
+INT16
 ndirty()
 {
     register struct buf *b;
-    register int n = 0;
+    register INT16 n = 0;
 
     for (b = blist; b < btop; b++)
         if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI)
@@ -671,11 +672,11 @@ ndirty()
  * the write to finish, so across the reboot() loop the count really does
  * drain to zero rather than just being issued.
  */
-int
+INT16
 bdrain()
 {
     register struct buf *b;
-    register int n = 0;
+    register INT16 n = 0;
 
     for (b = blist; b < btop; b++)
         if ((b->flags & (BBUSY | BDELWRI)) == BDELWRI) {
@@ -744,7 +745,7 @@ bwin(seg)
 UINT8 bholdn;                   /* holds up: sleep() panics on a nonzero */
 static UINT8 holdstk[NHOLD];
 
-char *
+UINT8 *
 bhold(b)
     register struct buf *b;
 {
@@ -797,7 +798,7 @@ static UINT8 sholdn;                    /* scratch holds up */
 static UINT8 sholdstk[NSHOLD];
 static UINT8 scratchseg = SCRSEG;       /* the scratch window's current segment */
 
-char *
+UINT8 *
 swin(seg)
     UINT8 seg;
 {
@@ -806,7 +807,7 @@ swin(seg)
     sholdstk[sholdn++] = scratchseg;
     map0[2 * SCRSEG] = seg;
     scratchseg = seg;
-    return ((char *)SCRWIN);
+    return ((UINT8 *)SCRWIN);
 }
 
 /*

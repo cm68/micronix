@@ -17,9 +17,9 @@ extern void ilock();
 extern void irelse();
 extern void send();
 extern void sleep();
-extern unsigned char valid();
+extern UINT8 valid();
 
-extern int rdwri(UINT8, UINT8, int, int);	/* below; rw and fd are bytes */
+extern INT16 rdwri(UINT8, UINT8, INT16, INT16);	/* below; rw and fd are bytes */
 
 /*
  * The pipe size at which the writing process is suspended.
@@ -31,7 +31,7 @@ extern int rdwri(UINT8, UINT8, int, int);	/* below; rw and fd are bytes */
  */
 void
 read(buf, count)
-    int buf, count;
+    INT16 buf, count;
 {
     u.hl = rdwri(IREAD, u.hl, buf, count);
 }
@@ -41,7 +41,7 @@ read(buf, count)
  */
 void
 write(buf, count)
-    int buf, count;
+    INT16 buf, count;
 {
     u.hl = rdwri(IWRITE, u.hl, buf, count);
 }
@@ -52,15 +52,16 @@ write(buf, count)
  * and memory buf. Errors: file not open for
  * desired access.
  */
+INT16
 rdwri(rw, fd, buf, count)
     UINT8 rw, fd;               /* both are bytes: u.hl's low byte is the fd */
-    int buf, count;
+    INT16 buf, count;
 {
     register struct inode *ip;
     register struct file *fp;
-    static char mode;
-    static int nbytes;
-    int dev;
+    static UINT8 mode;
+    static INT16 nbytes;
+    INT16 dev;
 
     if (!valid(buf, count))     /* is user memory allocated? */
         return;
@@ -106,11 +107,12 @@ rdwri(rw, fd, buf, count)
  * Write a pipe. Use the file size as the write pointer.
  * If there is no reader, signal and return error.
  */
+INT16
 pwrite(ip, dev)
     register struct inode *ip;
-    int dev;
+    INT16 dev;
 {
-    register int request, nleft;
+    register INT16 request, nleft;
 
     request = nleft = u.count;
   lock:
@@ -144,11 +146,12 @@ pwrite(ip, dev)
  * If the pipe empties during the read, return without
  * waiting for more. This allows interactive pipes.
  */
+INT16
 pread(ip, dev)
     register struct inode *ip;
-    int dev;
+    INT16 dev;
 {
-    register int nbytes;
+    register INT16 nbytes;
 
   lock:
     ilock(ip);

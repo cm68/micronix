@@ -13,11 +13,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char intoff();
-extern unsigned char pic_init();
+extern UINT8 intoff();
+extern UINT8 pic_init();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 #define MBASE    0x48
 #define MSELECT  (MBASE + 7)    /* the group select: PENABLE picks the PIC */
@@ -26,8 +26,8 @@ extern int di(), ei();
 
 #define PENABLE   0x28          /* group select: the PIC */
 
-extern char vectors[];          /* sys/intrpt.s: the table + slack */
-extern int vecalign();          /* sys/picvec.c */
+extern UINT8 vectors[];          /* sys/intrpt.s: the table + slack */
+extern INT16 vecalign();          /* sys/picvec.c */
 
 /*
  * Bring the 8259 up, every VI line masked.  Level triggered, 4-byte
@@ -35,10 +35,10 @@ extern int vecalign();          /* sys/picvec.c */
  * ICWs.  The clock (IR7) is left unmasked; the attach loop opens the
  * VI lines.
  */
-unsigned char
+UINT8
 pic_init()
 {
-    register int base;
+    register INT16 base;
 
     base = vecalign(vectors);
     out(MSELECT, PENABLE);
@@ -51,8 +51,9 @@ pic_init()
     return (0);
 }
 
-unsigned char
+UINT8
 intoff(a)
+    INT16 a;
 {
     di();
     out(MSELECT, PENABLE);
@@ -64,6 +65,7 @@ intoff(a)
 /*
  * Which lines are pending, as a bit mask (the master's IR0-2).
  */
+INT16
 pic_irr()
 {
     out(MSELECT, PENABLE);

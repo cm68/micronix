@@ -11,22 +11,22 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void irelse();
 extern void itrunc();
 extern void ilock();
 extern void ilink();
-extern unsigned char access();
+extern UINT8 access();
 
-extern char iopen();          /* open.c: a descriptor or ERROR */
+extern INT8 iopen();          /* open.c: a descriptor or ERROR */
 
 /*
  * Creat system call.
  */
 void
 creat(name, mode)
-    char *name;
-    int mode;
+    UINT8 *name;
+    INT16 mode;
 {
     register struct inode *ip;
 
@@ -62,8 +62,8 @@ creat(name, mode)
  */
 void
 mknod(name, mode, dev)
-    char *name;
-    int mode, dev;
+    UINT8 *name;
+    INT16 mode, dev;
 {
     register struct inode *ip;
 
@@ -86,7 +86,7 @@ mknod(name, mode, dev)
  */
 struct inode *
 imkfile(mode, dev)
-    int mode, dev;
+    INT16 mode, dev;
 {
     register struct inode *ip;
 

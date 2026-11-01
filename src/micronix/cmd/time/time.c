@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include <types.h>
 #include <sys/signal.h>
 #include <sys/times.h>
 

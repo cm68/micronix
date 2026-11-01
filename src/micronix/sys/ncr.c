@@ -1,10 +1,3 @@
-extern void wakeup();
-extern void sleep();
-extern void brelse();
-extern void iodone();
-static char scsistart();
-static char scsiselect();
-extern unsigned char dlslice();
 /*
  * Micronix driver for a SCSI host adapter built on the NCR 5380.
  *
@@ -163,15 +156,22 @@ extern unsigned char dlslice();
 #include <sys/ncr.h>
 #include <sys/ovl.h>
 #include <errno.h>
+extern void wakeup();
+extern void sleep();
+extern void brelse();
+extern void iodone();
+static INT8 scsistart();
+static INT8 scsiselect();
+extern UINT8 dlslice();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int scsibsy(), scsifinish();
-static char scsistart();
-static int scsireset();
-static char scsiselect();
+static INT16 scsibsy(), scsifinish();
+static INT8 scsistart();
+static INT16 scsireset();
+static INT8 scsiselect();
 
 /*
  * How many targets the bus can hold, and so how many rows scs[] below
@@ -314,7 +314,7 @@ static char scsiselect();
  *		The LUN is zero: one target, one logical unit, always.
  *	2,3	LBA bits 15-8, then 7-0
  *	4	LBA bits 31-24.  Zero above bit 23, because a block number
- *		here is a UINT and cannot reach that far - the field is
+ *		here is a UINT16 and cannot reach that far - the field is
  *		written out anyway so the CDB is well formed.
  *	5	reserved
  *	6,7	how many blocks, high byte first
@@ -363,15 +363,15 @@ struct scsiif
 {
     /* prototyped: the byte first parameters ride in A and the indirect
      * caller learns that from the pointer's type, not the callee */
-    int (*rd)(UINT8);           /* rd(reg) -> byte */
-    int (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
-    int (*reset)();             /* reset() */
-    int (*intr)();              /* intr(on): connect or cut the chip's IRQ */
+    INT16 (*rd)(UINT8);           /* rd(reg) -> byte */
+    INT16 (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
+    INT16 (*reset)();             /* reset() */
+    INT16 (*intr)();              /* intr(on): connect or cut the chip's IRQ */
 
-    int busy;                   /* a command is out and not yet finished */
-    int done;                   /* ... and the card has interrupted for it */
-    int status;                 /* what the handler's register read found */
-    int error;                  /* ... and what it made of that */
+    INT16 busy;                   /* a command is out and not yet finished */
+    INT16 done;                   /* ... and the card has interrupted for it */
+    INT16 status;                 /* what the handler's register read found */
+    INT16 error;                  /* ... and what it made of that */
 
     UINT8 cdb[CDBLEN];          /* the command in flight */
 };
@@ -379,7 +379,7 @@ struct scsiif
 /*
  * One register, read: the register number is the port.
  */
-static int
+static INT16
 myrd(reg)
     UINT8 reg;
 {
@@ -389,7 +389,7 @@ myrd(reg)
 /*
  * One register, written.
  */
-static int
+static INT16
 mywr(reg, val)
     UINT8 reg;
     UINT8 val;
@@ -410,10 +410,10 @@ mywr(reg, val)
  * This is what makes a card left mid-command usable again, and so what
  * lets open trust the label read that follows.
  */
-static int
+static INT16
 myreset()
 {
-    static UINT n;
+    static UINT16 n;
 
     out(SCSIBASE + ICR, ICR_RST);
     for (n = 0; n < 0x40; n++)
@@ -433,9 +433,9 @@ myreset()
  * is the one moment the chip is entitled to raise IRQ with nothing
  * behind it.
  */
-static int
+static INT16
 myintr(on)
-    int on;
+    INT16 on;
 {
     out(SCSIBASE + MR, on ? MR_MONBSY : 0);
     return (0);
@@ -468,16 +468,16 @@ static struct scsiif boards[] = {
  */
 struct info
 {
-    UINT tracks;                /* cylinders */
+    UINT16 tracks;                /* cylinders */
     UINT8 heads;
     UINT8 sectors;              /* sectors per track */
 
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
     UINT8 flags;                /* see below */
     UINT8 lun;                  /* the logical unit this open addresses */
 
@@ -496,12 +496,12 @@ struct info
  * status that said so, or -1 if it stayed busy past the spin bound and
  * the driver is giving up on it.
  */
-static int
+static INT16
 scsibsy(ip)
     register struct scsiif *ip;
 {
     static UINT32 n;
-    static int st;
+    static INT16 st;
 
     for (n = 0; n < SPIN; n++) {
         st = (*ip->rd) (CSBS);
@@ -535,11 +535,11 @@ scsibsy(ip)
  * The poll is REQ in the bus and status register.  Returns 0, or -1 at
  * the first byte that never came.
  */
-static char
+static INT8
 scsiio(p, n, snd)
-    register char *p;
-    UINT n;
-    int snd;
+    register UINT8 *p;
+    UINT16 n;
+    INT16 snd;
 {
     static UINT32 i, j;
     static UINT8 st;
@@ -602,13 +602,13 @@ scsiio(p, n, snd)
  * caller has already taken the card, so the failure path here only has
  * to leave the bus alone.
  */
-static char
+static INT8
 scsiselect(ip, target)
     register struct scsiif *ip;
     UINT8 target;
 {
     static UINT32 n;
-    static int st;
+    static INT16 st;
     static UINT8 mask;
 
     if (scsibsy(ip) < 0)
@@ -641,7 +641,7 @@ scsiselect(ip, target)
 /*
  * The command phase: hand the CDB over, one byte per handshake.
  */
-static char
+static INT8
 scsicmd(ip)
     register struct scsiif *ip;
 {
@@ -656,9 +656,9 @@ scsicmd(ip)
 static void
 scsibuild(ip, read, lba, nblk)
     struct scsiif *ip;
-    int read;
+    INT16 read;
     UINT32 lba;
-    UINT nblk;
+    UINT16 nblk;
 {
     UINT8 *s;
 
@@ -760,13 +760,13 @@ scsibegin(ip)
  * discipline in uio.c forbids sleeping with a buffer held, which is why
  * bhold() sits in ncrstrat() and not here.
  */
-static char
+static INT8
 scsistart(ip, target, read, lba, nblk)
     register struct scsiif *ip;
     UINT8 target;
-    int read;
+    INT16 read;
     UINT32 lba;
-    UINT nblk;
+    UINT16 nblk;
 {
     scsibegin(ip);
 
@@ -800,23 +800,23 @@ scsistart(ip, target, read, lba, nblk)
  *
  * Returns 0, or -1 if the target reported a problem or stopped answering.
  */
-static int
+static INT16
 scsifinish(ip, target)
     register struct scsiif *ip;
     UINT8 target;
 {
-    static int st, msg, bad;
+    static INT16 st, msg, bad;
 
     bad = 0;
 
     st = 0;
-    if (scsiio((char *)&st, 1, 0) < 0)
+    if (scsiio((UINT8 *)&st, 1, 0) < 0)
         bad = 1;
     else if (st & ST_CHECK)
         bad = 1;
 
     msg = 0;
-    if (scsiio((char *)&msg, 1, 0) < 0)
+    if (scsiio((UINT8 *)&msg, 1, 0) < 0)
         bad = 1;
     else if (msg == MSG_DISCONN)
         /*
@@ -860,7 +860,7 @@ scsifinish(ip, target)
  * behind it, and an interrupt arriving here would be answered by a
  * handler with no command to report on.
  */
-static int
+static INT16
 scsireset(ip)
     register struct scsiif *ip;
 {
@@ -883,11 +883,11 @@ scsireset(ip)
  * mw.c apply exactly the same two, and lib/fslib.c inverts the same two
  * on the host, which is what makes them agree.
  */
-static UINT
+static UINT16
 scsicyl(blk, spc, cylstart, roll, len)
-    UINT blk, spc, cylstart, roll, len;
+    UINT16 blk, spc, cylstart, roll, len;
 {
-    static UINT cyl;
+    static UINT16 cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -910,9 +910,9 @@ scsicyl(blk, spc, cylstart, roll, len)
  */
 static UINT32
 scsilba(blk, spc, cylstart, roll, len, heads, sectors)
-    UINT blk, spc, cylstart, roll, len, heads, sectors;
+    UINT16 blk, spc, cylstart, roll, len, heads, sectors;
 {
-    static UINT csec, cyl;
+    static UINT16 csec, cyl;
     static UINT32 lba;
 
     /*
@@ -946,13 +946,14 @@ scsilba(blk, spc, cylstart, roll, len, heads, sectors)
  * what the label is needed for; sys/dlabel.c does the reading, off block
  * 0 of the drive's own 'c'.
  */
+INT16
 ncropen(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     struct scsiif *ip;
     UINT8 target, lun;
-    UINT sl;
+    UINT16 sl;
     struct buf *b;
 
     target = minor(dev) & 7;
@@ -1039,7 +1040,7 @@ ncropen(dev, mode)
  */
 void
 ncrclose(dev)
-    int dev;
+    INT16 dev;
 {
     scs[dev & 7].flags &= ~OPEN;
 }
@@ -1072,9 +1073,9 @@ ncrstrat(b)
 {
     static struct info *info;
     static struct scsiif *ip;
-    static char *p;
+    static UINT8 *p;
     static UINT32 lba;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &scs[b->dev & 7];
     ip = &boards[0];
@@ -1155,15 +1156,15 @@ ncrstrat(b)
  * that wants the reason can have it by sending REQUEST SENSE itself, as
  * the six-byte block this call exists to make possible.
  */
-int
+INT16
 ncrioctl(dev, cmd, r, b)
-    UINT dev, cmd;
+    UINT16 dev, cmd;
     register struct cdb *r;
     register struct buf *b;
 {
     static struct info *info;
     static struct scsiif *ip;
-    static char *p;
+    static UINT8 *p;
 
     info = &scs[dev & 7];
     ip = &boards[0];
@@ -1230,8 +1231,9 @@ struct biovec ncrbvec = { &ncropen, &ncrclose, &ncrstrat, &ncrioctl };
  * This runs from the module's page, which is the only place with room:
  * the init region is full.
  */
+INT16
 ncrprobe(mode)
-    int mode;
+    INT16 mode;
 {
     register struct scsiif *ip;
 

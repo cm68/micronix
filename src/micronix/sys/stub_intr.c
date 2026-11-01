@@ -38,6 +38,7 @@
  * The wrapper does not look at the return value, but the interface says
  * int, so return 0.
  */
+INT16
 stubint()
 {
     return (0);

@@ -18,9 +18,9 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 extern void panic();
-extern unsigned char intoff();
-extern unsigned char inton();
-extern unsigned char pic_eoi();
+extern UINT8 intoff();
+extern UINT8 inton();
+extern UINT8 pic_eoi();
 
 /*
  * The same definition as sys/probe.c's, and it has to stay the same to
@@ -30,7 +30,7 @@ extern unsigned char pic_eoi();
  * misaligned slot happens to hold.
  */
 struct ovlintr {
-    int (*fn) ();
+    INT16 (*fn) ();
     UINT8 seg;
 };
 
@@ -46,9 +46,9 @@ extern struct ovlintr ovlint[MAXNOVLINE];  /* sys/probe.c */
 #define NPINTR  12              /* the module pages all carry a probe: nine
                                  * of them, a stamped root driver, and the
                                  * net probe the nd module adds */
-static int (*intrprobe[NPINTR]) ();
-static int (*intrfn[NPINTR]) ();
-static UINT intrseg[NPINTR];
+static INT16 (*intrprobe[NPINTR]) ();
+static INT16 (*intrfn[NPINTR]) ();
+static UINT16 intrseg[NPINTR];
 static UINT8 nintr;
 static UINT8 nintrdone;
 
@@ -58,11 +58,11 @@ static UINT8 nintrdone;
  * the handler - plus the segment the driver was placed in.  Nothing is
  * wired yet: the line is not known until the card is tickled.
  */
-char
+INT8
 intrset(probe, fn, seg)
-    int (*probe) ();
-    int (*fn) ();
-    UINT seg;
+    INT16 (*probe) ();
+    INT16 (*fn) ();
+    UINT16 seg;
 {
     if (nintr >= NPINTR)
         return (-1);
@@ -81,10 +81,11 @@ intrset(probe, fn, seg)
  * emit nothing.
  */
 static
+INT16
 bitline(mask)
-    int mask;
+    INT16 mask;
 {
-    register int l;
+    register INT16 l;
 
     for (l = 0; l < nlines; l++) {
         if (mask & 1)
@@ -130,12 +131,12 @@ bitline(mask)
  * above is machine-wide and would otherwise close the lines the first
  * pass opened.  A line is live exactly when it has a handler.
  */
-unsigned char
+UINT8
 intr_attach()
 {
-    register UINT i;
-    register int l;
-    int line, before;
+    register UINT16 i;
+    register INT16 l;
+    INT16 line, before;
 
     for (l = 0; l < nlines; l++)
         intoff(l);              /* mask every line, whatever came before */

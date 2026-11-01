@@ -67,8 +67,8 @@ struct netcard {
  * netready are the resident pieces in sys/netint.c; the line is
  * discovered, not named.
  */
-extern int netprobe(), netint(), netattached();
-extern int netchan, netlock;
+extern INT16 netprobe(), netint(), netattached();
+extern INT16 netchan, netlock;
 extern UINT8 netready[];
 
 /* NETSTAT bits */

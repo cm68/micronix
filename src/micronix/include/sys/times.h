@@ -11,8 +11,8 @@
  */
 
 struct tms {
-    long tms_utime;     /* user time */
-    long tms_stime;     /* system time */
-    long tms_cutime;    /* user time of children */
-    long tms_cstime;    /* system time of children */
+    INT32 tms_utime;     /* user time */
+    INT32 tms_stime;     /* system time */
+    INT32 tms_cutime;    /* user time of children */
+    INT32 tms_cstime;    /* system time of children */
 };

@@ -55,9 +55,9 @@ extern void brelse();
 extern void iodone();
 extern void bsort();
 extern void d2start();
-extern unsigned char dlslice();
-extern unsigned char busgive();
-extern unsigned char busget();
+extern UINT8 dlslice();
+extern UINT8 busgive();
+extern UINT8 busget();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
@@ -68,7 +68,7 @@ static void d2begin(), d2done(), d2error(), d2fin(), d2home(), d2load(),
 /* the two with a byte first parameter: the declaration is what tells
  * the calls above their definition which register it arrives in */
 static void d2sel(UINT8, UINT8);
-static void d2step(UINT8, UINT);
+static void d2step(UINT8, UINT16);
 
 #define NDRIVES 4               /* Number of drives */
 #define RETRIES 10              /* no. of retries on r/w error */
@@ -86,17 +86,17 @@ static void d2step(UINT8, UINT);
  */
 struct info
 {
-    UINT tracks;                /* number of tracks per surface */
+    UINT16 tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* number of sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
 
-    UINT curtrk;                /* where the driver thinks the head is */
+    UINT16 curtrk;                /* where the driver thinks the head is */
     UINT8 flags;                /* see below */
 
     struct slicemap sm[NSLICE];
@@ -115,7 +115,7 @@ struct info
  */
 static struct info *d2info = 0; /* the drive of the request in flight */
 static struct buf *d2buf = 0;   /* the request in flight */
-static int (*d2intr) () = 0;    /* the phase the op-done interrupt resumes */
+static INT16 (*d2intr) () = 0;    /* the phase the op-done interrupt resumes */
 static UINT8 retry = 0;         /* number of retries so far */
 static UINT8 curdrv = -1;       /* number of current drive */
 static UINT8 d2dead = 0;        /* ticks the request has been in flight */
@@ -125,8 +125,9 @@ static UINT8 d2dead = 0;        /* ticks the request has been in flight */
  * label and by nothing else, so the label is read once per drive and its
  * geometry and slice table cached.
  */
+INT16
 disk2open(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     UINT8 drive, sl;
@@ -182,7 +183,7 @@ disk2open(dev, mode)
  */
 void
 disk2close(dev)
-    int dev;
+    INT16 dev;
 {
     disk2s[dev & 3].flags &= ~OPEN;
 }
@@ -195,7 +196,7 @@ disk2strat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &disk2s[b->dev & 3];
 
@@ -275,8 +276,8 @@ d2begin()
 static void
 d2seek()
 {
-    static UINT track, cur;
-    static int steps;
+    static UINT16 track, cur;
+    static INT16 steps;
     static UINT8 dir;
 
     track = d2buf->cyl;
@@ -285,7 +286,7 @@ d2seek()
         d2rw();                 /* already there: the drive never moved */
         return;
     }
-    steps = (int) track - (int) cur;
+    steps = (INT16) track - (INT16) cur;
     dir = 0;
     if (steps < 0) {
         dir = D2_OP2;           /* step out, toward track 0 */
@@ -308,7 +309,7 @@ d2seek()
 static void
 d2home()
 {
-    static UINT i;
+    static UINT16 i;
 
     d2sel(curdrv, 0);
     out(D2_CTL, D2_ATTN | D2_OP2 | (curdrv & 3));    /* step out */
@@ -343,7 +344,7 @@ d2home()
 static void
 d2step(dir, n)
     UINT8 dir;
-    UINT n;
+    UINT16 n;
 {
     out(D2_CTL, D2_ATTN | dir | (curdrv & 3));
     while (n--)
@@ -361,7 +362,7 @@ d2step(dir, n)
  */
 static void
 d2settle(cont)
-    int (*cont) ();
+    INT16 (*cont) ();
 {
     d2intr = cont;
     out(D2_CTL, D2_ATTN | D2_RUN | (curdrv & 3));
@@ -381,7 +382,7 @@ d2settle(cont)
 static void
 d2rw()
 {
-    static UINT spc, csec, head, sect;
+    static UINT16 spc, csec, head, sect;
 
     spc = d2info->spc;
     csec = d2buf->blk % spc;
@@ -463,7 +464,7 @@ d2fin()
 static void
 d2sc(b, writemem)
     struct buf *b;
-    int writemem;
+    INT16 writemem;
 {
     UINT32 phys;
 
@@ -474,7 +475,7 @@ d2sc(b, writemem)
      * The card is a bus master and sees physical memory; the window
      * address is the kernel's alone.
      */
-    phys = ((UINT32) b->xmem << 12) | ((unsigned) b->data & 0xfff);
+    phys = ((UINT32) b->xmem << 12) | ((UINT16) b->data & 0xfff);
 
     in(D2_SC);                              /* disable the channel */
     out(D2_SC, (UINT8) (phys >> 16));       /* A23-A16, extended byte */
@@ -500,7 +501,7 @@ d2sel(drive, head)
  */
 static void
 d2load(cyl, head, sect)
-    UINT cyl, head, sect;
+    UINT16 cyl, head, sect;
 {
     out(D2_CTL, D2_ATTN | D2_REG_CYL | (curdrv & 3));
     out(D2_DATA, (UINT8) cyl);
@@ -515,10 +516,11 @@ d2load(cyl, head, sect)
  * other disk drivers use, because the disk and the label are the same even
  * when the controller is not.
  */
+INT16
 d2cyl(blk, spc, off, roll, len)
-    UINT blk, spc, off, roll, len;
+    UINT16 blk, spc, off, roll, len;
 {
-    UINT cyl;
+    UINT16 cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -542,9 +544,10 @@ d2error()
  * returns, which is what leaves an interrupt with nothing to resume when
  * the card's done flag is one the attach already accounted for.
  */
+INT16
 disk2int()
 {
-    int (*f) ();
+    INT16 (*f) ();
 
     f = d2intr;
     if (f == 0)
@@ -564,6 +567,7 @@ disk2int()
  * so a late interrupt - if the board ever does answer - finds nothing to
  * resume.
  */
+INT16
 disk2check()
 {
     if (d2buf == 0)
@@ -614,10 +618,11 @@ struct biovec disk2bvec = { &disk2open, &disk2close, &disk2strat, 0 };
  */
 #define PROBEWAIT 10000
 
+INT16
 disk2probe(mode)
-	int mode;
+	INT16 mode;
 {
-    register int n;
+    register INT16 n;
 
     if (mode == PROBE_CLEAR) {
         out(D2_CTL, 0);                 /* a write with RUN clear releases the line */

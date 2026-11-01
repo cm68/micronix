@@ -13,16 +13,16 @@
 #include <sys/file.h>
 #include <sys/con.h>
 #include <errno.h>
-extern unsigned char next();
+extern UINT8 next();
 extern void pr();
 extern void bankcopy();
 extern void run();
 extern void wakeup();
 extern void mfree();
 extern void sleep();
-extern unsigned char swapout();
-extern unsigned char mget();
-extern unsigned char procopy();
+extern UINT8 swapout();
+extern UINT8 mget();
+extern UINT8 procopy();
 
 extern void close(UINT8);    /* open.c */
 
@@ -31,6 +31,7 @@ extern struct proc *initproc, *swapproc;
 /*
  * Fork system call.
  */
+INT16
 fork()
 {
     register struct proc *child;
@@ -75,12 +76,12 @@ fork()
  * Then return 1. Later, the copy will be activated
  * by next() and will return from this level with 0.
  */
-unsigned char
+UINT8
 procopy(child)
     register struct proc *child;    /* see comments to next (sleep.c) */
 {
-    register int s;
-    register char mode;
+    register INT16 s;
+    register UINT8 mode;
 
     saveframe(&u.p->frmptr, &u.p->stkptr);
     copy(u.p, child, sizeof(struct proc));
@@ -115,6 +116,7 @@ procopy(child)
 /*
  * Turn a process pointer into a process id
  */
+INT16
 procid(p)
     struct proc *p;
 {
@@ -126,6 +128,7 @@ procid(p)
  */
 struct proc *
 procptr(id)
+    INT16 id;
 {
     struct proc *p;
 
@@ -140,10 +143,12 @@ procptr(id)
  * Generate a new process ID number 
  */
 
+INT16
 newpid(a)
+    INT16 a;
 {
-    unsigned new;
-    static pid = 1;
+    UINT16 new;
+    static INT16 pid = 1;
 
     for (;;) {
         new = pid;              /* Pick a new number. */
@@ -204,8 +209,8 @@ exit()
 void
 wait()
 {
-    char child;                 /* children detection flag */
-    unsigned pid;               /* process id */
+    UINT8 child;                 /* children detection flag */
+    UINT16 pid;               /* process id */
     struct proc *p;
 
     for (;;) {

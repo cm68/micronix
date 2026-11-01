@@ -8,7 +8,7 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
-extern unsigned char next();
+extern UINT8 next();
 extern void set0();
 extern void main();
 extern void r_system();
@@ -19,11 +19,11 @@ extern void fault();
  * Firmware constants, defined in uhdr.s
  */
 extern UINT8 status, cmask, ctask, mask, oldstack, rst1[];
-extern UINT trapvec, trapstack;
+extern UINT16 trapvec, trapstack;
 
-extern char resched;            /* sleep.c defines and initializes it */
+extern UINT8 resched;            /* sleep.c defines and initializes it */
 
-extern int fork();
+extern INT16 fork();
 extern void expand_bufs(), swap();
 
 /*
@@ -65,7 +65,7 @@ extern void expand_bufs(), swap();
 void
 start()
 {
-    extern int task0();
+    extern INT16 task0();
 
     /*
      * Set the trap vector so that the next
@@ -97,7 +97,7 @@ void
 task0_body()
 {
     extern void trap();
-    extern int retask();
+    extern INT16 retask();
 
     /*
      * Set traps appropriately for
@@ -123,7 +123,7 @@ task0_body()
      */
     zero(&u, sizeof(struct user));
     zero(&curmem, sizeof curmem);
-    copy(&oldstack, &u.stack, (UINT) & u.save - (UINT) & u.stack);
+    copy(&oldstack, &u.stack, (UINT16) & u.save - (UINT16) & u.stack);
     setframe(&u.stack, &u.stack);
     trapstack = &u.save;
 
@@ -196,7 +196,7 @@ task0_body()
  * of saved registers.
  */
 
-char cause = 0;                 /* saved trap status */
+UINT8 cause = 0;                 /* saved trap status */
 
 void
 trap()
@@ -262,6 +262,7 @@ set0()
  * Used by sig() in sig.c to kill
  * the current process.
  */
+INT16
 setexit()
 {
     copyout(EXIT, &rst1[0], 3);

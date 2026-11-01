@@ -9,11 +9,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char inton();
-extern unsigned char pic_eoi();
+extern UINT8 inton();
+extern UINT8 pic_eoi();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 #define MBASE    0x48
 #define MSELECT  (MBASE + 7)    /* the group select: PENABLE picks the PIC */
@@ -25,8 +25,9 @@ extern int di(), ei();
 /*
  * End of interrupt on a line: specific EOI on the master.
  */
-unsigned char
+UINT8
 pic_eoi(line)
+    INT16 line;
 {
     out(PIC0, 0x60 | line);
     return (0);
@@ -37,8 +38,9 @@ pic_eoi(line)
  * BC and c1 emits nothing for a shift by a register, so the mask forces
  * the arithmetic that moves it out.
  */
-unsigned char
+UINT8
 inton(a)
+    INT16 a;
 {
     di();
     out(MSELECT, PENABLE);

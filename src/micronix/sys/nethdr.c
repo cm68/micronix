@@ -15,7 +15,7 @@
 #include <sys/con.h>
 #include <sys/ovl.h>
 
-extern int netstart(), netprobe(), netint(), nettick();
+extern INT16 netstart(), netprobe(), netint(), nettick();
 extern struct ciovec netcvec;
 
 struct ovlhdr nethdr = { 0, &netstart, &nettick, 0, 0, &netcvec,

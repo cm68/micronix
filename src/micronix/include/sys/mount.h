@@ -13,13 +13,13 @@
  * numbers df reports, and the superblock is their backing store.
  */
 struct mount {
-    UINT dev;                   /* device number */
+    UINT16 dev;                   /* device number */
     struct inode *inode;        /* inode on which mounted */
     UINT8 ronly;                /* non zero if read only */
-    UINT fsize;                 /* see sup.h */
-    UINT isize;                 /* see sup.h */
-    UINT bfree;                 /* live free-block count */
-    UINT ifree;                 /* live free-inode count */
+    UINT16 fsize;                 /* see sup.h */
+    UINT16 isize;                 /* see sup.h */
+    UINT16 bfree;                 /* live free-block count */
+    UINT16 ifree;                 /* live free-inode count */
 } mlist[];
 
 struct mount *mlook();          /* find a mount entry by device number */

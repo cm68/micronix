@@ -19,7 +19,7 @@ extern void prs();
 void
 
 panic(s)
-    char *s;
+    UINT8 *s;
 {
     sync();
     pr("panic: %s\n", s);
@@ -33,8 +33,8 @@ panic(s)
 
 void
 prdev(s, dev)
-    char *s;
-    UINT dev;
+    UINT8 *s;
+    UINT16 dev;
 {
     pr("%s on disk %s/%d\n", s, devname, minor(dev));
 }
@@ -46,11 +46,11 @@ prdev(s, dev)
 
 void
 pr(fmt, args)
-    char *fmt;
-    int args;                   /* may have any number of args */
+    UINT8 *fmt;
+    INT16 args;                   /* may have any number of args */
 {
-    int *argp;
-    char c;
+    INT16 *argp;
+    UINT8 c;
 
     argp = &args;
     while ((c = *fmt++) != '\0') {
@@ -87,7 +87,7 @@ pr(fmt, args)
 
 void
 prn(n, b)
-    register unsigned n, b;
+    register UINT16 n, b;
 {
     static UINT8 c;
 
@@ -105,9 +105,9 @@ prn(n, b)
 
 void
 prs(s)
-    char *s;
+    UINT8 *s;
 {
-    char c;
+    UINT8 c;
 
     while ((c = *s++) != 0)
         console(c);

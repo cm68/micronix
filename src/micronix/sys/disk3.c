@@ -40,11 +40,11 @@ extern void rwint();
 extern void issue();
 extern void newrw();
 extern void panic();
-extern unsigned char inton();
-extern unsigned char dlslice();
-extern unsigned char d3wait();
-extern unsigned char busgive();
-extern unsigned char busget();
+extern UINT8 inton();
+extern UINT8 dlslice();
+extern UINT8 d3wait();
+extern UINT8 busgive();
+extern UINT8 busget();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
@@ -52,7 +52,7 @@ extern unsigned char busget();
  */
 static void d3error();
 static void d3link();
-static unsigned char d3specify(UINT8);    /* drive is curdrv: dev & 3 */
+static UINT8 d3specify(UINT8);    /* drive is curdrv: dev & 3 */
 static UINT32 d3addr();
 
 #define NDRIVES 4               /* Number of drives */
@@ -72,22 +72,22 @@ static UINT32 d3addr();
  */
 struct info
 {
-    UINT tracks;                /* number of tracks per surface */
+    UINT16 tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* number of sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
 
     UINT8 step;                 /* step pulse delay, 100 us */
     UINT8 seek;                 /* head settle after seek, 100 us */
-    UINT precomp;               /* track where precomp begins */
-    UINT lowcur;                /* track where low current begins */
+    UINT16 precomp;               /* track where precomp begins */
+    UINT16 lowcur;                /* track where low current begins */
 
-    UINT curtrk;                /* not used: the board keeps this itself */
+    UINT16 curtrk;                /* not used: the board keeps this itself */
     UINT8 flags;                /* see below */
 
     /* the slice map off the label, cached at open */
@@ -136,8 +136,9 @@ static UINT8 retry = 0,         /* number of retries so far */
  * timing both - comes from sys/dlabel.c through the first thirteen fields
  * of struct info.
  */
+INT16
 disk3open(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     UINT8 drive, sl;
@@ -190,7 +191,7 @@ disk3open(dev, mode)
  */
 void
 disk3close(dev)
-    int dev;
+    INT16 dev;
 {
     struct info *info;
 
@@ -206,7 +207,7 @@ disk3strat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &disk3s[b->dev & 3];
 
@@ -385,7 +386,7 @@ void
 newrw()
 {
     UINT32 abs, dma;
-    UINT spc;
+    UINT16 spc;
 
     spc = d3info->spc;
     abs = ((UINT32) d3buf->cyl * spc) + (d3buf->blk % spc);
@@ -405,7 +406,7 @@ newrw()
      * a bus master and sees physical memory; the window address is the
      * kernel's alone.
      */
-    dma = ((UINT32) d3buf->xmem << 12) | ((unsigned) d3buf->data & 0xfff);
+    dma = ((UINT32) d3buf->xmem << 12) | ((UINT16) d3buf->data & 0xfff);
     iopb.data = (UINT8) dma;
     iopb.xdata = (UINT8) (dma >> 8);
     iopb.sdata = (UINT8) (dma >> 16);
@@ -422,10 +423,11 @@ newrw()
  * when the controller is not.  The block's cylinder is rotated by the
  * slice's own roll within the slice, then shifted by the slice's offset.
  */
+INT16
 d3cyl(blk, spc, off, roll, len)
-    UINT blk, spc, off, roll, len;
+    UINT16 blk, spc, off, roll, len;
 {
-    UINT cyl;
+    UINT16 cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -448,7 +450,7 @@ d3error()
  * is a data object in this module, so the board is handed its physical
  * address in the IOPB's DATA field - d3addr, below.
  */
-static unsigned char
+static UINT8
 d3specify(drive)
     UINT8 drive;        /* newdrv: curdrv = dev & 3 */
 {
@@ -465,7 +467,7 @@ d3specify(drive)
     d3spec.reserved = 0;
     d3spec.restracks = 0;
     d3spec.position = 0;
-    a = d3addr((char *) &d3spec);
+    a = d3addr((UINT8 *) &d3spec);
     iopb.command = D3_SPECIFY;
     iopb.drive = drive;
     iopb.data = (UINT8) a;
@@ -482,10 +484,10 @@ d3specify(drive)
  * physical address, and the address this driver's own code computes for
  * the IOPB is the window one, so a placed module has to convert.
  */
-static UINT d3seg = 0;          /* the page we were placed in, 0 = resident */
+static UINT16 d3seg = 0;          /* the page we were placed in, 0 = resident */
 
 disk3init(seg)
-    UINT seg;
+    UINT16 seg;
 {
     d3seg = seg;
     d3link();
@@ -499,11 +501,11 @@ disk3init(seg)
  */
 static UINT32
 d3addr(p)
-    char *p;
+    UINT8 *p;
 {
     if (d3seg)
-        return ((UINT32) d3seg << 12) | ((unsigned) p & 0xfff);
-    return (unsigned) p;
+        return ((UINT32) d3seg << 12) | ((UINT16) p & 0xfff);
+    return (UINT16) p;
 }
 
 /*
@@ -516,7 +518,7 @@ d3link()
 {
     UINT32 a;
 
-    a = d3addr((char *) &iopb);
+    a = d3addr((UINT8 *) &iopb);
     iopb.link = (UINT8) a;
     iopb.xlink = (UINT8) (a >> 8);
     iopb.slink = (UINT8) (a >> 16);
@@ -532,17 +534,17 @@ d3link()
 void
 reset()
 {
-    extern char map0[];
+    extern UINT8 map0[];
     UINT32 a;
-    int *ichan;
+    INT16 *ichan;
 
     d3link();
-    a = d3addr((char *) &iopb);
+    a = d3addr((UINT8 *) &iopb);
     ichan = 0x105d;             /* the initial IOPB's LINK, physical 0x5d */
     di();
     map0[2] = 0;
-    ichan[0] = (UINT) a;        /* the low two bytes */
-    ichan[1] = ((UINT *) &a)[0];/* the high word */
+    ichan[0] = (UINT16) a;        /* the low two bytes */
+    ichan[1] = ((UINT16 *) &a)[0];/* the high word */
     map0[2] = 1;
     inton(DISK3INT);
     ei();
@@ -581,7 +583,7 @@ issue()
  * caller is told so instead of the one-second watchdog having to shoot
  * the request down.
  */
-unsigned char
+UINT8
 d3wait()
 {
     UINT32 i;
@@ -648,8 +650,9 @@ struct biovec disk3bvec = { &disk3open, &disk3close, &disk3strat, 0 };
  * ignored by disk3int: nothing is in flight, and there is no buffer for
  * the handler to finish.
  */
+INT16
 disk3probe(mode)
-	int mode;
+	INT16 mode;
 {
     UINT32 i;
 

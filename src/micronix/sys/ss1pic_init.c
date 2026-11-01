@@ -15,11 +15,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char intoff();
-extern unsigned char pic_init();
+extern UINT8 intoff();
+extern UINT8 pic_init();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 /* the board's jumper block: 0x70, not CompuPro's default 0x50 - see ss1pic.c */
 #define MPIC0   0x70            /* master: ICW1/OCW2/OCW3, IRR/ISR read */
@@ -27,9 +27,9 @@ extern int di(), ei();
 #define SPIC0   0x72            /* the slave's same two ports */
 #define SPIC1   0x73
 
-extern char ss1_master_vec[];   /* sys/ss1pic.s: 32 bytes of table, slack above */
-extern char ss1_slave_vec[];
-extern int vecalign();          /* sys/picvec.c */
+extern UINT8 ss1_master_vec[];   /* sys/ss1pic.s: 32 bytes of table, slack above */
+extern UINT8 ss1_slave_vec[];
+extern INT16 vecalign();          /* sys/picvec.c */
 
 /*
  * Bring both 8259s up, CAS-cascaded, every line masked.  The slave is
@@ -37,10 +37,10 @@ extern int vecalign();          /* sys/picvec.c */
  * is told the cascade is IR7 (ICW3 = 0x80).  Each has its own vector
  * table, moved to a boundary and named in ICW1/ICW2.
  */
-unsigned char
+UINT8
 pic_init()
 {
-    register int base;
+    register INT16 base;
 
     /* the slave first, so it is not signalling when the master arms */
     base = vecalign(ss1_slave_vec);
@@ -59,8 +59,9 @@ pic_init()
     return (0);
 }
 
-unsigned char
+UINT8
 intoff(a)
+    INT16 a;
 {
     di();
     if (a >= 7)
@@ -76,9 +77,10 @@ intoff(a)
  * read-register) and fold it into line numbers: the master's IR0-6 are
  * lines 0-6, the slave's IR0 is line 7.
  */
+INT16
 pic_irr()
 {
-    register int mask;
+    register INT16 mask;
 
     out(MPIC0, 0x0a);                   /* OCW3: read the master's IRR */
     mask = in(MPIC0) & 0x7f;            /* IR0-6, drop the cascade */

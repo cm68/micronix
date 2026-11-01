@@ -49,16 +49,16 @@
 # define	DJPRIORITY	PRIBIO
 
 # define	TIME		 (~0)
-# define	MAX		((unsigned) 3000) /* biggest floppy boundary */
-# define	CHAN		((unsigned)(djcomm))
+# define	MAX		((UINT16) 3000) /* biggest floppy boundary */
+# define	CHAN		((UINT16)(djcomm))
 # define	OKSTAT		0x40
 # define 	NOSTAT		0
 # define	BADSTAT		1
 # define	COMMSIZE	9
 # define	ISOPEN		(1 << 0)
 # define	ORG1		(1 << 1) /* sector numbers start from 1 */
-# define	MAP		((char *) (0x602))
-# define	IMAGE		((char *) (0x202))
+# define	MAP		((UINT8 *) (0x602))
+# define	IMAGE		((UINT8 *) (0x202))
 
 /*
  * DJDMA command codes.
@@ -181,7 +181,6 @@
 # define	BUFSIZE		512
 # define 	K		1024
 # define	K4		4096
-# define	UCHAR		unsigned char
 
 # define	NDRIVES		8	
 
@@ -209,25 +208,25 @@
  */
 
 struct djtable {
-	char
+	UINT8
     	tracks,		/* no. of tracks on the drive */
 		curtrack,	/* current track */
 		pattern,
 		number;
 
-	int	
+	INT16
         steprate,	/* stepping rate */
 		rampup,
 		rampdown,
 		settle,		/* head settle delay 34.1 to the mS */
 		image;
 
-	char	config, code;
+	UINT8	config, code;
 };
 
  
 struct status {
-	unsigned char	
+	UINT8
 		other[8],
 		spt,
 		config,

@@ -520,7 +520,7 @@ sio(a, b, c)
 
     req.count = d->bps;         /* the caller's sector size */
     req.flags = (c == READ) ? CDB_IN : 0;
-    req.buf = b;
+    req.buf = (UINT8 *) b;
 
     /*
      * The transfer's own answer is in the block that comes back, at the end

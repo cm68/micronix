@@ -9,11 +9,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char inton();
-extern unsigned char pic_eoi();
+extern UINT8 inton();
+extern UINT8 pic_eoi();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 #define MBASE    0x48
 #define MSELECT  (MBASE + 7)    /* the group select: PENABLE picks the PIC */
@@ -33,8 +33,9 @@ extern int di(), ei();
  * master alone.  A slave line (3-5) is dismissed by the master's cascade
  * EOI - the slave's poll was its own acknowledge.
  */
-unsigned char
+UINT8
 pic_eoi(line)
+    INT16 line;
 {
     if (line >= 3)
         out(PIC0, 0x60 | CASCADE_IR);   /* specific EOI, master IR6 */
@@ -49,8 +50,9 @@ pic_eoi(line)
  * sits in BC and c1 emits nothing for a shift by a register, so the mask
  * forces the arithmetic that moves it out.
  */
-unsigned char
+UINT8
 inton(a)
+    INT16 a;
 {
     di();
     if (a >= 3) {

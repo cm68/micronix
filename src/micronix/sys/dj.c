@@ -31,15 +31,15 @@ extern void djack();
 extern void iodone();
 extern void wakeup();
 extern void sleep();
-static unsigned char getstat();
-extern unsigned char busgive();
-extern unsigned char busget();
+static UINT8 getstat();
+extern UINT8 busgive();
+extern UINT8 busget();
 
 /*
  * The static routines below, declared before anything calls them.
  */
 static void sio(), djwait(), djstart();
-static unsigned char getstat();
+static UINT8 getstat();
 static void memio(), busready(), busplease(), busthanks();
 
 /*
@@ -47,12 +47,12 @@ static void memio(), busready(), busplease(), busthanks();
  * allocator, the raw user-memory copies, the raw window mapping, and the
  * disk label decoder.
  */
-extern unsigned char segalloc();
+extern UINT8 segalloc();
 extern UINT8 map0[], bufseg;
-extern int copyin(), copyout();
+extern INT16 copyin(), copyout();
 extern void bwin(UINT8);
-extern int dllabel();
-extern char *swin(UINT8);
+extern INT16 dllabel();
+extern UINT8 *swin(UINT8);
 extern void srel();
 
 /*
@@ -62,9 +62,9 @@ extern void srel();
  * have to.
  */
 
-static unsigned char *haltstat = 0, djtimer = 0;
+static UINT8 *haltstat = 0, djtimer = 0;
 
-unsigned char djcomm[26] = { 0 };
+UINT8 djcomm[26] = { 0 };
 
 /*
  * The staging page.
@@ -118,13 +118,14 @@ static struct buf *curbuf = 0,  /* buffer currently under scrutiny */
 #define DSTEP   170             /* 5 ms, in the board's delay ticks */
 #define DSETTLE 511             /* 15 ms */
 
+INT16
 djopen(dev, mode)
-	register dev, mode;
+	register INT16 dev, mode;
 {
 	struct dm *d;
 	struct dlgeom *g;
 	struct status *s;
-	unsigned drive, sl;
+	UINT16 drive, sl;
 
 	/*
 	 * The staging page, before anything can want it.  This is the one
@@ -212,7 +213,7 @@ djopen(dev, mode)
 
 void
 djclose(dev)
-	register dev;
+	register INT16 dev;
 {
 	dm[dev & 7].flags = 0;
 }
@@ -250,11 +251,12 @@ djstrat(b)
 static
 void
 sio(d, addr, xaddr, op, sec, dev)
-	register unsigned sec;
+	register UINT16 sec;
+	register INT16 addr, xaddr, op, dev;
 	register struct dm *d;
 {
 	static struct dlgeom *g;
-	static unsigned track, within;
+	static UINT16 track, within;
 	UINT32 phys;
 
 	g = &d->g;
@@ -265,7 +267,7 @@ sio(d, addr, xaddr, op, sec, dev)
 	 * view of it, the same pair disk1 and uio use.  Unfold it: the
 	 * segment's twelve bits start where the window address stops.
 	 */
-	phys = ((UINT32) xaddr << 12) | ((unsigned) addr & 0xfff);
+	phys = ((UINT32) xaddr << 12) | ((UINT16) addr & 0xfff);
 
 	D[0] = SETDMA;              /* set DMA command */
 	D[1] = (UINT8) phys;        /* D[1], D[2], D[3]: */
@@ -326,8 +328,8 @@ static
 void
 fmio(d, addr, xaddr, op, n, dev)
 	register struct dm *d;
-	unsigned addr, xaddr;
-	unsigned op, n, dev;
+	UINT16 addr, xaddr;
+	UINT16 op, n, dev;
 {
 	UINT32 phys;
 
@@ -360,21 +362,21 @@ fmio(d, addr, xaddr, op, n, dev)
 static
 void
 djwait(a)
-	char *a;
+	UINT8 *a;
 {
-	unsigned int i;
+	UINT16 i;
 
 	for (i = TIME; i && *a == NOSTAT; i--);
 }
 
-static unsigned char inservice = 0;
-static unsigned char fmsec = 0; /* which fm sector of block 0 is in flight */
+static UINT8 inservice = 0;
+static UINT8 fmsec = 0; /* which fm sector of block 0 is in flight */
 
 void
 djint()
 {
-	static unsigned char op, kw;
-	static unsigned addr, xaddr, sec, koff, dev;
+	static UINT8 op, kw;
+	static UINT16 addr, xaddr, sec, koff, dev;
 	static struct dm *d;
 	static struct dlgeom *g;
 
@@ -484,7 +486,7 @@ djint()
 			 */
 			addr = bhold(curbuf);
 			swin(kseg);
-			copy(addr, (char *) SCRWIN + koff, BUFSIZE);
+			copy(addr, (UINT8 *) SCRWIN + koff, BUFSIZE);
 			srel();
 			brel();
 			kw = 1;
@@ -506,7 +508,7 @@ djint()
 			 */
 			addr = bhold(curbuf);
 			swin(kseg);
-			copy((char *) SCRWIN + koff, addr, BUFSIZE);
+			copy((UINT8 *) SCRWIN + koff, addr, BUFSIZE);
 			srel();
 			brel();
 		}
@@ -627,12 +629,12 @@ djstart()
  * and the write protect bit, which the status carries.
  */
 static
-unsigned char
+UINT8
 getstat(a)
-	register a;
+	register INT16 a;
 {
-	static unsigned astep, asettle;
-	static int step = DSTEP, settle = DSETTLE;
+	static UINT16 astep, asettle;
+	static INT16 step = DSTEP, settle = DSETTLE;
 
 	a &= 7;                     /* the drive select, not the full dev */
 
@@ -690,6 +692,7 @@ getstat(a)
 static
 void
 memio(flag, memaddr, djaddr, count)
+    INT16 flag, memaddr, djaddr, count;
 {
 	D[0] = (flag == READ) ? MEMREAD : MEMWRITE;
 
@@ -698,13 +701,13 @@ memio(flag, memaddr, djaddr, count)
 	 * address is already flat and the extended page is zero - which is
 	 * what KERNEL names.
 	 */
-	*(char **) (D + 1) = memaddr;
+	*(UINT8 **) (D + 1) = memaddr;
 
 	D[3] = KERNEL;
 
-	*(int *) (D + 4) = count;
+	*(INT16 *) (D + 4) = count;
 
-	*(char **) (D + 6) = djaddr;
+	*(UINT8 **) (D + 6) = djaddr;
 
 	D[8] = HALT;
 	D[9] = NOSTAT;
@@ -746,7 +749,7 @@ djgoose()
 	}
 }
 
-static char djticker = 0;
+static UINT8 djticker = 0;
 
 djtick()
 {
@@ -779,16 +782,16 @@ djtick()
  * up, so the window is given back here.  More than a block arrives in
  * nothing and is staged in the page getstat and the big transfers share.
  */
-int
+INT16
 djioctl(dev, cmd, r, b)
-	UINT dev, cmd;
+	UINT16 dev, cmd;
 	register struct cdb *r;
 	struct buf *b;
 {
-	static char *p;             /* the staging, as the kernel reaches it */
+	static UINT8 *p;             /* the staging, as the kernel reaches it */
 	UINT32 phys;                /* ... and as the board is told it */
 	static UINT8 save;
-	static int i, len, count, hole, flags, st;
+	static INT16 i, len, count, hole, flags, st;
 
 	/*
 	 * The block's own words come off the caller's structure once; this
@@ -809,15 +812,15 @@ djioctl(dev, cmd, r, b)
 		kstg();
 		save = bufseg;
 		bwin(kseg);
-		p = (char *) BUFWIN;
-		phys = ((UINT32) kseg << 12) | ((unsigned) p & 0xfff);
+		p = (UINT8 *) BUFWIN;
+		phys = ((UINT32) kseg << 12) | ((UINT16) p & 0xfff);
 
 		if ((flags & CDB_IN) == 0)
 			copyin(r->buf, p, count);
 
 	} else if (count) {
 		p = bhold(b);
-		phys = ((UINT32) b->xmem << 12) | ((unsigned) p & 0xfff);
+		phys = ((UINT32) b->xmem << 12) | ((UINT16) p & 0xfff);
 
 	} else {
 		p = 0;
@@ -935,11 +938,12 @@ struct biovec djbvec = { &djopen, &djclose, &djstrat, &djioctl };
  */
 #define PROBEWAIT 10000
 
+INT16
 djprobe(mode)
-	int mode;
+	INT16 mode;
 {
-	register int n;
-	int before;
+	register INT16 n;
+	INT16 before;
 
 	/*
 	 * The clear half: acknowledge whatever the board is holding, so the

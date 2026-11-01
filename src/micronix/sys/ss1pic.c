@@ -9,11 +9,11 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern unsigned char inton();
-extern unsigned char pic_eoi();
+extern UINT8 inton();
+extern UINT8 pic_eoi();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 /*
  * The board's jumper block, which is 0x70 here and not CompuPro's
@@ -31,8 +31,9 @@ extern int di(), ei();
  * master alone.  Line 7 is the slave: it is dismissed first, then the
  * master's cascade (IR7), which stays asserted until the slave is told.
  */
-unsigned char
+UINT8
 pic_eoi(line)
+    INT16 line;
 {
     if (line >= 7) {
         out(SPIC0, 0x60);               /* specific EOI, slave IR0 */
@@ -49,8 +50,9 @@ pic_eoi(line)
  * shifting by a register, so the mask forces the arithmetic that moves it
  * out.
  */
-unsigned char
+UINT8
 inton(a)
+    INT16 a;
 {
     di();
     if (a >= 7)

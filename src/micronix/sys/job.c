@@ -19,7 +19,7 @@
 #include <sys/proc.h>
 #include <sys/tty.h>
 #include <errno.h>
-extern unsigned char super();
+extern UINT8 super();
 extern void wakeup();
 
 UINT8 jctl[NPROC];
@@ -34,11 +34,11 @@ UINT8 jctl[NPROC];
  */
 void
 jobctl(op)
-    int op;
+    INT16 op;
 {
     register struct proc *p;
     register UINT8 *b;
-    int pid;
+    INT16 pid;
 
     pid = u.hl;
     if ((p = procptr(pid)) == 0 || p == u.p || !(p->mode & ALIVE) ||

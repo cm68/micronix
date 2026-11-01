@@ -92,22 +92,22 @@
  * interrupt resumes.
  */
 struct hd {
-	UINT	h_tracks;	/* cylinders */
+	UINT16	h_tracks;	/* cylinders */
 	UINT8	h_heads;
 	UINT8	h_sectors;	/* sectors per track */
-	UINT	h_maxblk;
-	UINT	h_spc;		/* sectors per cylinder */
-	UINT	h_roll;
-	UINT	h_cylstart;
+	UINT16	h_maxblk;
+	UINT16	h_spc;		/* sectors per cylinder */
+	UINT16	h_roll;
+	UINT16	h_cylstart;
 	UINT8	h_firstsec;
-	UINT	h_len;		/* the slice's length, in cylinders */
+	UINT16	h_len;		/* the slice's length, in cylinders */
 
 	UINT8	h_flags;	/* busy/write/open/... */
-	UINT	h_slice;	/* the slice this drive is open for */
+	UINT16	h_slice;	/* the slice this drive is open for */
 	UINT8	h_retry;	/* retry count */
-	UINT	h_cyl;		/* current cylinder */
-	int	h_trackdelta;	/* target track - h_cyl */
-	UINT	h_head;		/* target head */
+	UINT16	h_cyl;		/* current cylinder */
+	INT16	h_trackdelta;	/* target track - h_cyl */
+	UINT16	h_head;		/* target head */
 	UINT8	h_sector;	/* target sector */
 	UINT8	h_drive;	/* the unit, dev & 3 */
 	UINT8	h_retry2;	/* retry counter */
@@ -115,7 +115,7 @@ struct hd {
 	UINT8	h_stat;		/* the ioctl's result, read back in cmd[HDLEN] */
 	struct buf *h_buf;	/* the request */
 	struct buf *h_cur;	/* the request to iodone */
-	int	(*h_intr)();	/* op-done continuation */
+	INT16	(*h_intr)();	/* op-done continuation */
 	struct hd *h_intarg;	/* continuation argument */
 	struct buf *h_next;	/* queued request */
 };

@@ -59,25 +59,25 @@
  * reserved.
  */
 struct dslice {
-    UINT d_off;                 /* where it starts, in cylinders */
-    UINT d_len;                 /* how many cylinders, 0 = not carved */
-    UINT d_roll;                /* rotation within the slice, 0 = none */
+    UINT16 d_off;                 /* where it starts, in cylinders */
+    UINT16 d_len;                 /* how many cylinders, 0 = not carved */
+    UINT16 d_roll;                /* rotation within the slice, 0 = none */
     UINT8 d_type;               /* SL_FS, SL_SWAP, or SL_UNUSED */
     UINT8 d_resv;               /* reserved, keeps the entry 8 bytes */
 };
 
 struct dlabel {
-    char d_magic[4];            /* DL_MAGIC, readable in a hex dump */
-    UINT d_version;             /* of this structure, DL_VERSION */
+    UINT8 d_magic[4];            /* DL_MAGIC, readable in a hex dump */
+    UINT16 d_version;             /* of this structure, DL_VERSION */
 
     /*
      * The drive, as the formatter wrote it.  A reader that disagrees with
      * these has found the wrong drive or the wrong table, and should say
      * so rather than carry on.
      */
-    UINT d_tracks;              /* cylinders */
-    UINT d_heads;
-    UINT d_spt;                 /* 512-byte sectors (blocks) per track */
+    UINT16 d_tracks;              /* cylinders */
+    UINT16 d_heads;
+    UINT16 d_spt;                 /* 512-byte sectors (blocks) per track */
 
     /*
      * The number of the first sector on a track, which is not always
@@ -86,7 +86,7 @@ struct dlabel {
      * zero.  The kernel gets this from the drive (sys/dj.c); the loader
      * has nothing to ask, so the medium says it here.
      */
-    UINT d_firstsec;
+    UINT16 d_firstsec;
 
     /*
      * The drive's timing - properties of the drive, not the controller,
@@ -98,8 +98,8 @@ struct dlabel {
      */
     UINT8 d_step;
     UINT8 d_seek;
-    UINT d_precomp;             /* 0xffff = never */
-    UINT d_lowcur;              /* 0xffff = never */
+    UINT16 d_precomp;             /* 0xffff = never */
+    UINT16 d_lowcur;              /* 0xffff = never */
 
     /*
      * The boot, which is an attribute of the drive and not of any slice.
@@ -107,8 +107,8 @@ struct dlabel {
      * (0 = no boot), and d_bootslice is the slice it loads its
      * filesystem from.  Nothing inside a filesystem is the boot.
      */
-    UINT d_bootblks;
-    UINT d_bootslice;
+    UINT16 d_bootblks;
+    UINT16 d_bootslice;
 
     /*
      * The filesystems and swap, a through h.
@@ -120,8 +120,8 @@ struct dlabel {
      * labelled drive can be identified without a table.  Both are
      * NUL-terminated and the rest of each field is zero.
      */
-    char d_mfg[16];             /* manufacturer, e.g. "Maxtor" */
-    char d_model[16];           /* model number, e.g. "XT-1140" */
+    UINT8 d_mfg[16];             /* manufacturer, e.g. "Maxtor" */
+    UINT8 d_model[16];           /* model number, e.g. "XT-1140" */
 };
 
 #define DL_MAGIC    "MWDL"      /* Micronix disk label */
@@ -146,15 +146,15 @@ struct dlabel {
  */
 struct dlgeom
 {
-    UINT tracks;                /* cylinders */
+    UINT16 tracks;                /* cylinders */
     UINT8 heads;
     UINT8 sectors;              /* sectors per track */
-    UINT maxblk;                /* highest legal block number in a slice */
-    UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* first cylinder of the slice */
+    UINT16 maxblk;                /* highest legal block number in a slice */
+    UINT16 spc;                   /* sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* first cylinder of the slice */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* the slice's length, in cylinders */
+    UINT16 len;                   /* the slice's length, in cylinders */
 };
 
 /*
@@ -169,8 +169,8 @@ struct dltiming
 {
     UINT8 step;                 /* step pulse delay, 100 us */
     UINT8 seek;                 /* head settle after seek, 100 us */
-    UINT precomp;               /* where write precomp begins, 0xffff never */
-    UINT lowcur;                /* where low write current begins, 0xffff never */
+    UINT16 precomp;               /* where write precomp begins, 0xffff never */
+    UINT16 lowcur;                /* where low write current begins, 0xffff never */
 };
 
 /*
@@ -181,9 +181,9 @@ struct dltiming
  */
 struct slicemap
 {
-    UINT sm_off;                /* where it starts, in cylinders */
-    UINT sm_len;                /* how many cylinders, 0 = not carved */
-    UINT sm_roll;               /* rotation within the slice, 0 = none */
+    UINT16 sm_off;                /* where it starts, in cylinders */
+    UINT16 sm_len;                /* how many cylinders, 0 = not carved */
+    UINT16 sm_roll;               /* rotation within the slice, 0 = none */
 };
 
 /*
@@ -208,7 +208,7 @@ struct slicemap
  *     -1   the label names no such slice; *g maps nothing, and u.error
  *	    is ENXIO.
  */
-extern int dllabel();
+extern INT16 dllabel();
 
 /*
  * Decode one slice of a drive against its cached map: offset in
@@ -216,7 +216,7 @@ extern int dllabel();
  * Returns 0, or ENXIO for a slice that is not carved or runs off the
  * drive.
  */
-extern unsigned char dlslice();
+extern UINT8 dlslice();
 
 /*
  * Reload the label out of the buffer being written to block 0 of 'c',
@@ -224,7 +224,7 @@ extern unsigned char dlslice();
  * "writing the label reloads the partition table" side effect, shared by
  * every block driver.  Returns 1 for a readable label, 0 otherwise.
  */
-extern int dlreload();
+extern INT16 dlreload();
 
 /*
  * vim: set tabstop=4 shiftwidth=4 expandtab:

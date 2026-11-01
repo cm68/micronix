@@ -6,15 +6,15 @@
  */
 struct buf {
     UINT8 flags;                /* see below */
-    UINT dev;                   /* device number */
-    UINT blk;                   /* block number */
-    char *data;                 /* memory address */
+    UINT16 dev;                   /* device number */
+    UINT16 blk;                   /* block number */
+    UINT8 *data;                 /* memory address */
     UINT8 xmem;                 /* extended address */
     struct buf *forw;           /* for use by strategy routine */
     struct buf *back;           /* for use by strategy routine */
-    UINT cyl;                   /* for use by strategy routine */
+    UINT16 cyl;                   /* for use by strategy routine */
     UINT8 error;                /* error return */
-    UINT time;                  /* "time" of last access */
+    UINT16 time;                  /* "time" of last access */
     struct buf *b_hash;         /* hash chain link */
 };
 
@@ -54,7 +54,7 @@ extern struct buf blist[];      /* boot headers; textpad.s links blist last */
  * would be borrowed over by swin()/srel() and mem.s.  The superblock
  * needs no window - getsb() keeps it in the kernel's own memory.
  */
-extern char *bhold();           /* map a buffer's data, return its address */
+extern UINT8 *bhold();           /* map a buffer's data, return its address */
 extern void brel();             /* put back the segment the hold saved */
 extern void bwin(UINT8);         /* the raw mapping, without the stack; seg is a byte */
 

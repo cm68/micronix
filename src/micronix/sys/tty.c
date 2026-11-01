@@ -32,19 +32,20 @@ extern void drain();
  * resident half instead of twice in a page.
  */
 extern void killfg(), ttynotify(), cstart(), ustart();
-extern char ttycbuf[];
-extern int selectchan;          /* select(2): a reader is watching */
+extern UINT8 ttycbuf[];
+extern INT16 selectchan;          /* select(2): a reader is watching */
 
 /*
  * Filter the raw input que into the cooked input que
  * We can't afford to sleep here while using the buffer
  */
+INT16
 cookin(tty)
     register struct tty *tty;
 {
     register struct que *cook, *raw;
-    register c;
-    register char *p, *q;
+    register INT16 c;
+    register UINT8 *p, *q;
 
     cook = &tty->cokque;
     raw = &tty->rawque;
@@ -166,6 +167,7 @@ cookin(tty)
  * sleeping if necessary.
  * See ttyin for the wakeup.
  */
+INT16
 cwait(tty)
     struct tty *tty;
 {
@@ -202,8 +204,8 @@ ttyout(tty)
     /*
      * fast struct que *que; 
      */
-    register char *state;
-    char cold;
+    register UINT8 *state;
+    UINT8 cold;
 
     /*
      * state is a UINT8 in struct tty and this walks it as a char.
@@ -211,7 +213,7 @@ ttyout(tty)
      * tested and set, never compared for order - so the cast is safe
      * and ccc wants it said.
      */
-    state = (char *) &tty->state;
+    state = (UINT8 *) &tty->state;
 
     /*
      * if (*state & STOPIN) { *state &= ~STOPIN; (*tty->put)(tty, XOFF);
@@ -263,14 +265,15 @@ ttyout(tty)
  * Get the next character for output.
  * Expand the output que if necessary.
  */
+INT16
 cookout(tty)
     register struct tty *tty;
 {
     struct que *que;
-    register int mode;
-    register char c;
-    int inc;
-    static char *more = "--more--\b\b\b\b\b\b\b\b        \b\b\b\b\b\b\b\b";
+    register INT16 mode;
+    register INT16 c;
+    INT16 inc;
+    static UINT8 *more = "--more--\b\b\b\b\b\b\b\b        \b\b\b\b\b\b\b\b";
 
   loop:
     que = &tty->outque;
@@ -368,8 +371,8 @@ ttyin(c, tty)
 {
     struct que *raw;
     register struct que *out;
-    char state;
-    int mode;
+    UINT8 state;
+    INT16 mode;
 
     raw = &tty->rawque;
     out = &tty->outque;

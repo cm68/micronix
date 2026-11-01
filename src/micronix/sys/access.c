@@ -12,7 +12,7 @@
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern unsigned char ronly();
+extern UINT8 ronly();
 extern void irelse();
 
 #define SUPERID 0               /* Id of superuser */
@@ -22,12 +22,12 @@ extern void irelse();
  * IREAD, IWRITE, and/or IEXEC to inode ip.
  */
 
-unsigned char
+UINT8
 access(i, per)
     struct inode *i;
-    int per;
+    INT16 per;
 {
-    int mode;
+    INT16 mode;
 
     mode = i->i_mode;
     /*
@@ -80,7 +80,7 @@ access(i, per)
  * Test whether or not the current user is the super-user.
  * Set u.error if not.
  */
-unsigned char
+UINT8
 super()
 {
     if (u.u_euid == SUPERID)
@@ -95,8 +95,8 @@ super()
 
 void
 permission(name, mode)
-    char *name;
-    int mode;
+    UINT8 *name;
+    INT16 mode;
 {
     struct inode *ip;
     UINT8 euid, egid;
@@ -119,7 +119,7 @@ permission(name, mode)
  * Called above, and from chmod and chown in sys1.c.
  */
 
-unsigned char
+UINT8
 ronly(ip)
     struct inode *ip;
 {

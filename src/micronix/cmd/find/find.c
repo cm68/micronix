@@ -485,7 +485,7 @@ char *name;
 		if (endofname[-1] != '/')
 			*c1++ = '/';
 		Fname = c1;	/* c1 is where the leaf name is written */
-		c2 = dentry.d_name;
+		c2 = (char *) dentry.d_name;
 		for (i=0; i<14; ++i)
 			if (*c2)
 				*c1++ = *c2++;

@@ -16,7 +16,7 @@
 #include <sys/ovl.h>
 #include <errno.h>
 
-extern unsigned bmajor();
+extern UINT16 bmajor();
 extern void nodev(), iodone();
 extern struct biovec ovlbvec[];
 
@@ -35,9 +35,9 @@ extern struct biovec ovlbvec[];
  * answer is not a test of presence.  A driver the kernel still holds has
  * entries and no segment, and then there is nothing to map.
  */
-int
+INT16
 ovlopen(dev, mode)
-    UINT dev;
+    UINT16 dev;
     UINT8 mode;
 {
     UINT8 maj;
@@ -51,9 +51,9 @@ ovlopen(dev, mode)
     return ((*ovlbvec[maj].open) (dev, mode));
 }
 
-int
+INT16
 ovlclose(dev, mode)
-    UINT dev;
+    UINT16 dev;
     UINT8 mode;
 {
     UINT8 maj;
@@ -67,7 +67,7 @@ ovlclose(dev, mode)
     return ((*ovlbvec[maj].close) (dev, mode));
 }
 
-int
+INT16
 ovlstrat(b)
     register struct buf *b;
 {
@@ -92,9 +92,9 @@ ovlstrat(b)
  * but of the request against this device, and ENOTTY says so the way the
  * character side's mode() has always said it.
  */
-int
+INT16
 ovlioctl(dev, cmd, r, b)
-    UINT dev, cmd;
+    UINT16 dev, cmd;
     struct cdb *r;
     struct buf *b;
 {

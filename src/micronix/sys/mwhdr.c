@@ -35,11 +35,11 @@
 #include <sys/mw.h>
 #include <sys/ovl.h>
 
-extern int mwopen();
+extern INT16 mwopen();
 extern void mwclose(), mwstrat();
 extern void mwcheck(), mwint();
-extern int mwprobe();
-extern int mwinit();
+extern INT16 mwprobe();
+extern INT16 mwinit();
 extern struct biovec mwbvec;
 
 struct ovlhdr mwhdr = { 3, &mwinit, &mwcheck, 0, &mwbvec, 0, &mwprobe, &mwint,

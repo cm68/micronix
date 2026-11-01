@@ -14,17 +14,17 @@
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <errno.h>
-extern unsigned char ronly();
-extern unsigned char super();
+extern UINT8 ronly();
+extern UINT8 super();
 extern void idec();
 extern void irelse();
 extern void isync();
 extern void bsync();
 extern void pr();
-extern unsigned char valid();
-extern unsigned char access();
+extern UINT8 valid();
+extern UINT8 access();
 
-extern char oalloc();       /* open.c: a descriptor or ERROR */
+extern INT8 oalloc();       /* open.c: a descriptor or ERROR */
 extern void close(UINT8);    /* open.c */
 
 /*
@@ -32,9 +32,9 @@ extern void close(UINT8);    /* open.c */
  */
 void
 brake(addr)
-    int addr;
+    INT16 addr;
 {
-    UINT old;
+    UINT16 old;
 
     if (addr > u.sp - 12 && u.brake < u.sp) {
         u.error = ENOMEM;
@@ -50,7 +50,7 @@ brake(addr)
  */
 void
 chdir(name)
-    char *name;
+    UINT8 *name;
 {
     register struct inode *i;
 
@@ -75,8 +75,8 @@ chdir(name)
  */
 void
 chmod(name, mode)
-    char *name;
-    int mode;
+    UINT8 *name;
+    INT16 mode;
 {
     register struct inode *i;
 
@@ -97,8 +97,8 @@ chmod(name, mode)
  */
 void
 chown(name, owner)
-    char *name;
-    UINT owner;
+    UINT8 *name;
+    UINT16 owner;
 {
     register struct inode *ip;
 
@@ -129,7 +129,7 @@ dup()
         return;
     /*
      * oalloc() hands back a byte, and ERROR is -1 in that byte.  As
-     * an unsigned char fd promotes to 0x00ff, which is not the
+     * a UINT8 fd promotes to 0x00ff, which is not the
      * 0xffff an int -1 promotes to, so the comparison has to stay in
      * the byte too - the cast is what keeps the compiler from
      * widening both sides and testing the wrong answer.
@@ -159,7 +159,7 @@ dup()
  */
 void
 dup2(fd2)
-    UINT fd2;
+    UINT16 fd2;
 {
     register struct file *fp;
     UINT8 fd;
@@ -196,9 +196,9 @@ sync()
  */
 void
 reboot(howto)
-    int howto;
+    INT16 howto;
 {
-    register int n;
+    register INT16 n;
 
     if (!super())
         return;
@@ -239,11 +239,11 @@ getuid()
 void
 setuid()
 {
-    register char uid, gid;
-    unsigned int id;
+    register UINT8 uid, gid;
+    UINT16 id;
 
     id = u.hl;
-    uid = (char) id;
+    uid = (UINT8) id;
     gid = id >> 8;
     if ((uid == u.u_uid && gid == u.u_gid) || super()) {
         u.p->uid = uid;
@@ -260,7 +260,7 @@ setuid()
 void
 nice()
 {
-    register char nice;
+    register INT8 nice;
 
     nice = u.hl;
     if (nice < 0 && !super())

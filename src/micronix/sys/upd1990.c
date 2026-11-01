@@ -37,15 +37,15 @@
 #define CC_SET      0x08            /* shift register -> clock */
 #define CC_GET      0x0c            /* clock -> shift register */
 
-extern int in(), out();
-extern int di(), ei();
-extern long seconds;
-extern long bcd2unix();         /* unbcd.s, hangs off the highmem */
+extern INT16 in(), out();
+extern INT16 di(), ei();
+extern INT32 seconds;
+extern INT32 bcd2unix();         /* unbcd.s, hangs off the highmem */
 extern void unixtobcd();        /* unixtobcd.s, stays in the u page */
 
 /* stroke a command: cmd, cmd|CSTROBE, cmd (falling edge commits) */
 static void
-clkcmd(int cmd)
+clkcmd(INT16 cmd)
 {
     out(CLOCKPORT, cmd);
     out(CLOCKPORT, cmd | CLK_SETCMD);
@@ -119,12 +119,12 @@ rtcset(UINT8 *r)
  * the callee's to give back (see the note in unbcd.s).
  */
 void
-upd_rtcinit(long base)
+upd_rtcinit(INT32 base)
 {
     UINT8 r[5];
     UINT8 b[6];
-    long t;
-    int y, m;
+    INT32 t;
+    INT16 y, m;
 
     rtcget(r);
     unixtobcd(base, b);             /* b[0] = year of the superblock stamp */
@@ -160,11 +160,11 @@ upd_rtcinit(long base)
  * Write the system time to the rtc (month and weekday, no year).
  */
 void
-upd_rtcwrite(long t)
+upd_rtcwrite(INT32 t)
 {
     UINT8 r[5];
     UINT8 b[6];
-    int m;
+    INT16 m;
 
     unixtobcd(t, b);                /* b = year,mon,day,hour,min,sec (BCD) */
     m = (b[1] & 0x0f) + (b[1] >= 0x10 ? 10 : 0);    /* 1..12 */

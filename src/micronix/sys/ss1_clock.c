@@ -27,10 +27,10 @@
 #define RTC_WRITE   0x20        /* bit 5: write the data port into the digit */
 #define RTC_READ    0x10        /* bit 4: read the digit out the data port */
 
-extern int in(), out();
-extern int di(), ei();
-extern long seconds;
-extern long bcd2unix();         /* unbcd.s, BCD -> unix */
+extern INT16 in(), out();
+extern INT16 di(), ei();
+extern INT32 seconds;
+extern INT32 bcd2unix();         /* unbcd.s, BCD -> unix */
 extern void unixtobcd();        /* unixtobcd.s, unix -> BCD */
 
 /*
@@ -40,15 +40,15 @@ extern void unixtobcd();        /* unixtobcd.s, unix -> BCD */
  * tens.  Read one: Hold|Read|digit to the command port, then the data
  * port's low nibble.  Write one: Hold|Write|digit, then the nibble.
  */
-static int
-rdigit(int d)
+static INT16
+rdigit(INT16 d)
 {
     out(SS1_RTC_CMD, RTC_HOLD | RTC_READ | d);
     return in(SS1_RTC_DATA) & 0x0f;
 }
 
 static void
-wdigit(int d, int v)
+wdigit(INT16 d, INT16 v)
 {
     out(SS1_RTC_CMD, RTC_HOLD | RTC_WRITE | d);
     out(SS1_RTC_DATA, v & 0x0f);
@@ -99,10 +99,10 @@ rtcset(UINT8 *b)
  * from the chip, so there is no rollover year to derive from it.
  */
 void
-ss1_rtcinit(long base)
+ss1_rtcinit(INT32 base)
 {
     UINT8 b[6];
-    long t;
+    INT32 t;
 
     rtcget(b);
     t = bcd2unix(b);
@@ -115,7 +115,7 @@ ss1_rtcinit(long base)
  * Write the system time to the calendar.
  */
 void
-ss1_rtcwrite(long t)
+ss1_rtcwrite(INT32 t)
 {
     UINT8 b[6];
 

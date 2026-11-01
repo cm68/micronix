@@ -16,9 +16,9 @@ extern void panic();
 extern void bdwrite();
 extern void prdev();
 extern void bawrite();
-extern unsigned char bcheck();
+extern UINT8 bcheck();
 
-extern char *swin(UINT8);       /* uio.c: the scratch window */
+extern UINT8 *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
 
 /*
@@ -37,32 +37,33 @@ extern void srel();
  * the first sane word begins.
  */
 #ifdef FREEDEBUG
+INT16
 sbdump(sup, what)
     struct super *sup;
-    char *what;
+    UINT8 *what;
 {
-    register UINT *w;
-    register int i;
+    register UINT16 *w;
+    register INT16 i;
     register struct buf *b, *b13;
     extern struct buf *btop;
 
     pr("sbdump(%s) sup %x slot0 %x blist %x btop %x\n",
         what, sup, blist, btop);
-    w = (UINT *)sup;
+    w = (UINT16 *)sup;
     for (i = 0; i < 8; i++)
         pr(" %x", w[i]);
     pr("\n");
     b13 = 0;
     for (b = blist; b < btop; b++)
-        if ((int)b >= 0xd000) {
+        if ((INT16)b >= 0xd000) {
             b13 = b;
             break;
         }
     if (b13) {
         pr("hdr %x: blk %d dev %d data %x xmem %d flags %x time %x\n",
-            b13, b13->blk, b13->dev, (int)b13->data, b13->xmem,
+            b13, b13->blk, b13->dev, (INT16)b13->data, b13->xmem,
             b13->flags, b13->time);
-        w = (UINT *)b13;
+        w = (UINT16 *)b13;
         for (i = 0; i < 10; i++)
             pr(" %x", w[i]);
         pr("\n");
@@ -70,12 +71,13 @@ sbdump(sup, what)
     panic("freelist nfree out of range");
 }
 
+INT16
 checkfreelist(sup, what)
     struct super *sup;
-    char *what;
+    UINT8 *what;
 {
-    register int i;
-    register UINT bn;
+    register INT16 i;
+    register UINT16 bn;
 
     if (sup->s_nfree > 100) {
         pr("freelist: nfree %d out of range\n", sup->s_nfree);
@@ -99,11 +101,12 @@ checkfreelist(sup, what)
  * and right before a spill (the list is about to be written out), so
  * the two edges of the chain can be compared block by block.
  */
+INT16
 dumpsb(sup, what)
     struct super *sup;
-    char *what;
+    UINT8 *what;
 {
-    register int i;
+    register INT16 i;
 
     pr("dumpsb(%s) nfree %d:", what, sup->s_nfree);
     for (i = 0; i < sup->s_nfree; i++)
@@ -119,12 +122,13 @@ dumpsb(sup, what)
  * 0x01 (BREAD) is set only if a real disk read happened; 0x10 (BDONE)
  * alone means the buffer was served from cache.
  */
+INT16
 dumpbuf(b, what)
     struct buf *b;
-    char *what;
+    UINT8 *what;
 {
     pr("buf(%s) blk %d dev %d data %x xmem %d flags %x idx %d\n",
-        what, b->blk, b->dev, (int)b->data, b->xmem, b->flags, (int)(b - blist));
+        what, b->blk, b->dev, (INT16)b->data, b->xmem, b->flags, (INT16)(b - blist));
 }
 #endif
 
@@ -133,15 +137,15 @@ dumpbuf(b, what)
  * See Unix Programmer's Manual, section V, File System
  * for a description of the algorithm.
  */
-UINT
+UINT16
 balloc(dev)
-    int dev;
+    INT16 dev;
 {
     register struct buf *sb;
     static struct buf *fb;
     register struct super *sup;
-    register UINT bn;
-    char *chunk;
+    register UINT16 bn;
+    UINT8 *chunk;
     UINT8 chunkseg;
 
     sb = getsb(dev);
@@ -172,8 +176,8 @@ balloc(dev)
         chunk = fb->data;
         chunkseg = fb->xmem;
         swin(chunkseg);
-        copy((char *) SCRWIN + (chunk & 0xfff), (char *)sup + 4, 202);
-        zero((char *) SCRWIN + (chunk & 0xfff), 512);
+        copy((UINT8 *) SCRWIN + (chunk & 0xfff), (UINT8 *)sup + 4, 202);
+        zero((UINT8 *) SCRWIN + (chunk & 0xfff), 512);
         srel();
         brel();
         ei();
@@ -205,12 +209,12 @@ balloc(dev)
  */
 void
 bfree(bn, dev)
-    UINT bn;
-    int dev;
+    UINT16 bn;
+    INT16 dev;
 {
     register struct buf *sb, *fb;
     register struct super *sup;
-    char *chunk;
+    UINT8 *chunk;
     UINT8 chunkseg;
 
     if (bn == 0)
@@ -238,7 +242,7 @@ bfree(bn, dev)
         chunk = fb->data;
         chunkseg = fb->xmem;
         swin(chunkseg);
-        copy((char *)sup + 4, (char *) SCRWIN + (chunk & 0xfff), 202);
+        copy((UINT8 *)sup + 4, (UINT8 *) SCRWIN + (chunk & 0xfff), 202);
         srel();
         brel();
         ei();
@@ -263,12 +267,12 @@ bfree(bn, dev)
  * the error says whether the bad number came off the free list (balloc)
  * or was handed in to be freed (bfree).
  */
-unsigned char
+UINT8
 bcheck(bn, sup, dev, who)
-    UINT bn;
-    int dev;
+    UINT16 bn;
+    INT16 dev;
     struct super *sup;
-    char *who;
+    UINT8 *who;
 {
     static UINT8 i;
 

@@ -106,14 +106,14 @@ extern void ttinit();
 /*
  * Hardware fiddlers in mio.s, and the SS1's 2651 in ss1_uart.c
  */
-extern int ace_start(), ace_stop(), ace_putc(), ace_set();
-extern int ss1_start(), ss1_stop(), ss1_set();
+extern INT16 ace_start(), ace_stop(), ace_putc(), ace_set();
+extern INT16 ss1_start(), ss1_stop(), ss1_set();
 extern void ss1_putc();
 extern void ss1_uart_open();
-extern unsigned char ttypub();            /* publish the page's doors (sys/ttyres.c) */
+extern UINT8 ttypub();            /* publish the page's doors (sys/ttyres.c) */
 extern void ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
 extern void ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
-extern void outwait(struct tty *, int);  /* drain the output queue (sys/ttysys.c) */
+extern void outwait(struct tty *, INT16);  /* drain the output queue (sys/ttysys.c) */
 extern void mumint();                   /* below, and an entry point the resident half calls */
 
 /*
@@ -139,8 +139,9 @@ extern struct tty mttys[];
  */
 struct tty *
 ttdev(dev)
+    INT16 dev;
 {
-    register m;
+    register INT16 m;
 
     m = dev & 15;
     if (m == TTY_CONSOLE)
@@ -164,10 +165,11 @@ ttdev(dev)
  */
 void
 muopen(dev, mode)
-    register dev;
+    register INT16 dev;
+    INT16 mode;
 {
     struct tty *tty;
-    register minor, port;
+    register INT16 minor, port;
 
     /*
      * Minor 0 is the console alias; resolve it once to the board the
@@ -265,6 +267,7 @@ muopen(dev, mode)
  */
 void
 muclose(dev)
+    INT16 dev;
 {
     register struct tty *t;
 
@@ -299,6 +302,7 @@ muclose(dev)
  */
 void
 muread(dev)
+    INT16 dev;
 {
     ttyread(ttdev(dev));
 }
@@ -308,6 +312,7 @@ muread(dev)
  */
 void
 muwrite(dev)
+    INT16 dev;
 {
     ttywrite(ttdev(dev));
 }
@@ -318,8 +323,8 @@ muwrite(dev)
  */
 void
 muioctl(dev, cmd, arg)
-    int dev, cmd;
-    char *arg;
+    INT16 dev, cmd;
+    UINT8 *arg;
 {
     if (cmd == TIOCGETA)
         ttymode(ttdev(dev), READ);
@@ -336,6 +341,7 @@ muioctl(dev, cmd, arg)
 void
 ttinit(tty, dev)
     register struct tty *tty;
+    INT16 dev;
 {
     tty->ispeed = tty->ospeed = 13;     /* 9600 baud */
     tty->erase = '\b';
@@ -383,7 +389,7 @@ void
 mumint(t)
     struct tty *t;
 {
-    unsigned char s;
+    UINT8 s;
 
     /*
      * read the modem status register
@@ -425,8 +431,9 @@ mumint(t)
 
 void
 mumcontrol(dev)
+    INT16 dev;
 {
-    unsigned char a;
+    UINT8 a;
     struct tty *t;
 
     t = ttdev(dev);
@@ -457,8 +464,9 @@ mumcontrol(dev)
 
 void
 mumstatus(dev)
+    INT16 dev;
 {
-    unsigned char s;
+    UINT8 s;
     struct tty *t;
 
     t = ttdev(dev);
@@ -513,6 +521,7 @@ mumstatus(dev)
 
 void
 muenable(dev, mode)
+    INT16 dev, mode;
 {
     struct tty *t;
 
@@ -540,8 +549,9 @@ struct ciovec ttycvec = {
  * addresses the interrupt stubs should call; the state it points at
  * (mttys, sys/ttyres.c) is resident and needs nothing from this page.
  */
+INT16
 ttyinit(seg)
-    UINT seg;
+    UINT16 seg;
 {
     ttypub(seg, ttyin, ttyout, mumint);
     return (0);

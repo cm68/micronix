@@ -17,7 +17,7 @@
 
 #define HEARTBEAT   62500   /* 2 MHz / 32 Hz, the count for the 32 Hz tick */
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * Program the 8253's counter 0, the heartbeat: 32 Hz, which the tick

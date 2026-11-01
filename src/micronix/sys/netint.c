@@ -19,10 +19,10 @@
 #include <types.h>
 #include <sys/net.h>
 
-int netchan;
+INT16 netchan;
 
 /* one command on the card at a time (sys/net.c) */
-int netlock;
+INT16 netlock;
 
 /* per socket: something a reader should ask for */
 UINT8 netready[8];
@@ -34,4 +34,4 @@ UINT8 netready[8];
  * 0xffff is "not attached yet": line 0 is a real line, so zero will not
  * do.
  */
-UINT netline = 0xffff;
+UINT16 netline = 0xffff;

@@ -32,11 +32,11 @@ extern void ttyout(struct tty *), ttyin(UINT8, struct tty *), ttymode();
  * Pair and side of a device number; -1 for a minor that is not one of
  * ours.  The caller has already bounded the major through ciosw.
  */
-int
+INT16
 ptyidx(dev)
-    int dev;
+    INT16 dev;
 {
-    register int m;
+    register INT16 m;
 
     m = dev & 0377;
     if (m < PTYMST + NPTY)
@@ -74,7 +74,7 @@ pty_start(t)
 void
 pty_put(t, c)
     struct tty *t;
-    char c;
+    UINT8 c;
 {
     ttyin(c, PEER(t));
 }
@@ -85,10 +85,10 @@ pty_put(t, c)
  */
 void
 ptyioctl(dev, cmd, arg)
-    int dev, cmd;
-    char *arg;
+    INT16 dev, cmd;
+    UINT8 *arg;
 {
-    register int i;
+    register INT16 i;
 
     if ((i = ptyidx(dev)) < 0) {
         u.error = ENXIO;

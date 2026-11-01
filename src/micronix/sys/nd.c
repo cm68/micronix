@@ -26,16 +26,16 @@
 #include <errno.h>
 extern void iodone();
 extern void sleep();
-extern unsigned char inton();
-static char exclude();
+extern UINT8 inton();
+static INT8 exclude();
 
-extern int in(), out();
-extern unsigned char inton();
+extern INT16 in(), out();
+extern UINT8 inton();
 
 struct nd ndinfo[NND];
 
-static int ndmutex;		/* the card, 0 = free */
-static int (*ndintr) ();	/* the phase the op-done interrupt resumes */
+static INT16 ndmutex;		/* the card, 0 = free */
+static INT16 (*ndintr) ();	/* the phase the op-done interrupt resumes */
 static struct nd *ndintarg;
 static UINT8 nddead;		/* seconds the request has been in flight */
 static UINT8 ndstat;		/* the status that raised the interrupt */
@@ -62,7 +62,7 @@ ndout(b)
  * Point the card at the block number and write it - four bytes, most
  * significant first, the way the HDCA's header is four bytes.
  *
- * The block number is a UINT (struct buf's blk), so the top two bytes
+ * The block number is a UINT16 (struct buf's blk), so the top two bytes
  * are always zero.  The two that are not written through a UINT8 cast:
  * that is the shape lower.c's byte-extraction pattern matches (a NARROW
  * over a shift), and it loads the byte straight out of the word instead
@@ -71,7 +71,7 @@ ndout(b)
  */
 static void
 ndblk(blk)
-	UINT blk;
+	UINT16 blk;
 {
 	out(ND_CMD, ND_BLOCK);
 	ndout(0);
@@ -86,9 +86,9 @@ ndblk(blk)
  */
 static void
 ndrdat(p)
-	register char *p;
+	register UINT8 *p;
 {
-	register UINT n;
+	register UINT16 n;
 
 	out(ND_CMD, ND_RAMDATA);
 	n = 512;
@@ -98,9 +98,9 @@ ndrdat(p)
 
 static void
 ndwdat(p)
-	register char *p;
+	register UINT8 *p;
 {
-	register UINT n;
+	register UINT16 n;
 
 	out(ND_CMD, ND_RAMDATA);
 	n = 512;
@@ -113,7 +113,7 @@ ndwdat(p)
  * table: the card serves one request at a time, and a request that finds
  * it busy is queued on the single drive.
  */
-static char
+static INT8
 exclude(np)
 	struct nd *np;
 {
@@ -143,7 +143,7 @@ release(np)
 /*
  * The strategy entry: a block I/O from the buffer cache.
  */
-int
+INT16
 ndstrat(b)
 	struct buf *b;
 {
@@ -173,7 +173,7 @@ phase00(np)
 	struct nd *np;
 {
 	struct buf *b = np->n_cur;
-	char *p;
+	UINT8 *p;
 
 	np->n_flags &= ~NDERROR;
 	nddead = 0;
@@ -201,7 +201,7 @@ static void
 phase04(np)
 	struct nd *np;
 {
-	char *p;
+	UINT8 *p;
 
 	if (ndstat & ND_ERROR) {
 		phase11(np, EIO);
@@ -235,7 +235,7 @@ phase09(np)
 static void
 phase11(np, err)
 	struct nd *np;
-	int err;
+	INT16 err;
 {
 	np->n_flags |= NDERROR;
 	np->n_stat = err;
@@ -269,7 +269,7 @@ phase12(np)
  * ever ends.  The probe reads a drive's label before the drive is opened,
  * so this is what turns that silence into a skip.
  */
-int
+INT16
 ndtick()
 {
 	struct nd *np;
@@ -295,7 +295,7 @@ ndtick()
  * line.  The ack has to come first because the phase may start the next
  * queued request, whose own op-done must not be cleared by this one's.
  */
-int
+INT16
 ndint()
 {
 	ndstat = in(ND_STATUS);
@@ -313,9 +313,9 @@ ndint()
 /*
  * Open the drive.  There is no label to read and no geometry to learn.
  */
-int
+INT16
 ndopen(dev, mode)
-	UINT dev, mode;
+	UINT16 dev, mode;
 {
 	return (0);
 }
@@ -323,9 +323,9 @@ ndopen(dev, mode)
 /*
  * Close the drive: wait for any I/O to drain.
  */
-int
+INT16
 ndclose(dev)
-	UINT dev;
+	UINT16 dev;
 {
 	struct nd *np;
 
@@ -341,9 +341,9 @@ ndclose(dev)
  * meaningless here.  The card's socket face is a character device of its
  * own (char major 6, sys/net.c) and does not come through this vector.
  */
-int
+INT16
 ndcioctl(dev, cmd, r, b)
-	UINT dev, cmd;
+	UINT16 dev, cmd;
 	struct cdb *r;
 	struct buf *b;
 {
@@ -368,10 +368,11 @@ struct biovec ndbvec = { &ndopen, &ndclose, &ndstrat, &ndcioctl };
  */
 #define PROBEWAIT	10000
 
+INT16
 ndprobe(mode)
-	int mode;
+	INT16 mode;
 {
-	register int n;
+	register INT16 n;
 
 	if (mode == PROBE_CLEAR) {
 		out(ND_CMD, ND_ACK);

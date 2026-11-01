@@ -112,17 +112,17 @@ struct disk3_iopb
  */
 struct disk3_spec
 {
-    UINT steprate;              /* seek step time, 100 us units */
-    UINT settle;                /* head settle after seek, 100 us units */
-    UINT secsize;               /* bytes per sector (512) */
-    UINT sectrk;                /* sectors per track */
-    UINT trkcyl;                /* heads per cylinder */
-    UINT maxtrk;                /* cylinders */
-    UINT precomp;               /* first cylinder to precompensate */
-    UINT reduce;                /* first cylinder for reduced write current */
-    UINT reserved;              /* ignored by current firmware */
-    UINT restracks;             /* tracks reserved for bad sector remap */
-    UINT position;              /* must be zero */
+    UINT16 steprate;              /* seek step time, 100 us units */
+    UINT16 settle;                /* head settle after seek, 100 us units */
+    UINT16 secsize;               /* bytes per sector (512) */
+    UINT16 sectrk;                /* sectors per track */
+    UINT16 trkcyl;                /* heads per cylinder */
+    UINT16 maxtrk;                /* cylinders */
+    UINT16 precomp;               /* first cylinder to precompensate */
+    UINT16 reduce;                /* first cylinder for reduced write current */
+    UINT16 reserved;              /* ignored by current firmware */
+    UINT16 restracks;             /* tracks reserved for bad sector remap */
+    UINT16 position;              /* must be zero */
 };
 
 /*

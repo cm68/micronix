@@ -5,8 +5,8 @@
  * Changed: <2021-12-23 14:20:40 curt>
  */
 struct dir {
-    UINT ino;
-    char name[14];
+    UINT16 ino;
+    UINT8 name[14];
 };
 
 /*

@@ -18,8 +18,8 @@
 #include <sys/nd.h>
 #include <sys/ovl.h>
 
-extern int ndopen(), ndclose(), ndstrat();
-extern int ndint(), ndtick(), ndprobe();
+extern INT16 ndopen(), ndclose(), ndstrat();
+extern INT16 ndint(), ndtick(), ndprobe();
 extern struct biovec ndbvec;
 
 struct ovlhdr ndhdr = { 6, 0, &ndtick, 0, &ndbvec, 0, &ndprobe, &ndint,

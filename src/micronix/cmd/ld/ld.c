@@ -18,6 +18,7 @@
  * is in libunix and needs no declaration; here the prototype has to be
  * in scope or gcc treats the call as an error rather than a guess.
  */
+#include <types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 

@@ -10,15 +10,15 @@ struct hddma_cmd
 {
     UINT8 drvsel;               /* out<<4 | drv */
 #define STEPOUT		0x10		/* step out toward track 0 */
-    UINT steps;                 /* number of steps */
+    UINT16 steps;                 /* number of steps */
     UINT8 headsel;              /* pcmp<<7 | hicur<<6 | (~head&7)<<2 | drv */
 #define PRECOMP		0x80		/* Write precompensation */
 #define HIGHCUR		0x40		/* Use high write current */
-    UINT dma;                   /* dma address */
+    UINT16 dma;                   /* dma address */
     UINT8 xdma;                 /* high byte of 24-bit address */
 
     union {
-        UINT word;
+        UINT16 word;
         struct {
             UINT8 low;
             UINT8 high;
@@ -34,7 +34,7 @@ struct hddma_cmd
 #define	SENSE_READY		0x04	/* zero if ready */
 #define	SENSE_SEEKDONE	0x08	/* zero if seek done */
 #define	SENSE_INDEX		0x10	/* toggles each rotation */
-    UINT link;                  /* address of next command */
+    UINT16 link;                  /* address of next command */
     UINT8 xlink;                /* high byte of address */
 };
 

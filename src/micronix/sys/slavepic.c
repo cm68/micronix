@@ -34,16 +34,16 @@
  * sys/slavevec.s is copied down to its 32-byte boundary here, the way
  * minit relocates the master's vectors, and ICW2/ICW1's VECL name it.
  */
-int
+INT16
 slave_pic_init()
 {
 #if N8259_POLLED == 0
-    extern char slave_vectors[];
-    int addr = (int) slave_vectors;     /* the address, as a plain int */
-    int base = addr & ~0x1f;            /* its 32-byte boundary */
-    char *bp = (char *) base;
-    char *src = slave_vectors;
-    int i;
+    extern UINT8 slave_vectors[];
+    INT16 addr = (INT16) slave_vectors;     /* the address, as a plain int */
+    INT16 base = addr & ~0x1f;            /* its 32-byte boundary */
+    UINT8 *bp = (UINT8 *) base;
+    UINT8 *src = slave_vectors;
+    INT16 i;
 
     for (i = 0; i < 12; i++)            /* the 3 entries, onto the boundary */
         bp[i] = src[i];

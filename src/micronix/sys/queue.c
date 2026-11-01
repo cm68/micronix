@@ -13,8 +13,8 @@ extern void drainques();
 extern void ustart();
 extern void drain();
 extern void qinit();
-static unsigned char qfree();
-static unsigned char qalloc();
+static UINT8 qfree();
+static UINT8 qalloc();
 
 /*
  * The static routines below, declared before anything calls them.
@@ -24,7 +24,7 @@ static unsigned char qalloc();
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-static unsigned char qalloc(), qfree();
+static UINT8 qalloc(), qfree();
 static void qrelse();
 
 /*
@@ -54,9 +54,9 @@ static void qrelse();
  *      A queue shall be no longer than TTYHOG
  */
 
-#define calign(a)	 (((unsigned int) (a) - 1) & ~15)       /* PORT */
+#define calign(a)	 (((UINT16) (a) - 1) & ~15)       /* PORT */
 
-char clist[CSIZE] = { 0 };
+UINT8 clist[CSIZE] = { 0 };
 
 struct cblock *cfree = 0;    /* free list */
 
@@ -138,8 +138,8 @@ void
 fillque(q)
     struct que *q;
 {
-    static char *from;
-    static unsigned cleft, qspace, togo, nfill;
+    static UINT8 *from;
+    static UINT16 cleft, qspace, togo, nfill;
 
     /*
      * extern char resched; 
@@ -164,12 +164,12 @@ fillque(q)
     from = u.base;
 
     while (cleft) {             /* still something to do */
-        if (((int) (q->last) & 15) == 0)        /* space needed */
+        if (((INT16) (q->last) & 15) == 0)        /* space needed */
             if (!qalloc(q)) {
                 break;
             }
 
-        togo = 16 - ((int) (q->last) & 15);     /* whole cblock */
+        togo = 16 - ((INT16) (q->last) & 15);     /* whole cblock */
 
         if (cleft < togo)       /* take only that requested */
             togo = cleft;
@@ -206,8 +206,8 @@ void
 sendque(q)
     register struct que *q;
 {
-    static char *to;
-    static unsigned cleft, nsent, togo;
+    static UINT8 *to;
+    static UINT16 cleft, nsent, togo;
 
     di();
 
@@ -219,11 +219,11 @@ sendque(q)
         cleft = q->count;
 
     while (cleft) {             /* still something to do */
-        if (((int) (q->first) & 15) == 0)       /* need to free up */
+        if (((INT16) (q->first) & 15) == 0)       /* need to free up */
             if (!qfree(q))
                 break;
 
-        togo = 16 - ((int) (q->first) & 15);    /* no. this block */
+        togo = 16 - ((INT16) (q->first) & 15);    /* no. this block */
 
         if (cleft < togo)       /* no more than requested */
             togo = cleft;
@@ -247,14 +247,15 @@ sendque(q)
     ei();
 }
 
+INT16
 putc(q, c)
     register struct que *q;
-    register char c;
+    register INT16 c;
 {
     di();
 
     if ((q->count < TTYHOG)
-        && (((int) (q->last) & 15) || qalloc(q))) {
+        && (((INT16) (q->last) & 15) || qalloc(q))) {
         q->count++;
         *q->last++ = c;
     } else {
@@ -266,14 +267,15 @@ putc(q, c)
     return c;
 }
 
+INT16
 getc(q)
     register struct que *q;
 {
-    register UINT c;
+    register UINT16 c;
 
     di();
 
-    if (q->count && (((int) (q->first) & 15) || qfree(q))) {
+    if (q->count && (((INT16) (q->first) & 15) || qfree(q))) {
         q->count--;
         c = *q->first++;
     } else {
@@ -289,7 +291,7 @@ getc(q)
 }
 
 static
-unsigned char
+UINT8
 qalloc(q)
     register struct que *q;
 {
@@ -331,16 +333,16 @@ qrelse(q)
 
     b = (struct cblock *) q->first;
     if (b) {
-        b = (struct cblock *) (((int) b - 1) & ~15);
+        b = (struct cblock *) (((INT16) b - 1) & ~15);
         b++;
-        q->first = (char *) b;
-        q->last = (char *) b;
+        q->first = (UINT8 *) b;
+        q->last = (UINT8 *) b;
         qfree(q);
     }
 }
 
 static
-unsigned char
+UINT8
 qfree(q)
     register struct que *q;
 {

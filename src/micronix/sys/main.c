@@ -31,10 +31,10 @@ extern void pr();
  * Kernel configuration, formerly con.c.  These are resident globals:
  * they must not move into the reclaimed highmem region.
  */
-UINT rootdev = 0x0300;          /* hddma drive 0 (Seagate 5 meg) */
-UINT swapdev = 0x0000;          /* none until setdev points it at a slice */
-UINT swapsize = 0;              /* no. of swap blocks */
-UINT swapaddr = 0;              /* block number of first swap block */
+UINT16 rootdev = 0x0300;          /* hddma drive 0 (Seagate 5 meg) */
+UINT16 swapdev = 0x0000;          /* none until setdev points it at a slice */
+UINT16 swapsize = 0;              /* no. of swap blocks */
+UINT16 swapaddr = 0;              /* block number of first swap block */
 
 /*
  * static initialization.
@@ -50,16 +50,16 @@ extern struct mount mlist[];    /* uhdr.s's _mlist: the mount table */
 /*
  * Buffer stuff initialized in binit
  */
-UINT nbuf = 0;                  /* buffered by nothing but MAXBUFS */
-UINT totmem = 0;                /* total memory in K, saved by pcon() */
+UINT16 nbuf = 0;                  /* buffered by nothing but MAXBUFS */
+UINT16 totmem = 0;                /* total memory in K, saved by pcon() */
 struct buf *btop = 0;
 
 UINT8 map0[];
 
-char lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
+UINT8 lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
 extern UINT8 nbufs;             /* uhdr.s's _nbufs: the published count */
 
-extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
+extern UINT8 segalloc();    /* malloc.c: a segment is a byte */
 extern void nodev();             /* con.c */
 
 /*
@@ -89,7 +89,7 @@ extern void nodev();             /* con.c */
 void
 signon()
 {
-    char i;
+    UINT8 i;
 
     pr("%d processes\n", NPROC);
     pr("disks: ");
@@ -132,11 +132,11 @@ void
 expand_bufs()
 {
     struct buf *b;
-    unsigned char seg;
+    UINT8 seg;
     UINT8 j;
 
     b = blist + 8;
-    while ((int)b + sizeof(*b) <= (int)SCRWIN && nbuf < MAXBUFS) {
+    while ((INT16)b + sizeof(*b) <= (INT16)SCRWIN && nbuf < MAXBUFS) {
         seg = segalloc();
         /*
          * The inner loop carries the MAXBUFS test too.  The group is
@@ -147,9 +147,9 @@ expand_bufs()
          * blocks unused; the pool does not have to be a whole segment.
          */
         for (j = 0; j < 8 && nbuf < MAXBUFS &&
-                     (int)b + sizeof(*b) <= (int)SCRWIN; j++, b++) {
+                     (INT16)b + sizeof(*b) <= (INT16)SCRWIN; j++, b++) {
             zero(b, sizeof(*b));
-            b->data = (char *)BUFWIN + j * 512;
+            b->data = (UINT8 *)BUFWIN + j * 512;
             b->xmem = seg;
             nbuf++;
         }

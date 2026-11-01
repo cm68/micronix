@@ -289,7 +289,7 @@ run(fd, nb, count, buf)
     r.len = CBKLEN;
     r.count = count;
     r.flags = 0;
-    r.buf = buf;
+    r.buf = (UINT8 *) buf;
     r.hole = count ? CBKDMA : -1;
 
     if (ioctl(fd, CDBCMD, &r) < 0)

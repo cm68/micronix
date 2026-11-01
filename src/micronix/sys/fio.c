@@ -19,10 +19,10 @@ extern void cwrite();
 extern void bawrite();
 extern void bdwrite();
 
-extern long seconds;
+extern INT32 seconds;
 
-extern char zpage[];            /* exec.c: a 512-byte zero page */
-extern void iomove(unsigned char, char *, int);	/* the flag is a byte */
+extern UINT8 zpage[];            /* exec.c: a 512-byte zero page */
+extern void iomove(UINT8, UINT8 *, INT16);	/* the flag is a byte */
 
 /*
  * Read a file from its inode. The transfer parameters
@@ -31,16 +31,17 @@ extern void iomove(unsigned char, char *, int);	/* the flag is a byte */
  * Called by the read system call (including pipes),
  * to read directories, and to load files for execution.
  */
+INT16
 iread(ip, dev)
     register struct inode *ip;
-    int dev;
+    INT16 dev;
 {
-    int request;
-    UINT log, phys, rahead;
-    register int into, nbytes;
-    static int type;
+    INT16 request;
+    UINT16 log, phys, rahead;
+    register INT16 into, nbytes;
+    static INT16 type;
     struct buf *bp;
-    static long gap;
+    static INT32 gap;
 
     if ((request = u.count) == 0)
         return (0);
@@ -97,16 +98,17 @@ iread(ip, dev)
  * Write a file from its inode. See iread comments above.
  * Used for system write calls, pipes, and directories.
  */
+INT16
 iwrite(ip, dev)
     register struct inode *ip;
-    int dev;
+    INT16 dev;
 {
-    int request;
+    INT16 request;
     UINT8 pipe;
-    UINT log, phys;
-    register int into, nbytes;
-    static int type;
-    static UINT dummy;
+    UINT16 log, phys;
+    register INT16 into, nbytes;
+    static INT16 type;
+    static UINT16 dummy;
     struct buf *bp;
 
     if ((request = u.count) == 0)
@@ -159,8 +161,8 @@ iwrite(ip, dev)
 void
 iomove(flag, buf, count)
     UINT8 flag;
-    register char *buf;
-    register int count;
+    register UINT8 *buf;
+    register INT16 count;
 {
     u.count -= count;
     u.offset += count;
@@ -184,12 +186,13 @@ iomove(flag, buf, count)
  * Assumes that u.offset and u.segflg
  * have been set elsewhere.
  */
+INT16
 nwrite(ip, base, count)
     struct inode *ip;
-    char *base;
-    UINT count;
+    UINT8 *base;
+    UINT16 count;
 {
-    int dev;
+    INT16 dev;
 
     dev = (ip->i_mode & IIO) ? ip->i_addr[0] : ip->i_dev;
     u.base = base;
@@ -203,12 +206,13 @@ nwrite(ip, base, count)
  * Assumes that u.offset and u.segflg
  * have been set elsewhere.
  */
+INT16
 nread(ip, base, count)
     struct inode *ip;
-    char *base;
-    UINT count;
+    UINT8 *base;
+    UINT16 count;
 {
-    int dev;
+    INT16 dev;
 
     dev = (ip->i_mode & IIO) ? ip->i_addr[0] : ip->i_dev;
     u.base = base;

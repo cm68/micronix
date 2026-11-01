@@ -20,11 +20,11 @@
 #include <sys/ovl.h>
 #include <sys/proc.h>
 extern void timeout();
-extern char intrset();
+extern INT8 intrset();
 
-extern UINT nbdev, ncdev;
+extern UINT16 nbdev, ncdev;
 extern UINT8 map0[];
-extern unsigned bmajor(), cmajor();
+extern UINT16 bmajor(), cmajor();
 extern void nodev(), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
@@ -35,8 +35,8 @@ extern void nodev(), noioctl();
  * rows in unrelated tables, and each module page is registered only in
  * the space its header names.
  */
-UINT bdevseg[NBDEV];			/* block major -> segment, 0 = none */
-UINT cdevseg[NCDEV];			/* char major -> segment, 0 = none */
+UINT16 bdevseg[NBDEV];			/* block major -> segment, 0 = none */
+UINT16 cdevseg[NCDEV];			/* char major -> segment, 0 = none */
 struct biovec ovlbvec[OVLMAJ];	/* entries its init() registered */
 static struct ciovec ovlcvec[OVLMAJ];
 
@@ -47,11 +47,11 @@ static struct ciovec ovlcvec[OVLMAJ];
  */
 #define	NTICK	12
 static struct tickrec {
-    int (*fn) ();
+    INT16 (*fn) ();
     UINT8 seg;          /* a segment number: 0..15 */
 } ovlticks[NTICK];
-static UINT novltick;
-static char ovltickarmed = 0;		/* the resident tick is running */
+static UINT16 novltick;
+static UINT8 ovltickarmed = 0;		/* the resident tick is running */
 
 /*
  * The DMA bus lock's words (sys/bus.c): the module driving the bus, and
@@ -67,10 +67,10 @@ static char ovltickarmed = 0;		/* the resident tick is running */
  * process had registered - a transfer that never started and never
  * completed, with nothing left to notice.
  */
-int (*busmaster) ();		/* module driving the bus, 0 = none */
-UINT busmasterseg = 0;		/* the segment busmaster lives in */
-int (*busheir) ();		/* module waiting for it, 0 = none */
-UINT busheirseg = 0;		/* the segment busheir lives in */
+INT16 (*busmaster) ();		/* module driving the bus, 0 = none */
+UINT16 busmasterseg = 0;		/* the segment busmaster lives in */
+INT16 (*busheir) ();		/* module waiting for it, 0 = none */
+UINT16 busheirseg = 0;		/* the segment busheir lives in */
 
 /*
  * Call something that lives in a module: put its page in place for the
@@ -97,10 +97,10 @@ UINT busheirseg = 0;		/* the segment busheir lives in */
  * really in.  The caller's goes back with its page, so a driver that
  * returns from here and sleeps later in its own code is still right.
  */
-unsigned char
+UINT8
 ovlcall(fn, seg)
-    int (*fn) ();
-    UINT seg;
+    INT16 (*fn) ();
+    UINT16 seg;
 {
     UINT8 drv;
 
@@ -130,13 +130,14 @@ ovlcall(fn, seg)
  * ovlcall with one argument, for the probe: the mode that clears the
  * card's interrupt or raises it (PROBE_CLEAR / PROBE_TICKLE in ovl.h).
  */
+INT16
 ovlcall1(fn, seg, arg)
-    int (*fn) ();
-    UINT seg;
-    int arg;
+    INT16 (*fn) ();
+    UINT16 seg;
+    INT16 arg;
 {
     UINT8 drv;
-    int r;
+    INT16 r;
 
     if (seg == 0)
         return ((*fn) (arg));
@@ -155,9 +156,9 @@ ovlcall1(fn, seg, arg)
  * the current segment is u.drv.  Zero is resident code - nothing to map.
  */
 static
-unsigned char
+UINT8
 ovlmapseg(seg)
-    UINT seg;
+    UINT16 seg;
 {
     if (seg == 0)
         return (0);
@@ -174,7 +175,7 @@ ovlmapseg(seg)
  */
 struct ovlhdr *
 ovlbmap(maj)
-    UINT maj;
+    UINT16 maj;
 {
     if (maj >= NBDEV || bdevseg[maj] == 0)
         return (0);
@@ -184,7 +185,7 @@ ovlbmap(maj)
 
 struct ovlhdr *
 ovlcmap(maj)
-    UINT maj;
+    UINT16 maj;
 {
     if (maj >= NCDEV || cdevseg[maj] == 0)
         return (0);
@@ -234,23 +235,23 @@ ovlremap()
  * second data object wants it inside this structure, not beside it -
  * there is no second way to name one.
  */
-char *
+UINT8 *
 ovldata(maj)
-    UINT maj;
+    UINT16 maj;
 {
     struct ovlhdr *hdr;
 
     if ((hdr = ovlbmap(maj)) == 0)
         hdr = ovlcmap(maj);
-    return (hdr ? hdr->data : (char *) 0);
+    return (hdr ? hdr->data : (UINT8 *) 0);
 }
 
 /*
  * The character trampolines, the same shape against ciosw[] (sys/cio.c).
  */
-int
+INT16
 ovlcopen(dev, mode)
-    UINT dev;
+    UINT16 dev;
     UINT8 mode;
 {
     UINT8 maj;
@@ -264,9 +265,9 @@ ovlcopen(dev, mode)
     return ((*ovlcvec[maj].open) (dev, mode));
 }
 
-int
+INT16
 ovlcclose(dev, mode)
-    UINT dev;
+    UINT16 dev;
     UINT8 mode;
 {
     UINT8 maj;
@@ -280,9 +281,9 @@ ovlcclose(dev, mode)
     return ((*ovlcvec[maj].close) (dev, mode));
 }
 
-int
+INT16
 ovlcread(dev)
-    UINT dev;
+    UINT16 dev;
 {
     UINT8 maj;
 
@@ -295,9 +296,9 @@ ovlcread(dev)
     return ((*ovlcvec[maj].read) (dev));
 }
 
-int
+INT16
 ovlcwrite(dev)
-    UINT dev;
+    UINT16 dev;
 {
     UINT8 maj;
 
@@ -310,11 +311,11 @@ ovlcwrite(dev)
     return ((*ovlcvec[maj].write) (dev));
 }
 
-int
+INT16
 ovlcioctl(dev, cmd, arg)
-    UINT dev;
-    int cmd;
-    char *arg;
+    UINT16 dev;
+    INT16 cmd;
+    UINT8 *arg;
 {
     UINT8 maj;
 
@@ -337,13 +338,13 @@ ovlcioctl(dev, cmd, arg)
  * has.
  */
 static
-char
+INT8
 bvecset(maj, open, close, strat, ioctl)
-    UINT maj;
-    int (*open) ();
-    int (*close) ();
-    int (*strat) ();
-    int (*ioctl) ();
+    UINT16 maj;
+    INT16 (*open) ();
+    INT16 (*close) ();
+    INT16 (*strat) ();
+    INT16 (*ioctl) ();
 {
     if (maj == 0 || maj >= nbdev || maj >= OVLMAJ)
         return (-1);
@@ -355,14 +356,14 @@ bvecset(maj, open, close, strat, ioctl)
 }
 
 static
-char
+INT8
 cvecset(maj, open, close, read, write, ioc)
-    UINT maj;
-    int (*open) ();
-    int (*close) ();
-    int (*read) ();
-    int (*write) ();
-    int (*ioc) ();
+    UINT16 maj;
+    INT16 (*open) ();
+    INT16 (*close) ();
+    INT16 (*read) ();
+    INT16 (*write) ();
+    INT16 (*ioc) ();
 {
     if (maj == 0 || maj >= ncdev || maj >= OVLMAJ)
         return (-1);
@@ -399,7 +400,7 @@ static
 void
 ovltick()
 {
-    register UINT i;
+    register UINT16 i;
 
     for (i = 0; i < novltick; i++)
         ovlcall(ovlticks[i].fn, ovlticks[i].seg);
@@ -413,7 +414,7 @@ ovltick()
  * driver running has no timer of its own in tlist[] at all.
  */
 static
-unsigned char
+UINT8
 ovlarm()
 {
     if (ovltickarmed)
@@ -429,10 +430,10 @@ ovlarm()
  * Zero withdraws the request.
  */
 static
-char
+INT8
 tickset(fn, seg)
-    int (*fn) ();
-    UINT seg;
+    INT16 (*fn) ();
+    UINT16 seg;
 {
     if (fn == 0)
         return (0);
@@ -464,13 +465,13 @@ tickset(fn, seg)
  * cost of the page and nothing else.
  */
 static
-char
+INT8
 ovlplace(hdr, seg)
     struct ovlhdr *hdr;
-    UINT seg;
+    UINT16 seg;
 {
     UINT8 bmaj, cmaj;
-    int (*init) (), (*tick) (), (*probe) (), (*intr) ();
+    INT16 (*init) (), (*tick) (), (*probe) (), (*intr) ();
     struct biovec bv;
     struct ciovec cv;
 
@@ -534,9 +535,9 @@ ovlplace(hdr, seg)
  * at OVLBASE by definition, so a pointer to one says only which page is
  * mapped at the moment, which is not necessarily the page being placed.
  */
-char
+INT8
 ovlattach(seg)
-    UINT seg;
+    UINT16 seg;
 {
     ovlmapseg(seg);             /* u.drv too: an interrupt may cut in */
     return (ovlplace((struct ovlhdr *) OVLBASE, seg));
@@ -571,7 +572,7 @@ ovlattach(seg)
  * bring-up already holds, so the driver's hardware setup happens exactly
  * where it used to.
  */
-int
+INT16
 ovlstart()
 {
     return (ovlattach(OVLSEG));

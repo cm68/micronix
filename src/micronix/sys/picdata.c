@@ -18,16 +18,16 @@ UINT8 lineir[MAXNOVLINE];
 UINT8 npics, nlines;
 
 /* the clock and RTC, chosen by the same probe (sys/pic_init.c) */
-int (*clockinit)();
-int (*rtcinit)();
-int (*rtcwrite)();
+INT16 (*clockinit)();
+INT16 (*rtcinit)();
+INT16 (*rtcwrite)();
 
 /* the console, chosen by the same probe */
-int (*console_putc)();
-int (*console_start)();
-int (*console_stop)();
-int (*console_set)();
-int (*console_minit)();
+INT16 (*console_putc)();
+INT16 (*console_start)();
+INT16 (*console_stop)();
+INT16 (*console_set)();
+INT16 (*console_minit)();
 
 /*
  * The board it was found on: TTY_SS1 or TTY_ACE0, what minor 0 aliases.
@@ -35,7 +35,7 @@ int (*console_minit)();
  * initialized cell in this object's data moves picdata.o out of the
  * linker's address order.
  */
-UINT console_minor;
+UINT16 console_minor;
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

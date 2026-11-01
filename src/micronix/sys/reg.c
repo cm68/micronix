@@ -23,9 +23,9 @@
 #include <errno.h>
 extern void pipe();
 
-extern long seconds;
+extern INT32 seconds;
 
-extern int arg[];               /* in-line arguments from system() */
+extern INT16 arg[];               /* in-line arguments from system() */
 
 /*
  * The return type has to be said, and this is the only caller that
@@ -33,11 +33,11 @@ extern int arg[];               /* in-line arguments from system() */
  * would be read out of HL alone and everything above 64K - the whole
  * reason r_seek hands back two words - would arrive as its low half.
  */
-extern UINT32 seek(UINT8 fd, UINT disp, unsigned from);
-extern char ftruncate(UINT8 fd, UINT32 length);
+extern UINT32 seek(UINT8 fd, UINT16 disp, UINT8 from);
+extern INT8 ftruncate(UINT8 fd, UINT32 length);
 extern void close(UINT8);
-extern char cioctl(UINT8, int, char *);
-extern char bioctl(UINT8, UINT, char *);
+extern INT8 cioctl(UINT8, INT16, UINT8 *);
+extern INT8 bioctl(UINT8, UINT16, UINT8 *);
 
 /*
  * First, pass registers across the system interface
@@ -62,7 +62,7 @@ r_close()
 void
 r_fork()
 {
-    int id;
+    INT16 id;
 
     id = fork();
     if (id != 0)                /* no reg changes in child */
@@ -110,7 +110,7 @@ r_ioctl()
 void
 r_pipe()
 {
-    int vec[2];
+    INT16 vec[2];
 
     pipe(vec);
     u.hl = vec[0];
@@ -143,8 +143,8 @@ r_seek()
         u.hl = u.error;
     } else {
         u.af &= ~ERRBIT;
-        u.hl = ((UINT *) &off)[1];
-        u.hl2 = ((UINT *) &off)[0];
+        u.hl = ((UINT16 *) &off)[1];
+        u.hl2 = ((UINT16 *) &off)[0];
     }
 }
 
@@ -154,7 +154,7 @@ r_ftruncate()
     UINT32 length;
 
     {
-        union { UINT32 l; UINT w[2]; } t;
+        union { UINT32 l; UINT16 w[2]; } t;
 
         t.w[0] = arg[1];
         t.w[1] = arg[0];
@@ -173,8 +173,8 @@ r_ftruncate()
 void
 r_time()
 {
-    u.de = ((UINT *) &seconds)[1];
-    u.hl = ((UINT *) &seconds)[0];
+    u.de = ((UINT16 *) &seconds)[1];
+    u.hl = ((UINT16 *) &seconds)[0];
 }
 
 /*

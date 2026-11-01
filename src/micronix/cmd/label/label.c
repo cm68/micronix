@@ -579,7 +579,7 @@ inquire()
 		r.len = 7;
 		r.count = 512;
 		r.flags = CDB_IN;
-		r.buf = (char *) idbuf;
+		r.buf = (UINT8 *) idbuf;
 		r.hole = -1;
 		if (ioctl(devfd, CDBCMD, &r) < 0)
 			die("identify device failed");
@@ -601,7 +601,7 @@ inquire()
 		r.len = 10;
 		r.count = 8;
 		r.flags = CDB_IN;
-		r.buf = (char *) capbuf;
+		r.buf = (UINT8 *) capbuf;
 		r.hole = -1;
 		if (ioctl(devfd, CDBCMD, &r) < 0)
 			die("read capacity failed");

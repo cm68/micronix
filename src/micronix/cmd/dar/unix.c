@@ -99,7 +99,7 @@ sio (a, b, c)
 
 	req.count = d->bps;
 	req.flags = (c == READ) ? CDB_IN : 0;
-	req.buf = b;
+	req.buf = (UINT8 *) b;
 
 /*
  * The transfer's own answer is in the block that comes back, at the end of
@@ -370,7 +370,7 @@ devsize (a)
 	req.hole = 1;		/* the address is the MEMREAD operand */
 	req.count = DJROWSZ;	/* the whole row */
 	req.flags = CDB_IN;
-	req.buf = (char *) row;
+	req.buf = (UINT8 *) row;
 
 	req.cmd[0] = MEMREAD;
 	req.cmd[1] = req.cmd[2] = req.cmd[3] = 0;

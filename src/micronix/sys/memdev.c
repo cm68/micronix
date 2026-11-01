@@ -47,7 +47,7 @@ static void iorw();
 #define LOWROM	0x800			/* monitor EPROM */
 #define LOWTOP	0x1000			/* rest of the page is on board */
 
-#define K4(x)	(4096 - ((UINT)(x) & 4095))
+#define K4(x)	(4096 - ((UINT16)(x) & 4095))
 
 /*
  * The size of a Morrow MPZ80 memory map address segment.
@@ -64,7 +64,7 @@ static void iorw();
 
 void
 memread(dev)
-    int dev;
+    INT16 dev;
 {
     if (dev & 0x100)            /* major 3: the ports */
         iorw(dev, READ);
@@ -74,7 +74,7 @@ memread(dev)
 
 void
 memwrite(dev)
-    int dev;
+    INT16 dev;
 {
     if (dev & 0x100)            /* major 3: the ports */
         iorw(dev, WRITE);
@@ -101,18 +101,19 @@ memwrite(dev)
  * through them rather than stop at them.
  */
 
-extern char zpage[];            /* exec.c: a 512-byte zero page */
-extern void iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
+extern UINT8 zpage[];            /* exec.c: a 512-byte zero page */
+extern void iomove(UINT8, UINT8 *, INT16);	/* fio.c: flag is a byte */
 
 static
 void
 krw(dev, rw)
     UINT8 rw;
+    INT16 dev;
 {
-    UINT n, off;
+    UINT16 n, off;
 
     if ((UINT8) dev & 1) {      /* minor 1: kernel space, low bit */
-        off = (UINT) u.offset;
+        off = (UINT16) u.offset;
         n = off + u.count;      /* below off: the transfer wraps at 64K */
         if (n < off || (off < LOWTOP && n > (off & LOWROM) + LOWREG)) {
             if (rw == READ)
@@ -122,7 +123,7 @@ krw(dev, rw)
             u.count = 0;
             return;
         }
-        iomove(rw, (char *) off, u.count);
+        iomove(rw, (UINT8 *) off, u.count);
     }
 
     else {                      /* outer space */
@@ -154,7 +155,7 @@ struct ciovec memcvec = {
 static
 void
 iorw(dev, rw)
-    int dev;
+    INT16 dev;
     UINT8 rw;
 {
     UINT8 port;

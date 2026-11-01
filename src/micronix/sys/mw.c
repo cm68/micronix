@@ -33,9 +33,9 @@ extern void rwcmd();
 extern void panic();
 extern void wakeup();
 extern void sleep();
-extern unsigned char dlslice();
-extern unsigned char busgive();
-extern unsigned char busget();
+extern UINT8 dlslice();
+extern UINT8 busgive();
+extern UINT8 busget();
 
 /*
  * Declared before anything calls it: an undeclared call is extern int
@@ -61,22 +61,22 @@ static void mwlink();
  */
 struct info
 {
-    UINT tracks;                /* number of tracks per surface */
+    UINT16 tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* number of sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
 
     UINT8 step;                 /* step pulse delay, 100 us */
     UINT8 seek;                 /* head settle after seek, 100 us */
-    UINT precomp;               /* track where precomp begins */
-    UINT lowcur;                /* track where low current begins */
+    UINT16 precomp;               /* track where precomp begins */
+    UINT16 lowcur;                /* track where low current begins */
 
-    UINT curtrk;                /* current track */
+    UINT16 curtrk;                /* current track */
     UINT8 flags;                /* see below */
 
     /*
@@ -102,14 +102,14 @@ struct info
 struct
 {
     UINT8 seksel;               /* out<<4 | drv */
-    UINT steps;                 /* number of steps */
+    UINT16 steps;                 /* number of steps */
     UINT8 hedsel;               /* pcmp<<7 | hicur<<6 | (~head&7)<<2 | drv */
-    UINT dma;                   /* dma address */
+    UINT16 dma;                   /* dma address */
     UINT8 xdma;                 /* high byte of 24-bit address */
 
     union
     {
-        UINT word;
+        UINT16 word;
         struct
         {
             UINT8 low;
@@ -123,11 +123,11 @@ struct
 
     UINT8 op;                   /* op code */
     UINT8 stat;                 /* completion status */
-    UINT link;                  /* address of next command */
+    UINT16 link;                  /* address of next command */
     UINT8 xlink;                /* high byte of address */
 
-    UINT count;                 /* number of bytes to transfer */
-    UINT blk;                   /* block no. */
+    UINT16 count;                 /* number of bytes to transfer */
+    UINT16 blk;                   /* block no. */
 } cmd = 0;
 
 /*
@@ -200,8 +200,9 @@ static UINT8 retry = 0,         /* number of retries so far */
  * which knows nothing about this controller; what is here is the handling
  * of a disk that has no label.
  */
+INT16
 mwopen(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     UINT8 drive, sl;
@@ -305,7 +306,7 @@ mwopen(dev, mode)
  */
 void
 mwclose(dev)
-    int dev;
+    INT16 dev;
 {
     struct info *info;
     struct buf *b;
@@ -338,7 +339,7 @@ mwstrat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &mws[b->dev & 3];
 
@@ -558,8 +559,8 @@ newrw()
 void
 rwcmd()
 {
-    static UINT track, head, sector;
-    static UINT csec, nsecs, curtrk;
+    static UINT16 track, head, sector;
+    static UINT16 csec, nsecs, curtrk;
 
     csec = cmd.blk % mwinfo->spc;
     nsecs = mwinfo->sectors;
@@ -611,10 +612,11 @@ rwcmd()
  * could not be one.  The slice terms are passed in because mwstrat
  * resolves them from the buffer's minor against the cached table.
  */
+INT16
 mwcyl(blk, spc, off, roll, len)
-    UINT blk, spc, off, roll, len;
+    UINT16 blk, spc, off, roll, len;
 {
-    UINT cyl;
+    UINT16 cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -666,11 +668,11 @@ error()
  * set again after every raw command block, because the caller's bytes
  * arrive over it (mwioctl).
  */
-static UINT mwseg = 0;          /* the page we were placed in, 0 = resident */
+static UINT16 mwseg = 0;          /* the page we were placed in, 0 = resident */
 static UINT32 mwphys = 0;       /* where cmd really is: (seg << 12) | offset */
 
 mwinit(seg)
-    UINT seg;
+    UINT16 seg;
 {
     mwseg = seg;
     mwlink();
@@ -683,16 +685,16 @@ mwinit(seg)
 void
 reset()
 {
-    extern char map0[];
-    int *ichan;
+    extern UINT8 map0[];
+    INT16 *ichan;
 
     mwlink();                   /* where cmd is, and the block's own chain */
 
     ichan = 0x1050;
     di();
     map0[2] = 0;
-    ichan[0] = (UINT) mwphys;           /* the channel command address, */
-    ichan[1] = ((UINT *) &mwphys)[0];   /* three bytes at physical 0x50 */
+    ichan[0] = (UINT16) mwphys;           /* the channel command address, */
+    ichan[1] = ((UINT16 *) &mwphys)[0];   /* three bytes at physical 0x50 */
     map0[2] = 1;
 
     /*
@@ -898,27 +900,27 @@ static
 void
 mwlink()
 {
-    char *cp;
+    UINT8 *cp;
 
-    cp = (char *) &cmd;
+    cp = (UINT8 *) &cmd;
     if (mwseg)
-        mwphys = ((UINT32) mwseg << 12) | ((unsigned) cp & 0xfff);
+        mwphys = ((UINT32) mwseg << 12) | ((UINT16) cp & 0xfff);
     else
-        mwphys = (unsigned) cp;
-    cmd.link = (UINT) mwphys;
+        mwphys = (UINT16) cp;
+    cmd.link = (UINT16) mwphys;
     cmd.xlink = ((UINT8 *) &mwphys)[0];
 }
 
-int
+INT16
 mwioctl(dev, com, r, b)
-    UINT dev, com;
+    UINT16 dev, com;
     register struct cdb *r;
     register struct buf *b;
 {
     static struct info *info;
-    static char *p;
-    static UINT i;
-    static int hole;
+    static UINT8 *p;
+    static UINT16 i;
+    static INT16 hole;
 
     /*
      * A block is twelve bytes or it is not a block: those are all the
@@ -971,7 +973,7 @@ mwioctl(dev, com, r, b)
     mwinfo = info;
 
     for (i = 0; i < MWLEN; i++)
-        ((char *) &cmd)[i] = r->cmd[i];
+        ((UINT8 *) &cmd)[i] = r->cmd[i];
     mwlink();
 
     if (r->count) {
@@ -984,9 +986,9 @@ mwioctl(dev, com, r, b)
          * 16-bit unsigned, and the segment is the top eight bits.
          */
         p = bhold(b);
-        ((char *) &cmd)[hole] = (unsigned) p;
-        ((char *) &cmd)[hole + 1] = (UINT8) ((unsigned) p >> 8);
-        ((char *) &cmd)[hole + 2] = b->xmem;
+        ((UINT8 *) &cmd)[hole] = (UINT16) p;
+        ((UINT8 *) &cmd)[hole + 1] = (UINT8) ((UINT16) p >> 8);
+        ((UINT8 *) &cmd)[hole + 2] = b->xmem;
     }
 
     mwwait();
@@ -1055,10 +1057,11 @@ struct biovec mwbvec = { &mwopen, &mwclose, &mwstrat, &mwioctl };
  */
 #define PROBEWAIT 10000
 
+INT16
 mwprobe(mode)
-	int mode;
+	INT16 mode;
 {
-    register int n;
+    register INT16 n;
 
     if (mode == PROBE_CLEAR) {
         out(RESET, 0);              /* the reset releases the line */

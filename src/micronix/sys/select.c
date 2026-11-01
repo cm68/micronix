@@ -58,15 +58,15 @@
 #include <sys/pty.h>
 #include <sys/net.h>
 #include <errno.h>
-extern unsigned char inton();
+extern UINT8 inton();
 
 extern void sleep(), wakeup();
-extern int in();
-extern unsigned char inton();
+extern INT16 in();
+extern UINT8 inton();
 extern struct tty mttys[];
 extern struct tty *ptyslave[], *ptymaster[];
-extern UINT console_minor;
-extern UINT netline;            /* the card's interrupt line, sys/netint.c */
+extern UINT16 console_minor;
+extern UINT16 netline;            /* the card's interrupt line, sys/netint.c */
 extern UINT8 netready[];        /* per socket: something to ask for */
 
 /*
@@ -74,7 +74,7 @@ extern UINT8 netready[];        /* per socket: something to ask for */
  * copy of the u page, and the drivers that wake it live in modules, so
  * the address has to be one the whole machine shares.
  */
-int selectchan;
+INT16 selectchan;
 
 /*
  * A tty with something to read.  The queue counts are read without
@@ -83,6 +83,7 @@ int selectchan;
  * the store that counted.
  */
 static
+INT16
 ttyready(t)
     register struct tty *t;
 {
@@ -103,10 +104,11 @@ ttyready(t)
  * rather than through a driver's page.
  */
 static
+INT16
 devready(dev)
-    int dev;
+    INT16 dev;
 {
-    register int m;
+    register INT16 m;
 
     if (major(dev) == 1) {
         m = minor(dev) & 15;
@@ -140,11 +142,11 @@ devready(dev)
 void
 select()
 {
-    register UINT mask, bit, r;
+    register UINT16 mask, bit, r;
     register UINT8 fd;
     register struct file *fp;
-    UINT netwanted;
-    int dev, m;
+    UINT16 netwanted;
+    INT16 dev, m;
 
     mask = u.hl;
     for (;;) {

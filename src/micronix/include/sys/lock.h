@@ -20,7 +20,7 @@
 struct lock {
     struct file *file;          /* file/user identity */
     UINT32 offset;              /* location of region */
-    UINT size;                  /* size of region */
+    UINT16 size;                  /* size of region */
 } llist[];
 
 /*

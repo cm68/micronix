@@ -36,9 +36,9 @@
 #include <sys/disk1.h>
 #include <sys/ovl.h>
 
-extern int disk1open(), disk1ioctl();
+extern INT16 disk1open(), disk1ioctl();
 extern void disk1close(), disk1strat();
-extern int disk1probe(), disk1int(), disk1check();
+extern INT16 disk1probe(), disk1int(), disk1check();
 extern struct biovec disk1bvec;
 
 struct ovlhdr disk1hdr = { 9, 0, &disk1check, 0, &disk1bvec, 0,

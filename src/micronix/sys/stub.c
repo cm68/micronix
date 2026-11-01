@@ -40,19 +40,20 @@ extern void iodone();
  * one pointer (ovldata, sys/ovl.h).  Empty for now.
  */
 struct stub {
-    int open;                   /* something has opened the device */
-    int busy;                   /* a request is in flight */
-    int done;                   /* the interrupt said it is done */
+    INT16 open;                   /* something has opened the device */
+    INT16 busy;                   /* a request is in flight */
+    INT16 done;                   /* the interrupt said it is done */
 };
 
 /*
  * The interrupt handler, in stub_intr.c.
  */
-extern int stubint();
+extern INT16 stubint();
 
+INT16
 stubopen(dev, mode)
-    int dev;
-    int mode;
+    INT16 dev;
+    INT16 mode;
 {
     /*
      * open(dev, mode): something has named this device - a mount, or an
@@ -62,8 +63,9 @@ stubopen(dev, mode)
     return (0);
 }
 
+INT16
 stubclose(dev)
-    int dev;
+    INT16 dev;
 {
     /*
      * close(dev): the last user is gone.  Release the hardware and undo
@@ -72,6 +74,7 @@ stubclose(dev)
     return (0);
 }
 
+INT16
 stubstrat(b)
     register struct buf *b;
 {
@@ -99,10 +102,11 @@ stubstrat(b)
     iodone(b);
 }
 
+INT16
 stubioctl(dev, cmd, r, b)
-    int dev;
-    int cmd;
-    int r;
+    INT16 dev;
+    INT16 cmd;
+    INT16 r;
     struct buf *b;
 {
     /*
@@ -114,6 +118,7 @@ stubioctl(dev, cmd, r, b)
     return (ENOTTY);
 }
 
+INT16
 stubtick()
 {
     /*
@@ -132,8 +137,9 @@ stubtick()
  * machine, in which case the major keeps answering as nodev.  ncrinit.c
  * is the presence-probe example.
  */
+INT16
 stubinit(seg)
-    UINT seg;
+    UINT16 seg;
 {
     return (0);
 }

@@ -48,18 +48,18 @@ extern void d1dma();
 extern void advque();
 extern void wakeup();
 extern void sleep();
-extern unsigned char dlslice();
-extern unsigned char busgive();
-extern unsigned char busget();
+extern UINT8 dlslice();
+extern UINT8 busgive();
+extern UINT8 busget();
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definition says static.
  */
 static void d1error(), d1seek(), d1cmd(), d1sel(), d1motor(), d1specify();
-static UINT d1res();
+static UINT16 d1res();
 
 #define NDRIVES 8               /* two banks of four */
 #define RETRIES 10              /* no. of retries on r/w error */
@@ -81,17 +81,17 @@ static UINT d1res();
  */
 struct info
 {
-    UINT tracks;                /* number of tracks per surface */
+    UINT16 tracks;                /* number of tracks per surface */
     UINT8 heads;                /* number of heads */
     UINT8 sectors;              /* number of sectors per track */
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* number of sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* number of sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
 
-    UINT curtrk;                /* where the driver thinks the head is */
+    UINT16 curtrk;                /* where the driver thinks the head is */
     UINT8 flags;                /* see below */
 
     /* the slice map off the label, cached at open */
@@ -139,8 +139,9 @@ static UINT8 retry = 0,         /* number of retries so far */
  * by its label and by nothing else, so the label is read once per drive
  * and its geometry and slice table cached.
  */
+INT16
 disk1open(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     UINT8 drive, sl;
@@ -197,7 +198,7 @@ disk1open(dev, mode)
  */
 void
 disk1close(dev)
-    int dev;
+    INT16 dev;
 {
     disk1s[dev & 7].flags &= ~OPEN;
 }
@@ -210,7 +211,7 @@ disk1strat(b)
     register struct buf *b;
 {
     register struct info *info;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &disk1s[b->dev & 7];
 
@@ -317,7 +318,7 @@ newdrv()
 void
 newrw()
 {
-    static UINT spc, csec, head, sect;
+    static UINT16 spc, csec, head, sect;
 
     spc = d1info->spc;
     csec = d1buf->blk % spc;
@@ -337,7 +338,7 @@ newrw()
  */
 static void
 d1seek(cyl, head)
-    UINT cyl, head;
+    UINT16 cyl, head;
 {
     d1fault = 0;
     di();
@@ -369,7 +370,7 @@ d1seek(cyl, head)
  */
 static void
 d1cmd(head, sect)
-    UINT head, sect;
+    UINT16 head, sect;
 {
     d1fault = 0;
     d1dma();
@@ -410,7 +411,7 @@ d1dma()
 {
     UINT32 a;
 
-    a = ((UINT32) d1buf->xmem << 12) | ((unsigned) d1buf->data & 0xfff);
+    a = ((UINT32) d1buf->xmem << 12) | ((UINT16) d1buf->data & 0xfff);
     out(D1_DMA, (UINT8) (a >> 16));
     out(D1_DMA, (UINT8) (a >> 8));
     out(D1_DMA, (UINT8) a);
@@ -420,10 +421,11 @@ d1dma()
  * Interrupt service begins here.  The chip has one interrupt and the
  * state says which of the two things it is.
  */
+INT16
 disk1int()
 {
     static UINT8 st0, st1, st2, c, h, r, n;
-    static int i;
+    static INT16 i;
 
     if (d1state == SEEKING) {
         /*
@@ -506,10 +508,11 @@ advque()
  * other disk drivers use, because the disk and the label are the same
  * even when the controller is not.
  */
+INT16
 d1cyl(blk, spc, off, roll, len)
-    UINT blk, spc, off, roll, len;
+    UINT16 blk, spc, off, roll, len;
 {
-    UINT cyl;
+    UINT16 cyl;
 
     cyl = blk / spc + roll;
     if (cyl >= len)
@@ -539,7 +542,7 @@ d1error()
 static void
 d1sel()
 {
-    static UINT bank, five;
+    static UINT16 bank, five;
 
     five = (curdrv >= 4);
     out(D1_DSEL, (five ? D1_FIVE : 0)
@@ -584,7 +587,7 @@ d1specify()
  */
 static void
 d1motor(drive)
-    UINT drive;
+    UINT16 drive;
 {
     if (drive >= 4)
         out(D1_MOTOR, D1_BOOTOFF | D1_M3);
@@ -602,9 +605,9 @@ d1motor(drive)
  */
 void
 d1putb(c)
-    UINT c;
+    UINT16 c;
 {
-    static int i;
+    static INT16 i;
 
     for (i = 0; i < D1SPIN; i++)
         if (in(D1_MSR) & D1_RQM)
@@ -621,9 +624,10 @@ d1putb(c)
  * are both set, which is the main status register's way of saying the
  * register holds a result rather than a command parameter.
  */
+INT16
 d1getb()
 {
-    static int i;
+    static INT16 i;
 
     for (i = 0; i < D1SPIN; i++)
         if ((in(D1_MSR) & (D1_RQM | D1_DIO)) == (D1_RQM | D1_DIO))
@@ -641,9 +645,9 @@ d1getb()
  * in, and reading a result that is not there reads the next command's
  * first byte instead, so the length is looked up and not assumed.
  */
-static UINT
+static UINT16
 d1res(op)
-    UINT op;
+    UINT16 op;
 {
     switch (op & 0x1f) {
     case FDC_READTRK:
@@ -668,7 +672,7 @@ d1res(op)
  * never does is a fault, and the caller is told so rather than left
  * spinning.
  */
-static unsigned char
+static UINT8
 d1wait()
 {
     static UINT32 i;
@@ -721,16 +725,16 @@ d1busplease()
  * the one address: a caller's buffer is a virtual address and the board
  * follows a physical one.
  */
-int
+INT16
 disk1ioctl(dev, com, r, b)
-    UINT dev, com;
+    UINT16 dev, com;
     register struct cdb *r;
     register struct buf *b;
 {
     static UINT8 res[7];
-    static char *p;
+    static UINT8 *p;
     UINT32 a;
-    static UINT i, n, op, hole;
+    static UINT16 i, n, op, hole;
     struct info *info;
 
     if (com != CDBCMD || r->len < 1 || r->len > CDBMAX) {
@@ -785,7 +789,7 @@ disk1ioctl(dev, com, r, b)
 
     if (r->count) {
         p = bhold(b);
-        a = ((UINT32) b->xmem << 12) | ((unsigned) p & 0xfff);
+        a = ((UINT32) b->xmem << 12) | ((UINT16) p & 0xfff);
         out(D1_DMA, (UINT8) (a >> 16));
         out(D1_DMA, (UINT8) (a >> 8));
         out(D1_DMA, (UINT8) a);
@@ -841,6 +845,7 @@ disk1ioctl(dev, com, r, b)
  * and letting the next one re-SPECIFY the chip and recalibrate the
  * drive, which is as much of a reset as the board offers.
  */
+INT16
 disk1check()
 {
     di();
@@ -871,6 +876,7 @@ struct biovec disk1bvec = { &disk1open, &disk1close, &disk1strat,
  * attach reads out of the PIC.  The pending interrupt is left standing;
  * the first request's SENSE INTERRUPT STATUS clears it.
  */
+INT16
 disk1probe()
 {
     out(D1_DSEL, 0);            /* the 8 inch bank */

@@ -13,12 +13,12 @@
  *      field names and defines now match
  */
 struct super {
-    UINT s_isize;               /* number of inode blocks */
-    UINT s_fsize;               /* largest file block + 1 */
-    UINT s_nfree;               /* number of free blocks in free[] */
-    UINT s_free[100];           /* the free block list */
-    UINT s_ninode;              /* number of free inumbers in inode[] */
-    UINT s_inode[100];          /* the free inode list */
+    UINT16 s_isize;               /* number of inode blocks */
+    UINT16 s_fsize;               /* largest file block + 1 */
+    UINT16 s_nfree;               /* number of free blocks in free[] */
+    UINT16 s_free[100];           /* the free block list */
+    UINT16 s_ninode;              /* number of free inumbers in inode[] */
+    UINT16 s_inode[100];          /* the free inode list */
 
     UINT8 s_flock;              /* mounted read only */
     UINT8 s_ilock;
@@ -39,8 +39,8 @@ struct super {
 
     UINT32 s_time;              /* last umount time */
     UINT32 s_magic;             /* filesystem signature */
-    UINT s_bfree;               /* total free blocks */
-    UINT s_ifree;               /* total free inodes */
+    UINT16 s_bfree;               /* total free blocks */
+    UINT16 s_ifree;               /* total free inodes */
 
     /*
      * The mount point the filesystem was last mounted on, a null
@@ -49,7 +49,7 @@ struct super {
      * sees a dirty superblock.  A char is a byte in every build, so this
      * needs no host/guest alignment dance.
      */
-    char s_mount[64];           /* the last mount point */
+    UINT8 s_mount[64];           /* the last mount point */
 };
 
 /*
@@ -79,13 +79,13 @@ struct super {
  * the included structure.
  */
 struct dsknod {
-    UINT d_mode;                /* what kind of inode */
+    UINT16 d_mode;                /* what kind of inode */
     UINT8 d_nlink;              /* link count */
     UINT8 d_uid;                /* user id of owner */
     UINT8 d_gid;                /* group id of owner */
     UINT8 d_size0;              /* high byte of size */
-    UINT d_size1;               /* low word */
-    UINT d_addr[8];             /* block list of file */
+    UINT16 d_size1;               /* low word */
+    UINT16 d_addr[8];             /* block list of file */
     UINT32 d_atime;             /* time of last read */
     UINT32 d_mtime;             /* time of last write */
 };

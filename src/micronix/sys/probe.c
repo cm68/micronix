@@ -19,10 +19,10 @@
 #include <sys/ovl.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
-extern unsigned char ovlcall();
-extern unsigned char pic_eoi();
+extern UINT8 ovlcall();
+extern UINT8 pic_eoi();
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * A handler on a line.  One card per line - a second card that tickles a
@@ -31,7 +31,7 @@ extern int in(), out();
  * the boot-found nlines is how many of them are real.
  */
 struct ovlintr {
-    int (*fn) ();
+    INT16 (*fn) ();
     UINT8 seg;          /* a segment number: 0..15 */
 };
 
@@ -43,9 +43,9 @@ struct ovlintr ovlint[MAXNOVLINE]; /* not static: probe_init.c's attach writes i
  * it.  A line nothing claimed returns without doing anything - the
  * interrupt from a card that never attached, or a spurious one.
  */
-unsigned char
+UINT8
 ovlntr(line)
-    UINT line;
+    UINT16 line;
 {
     if (line < nlines && ovlint[line].fn != 0)
         ovlcall(ovlint[line].fn, ovlint[line].seg);
@@ -71,12 +71,12 @@ ovlntr(line)
  * handler calls this from an interrupt, so it is a walk of at most
  * MAXNOVLINE entries.  -1 is not attached.
  */
-int
+INT16
 intrline(fn, seg)
-    int (*fn) ();
-    UINT seg;
+    INT16 (*fn) ();
+    UINT16 seg;
 {
-    register int l;
+    register INT16 l;
 
     for (l = 0; l < nlines; l++)
         if (ovlint[l].fn == fn && ovlint[l].seg == seg)
@@ -94,9 +94,9 @@ intrline(fn, seg)
  * interrupts already off.  A process-context caller would have to keep
  * its read-modify-write of the IMR from racing the handler's.
  */
-unsigned char
+UINT8
 pic_mask(line)
-    UINT line;
+    UINT16 line;
 {
     register struct pic8259 *p;
 

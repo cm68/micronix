@@ -71,7 +71,7 @@ devsize(a)
     req.hole = 1;               /* the address is the MEMREAD operand */
     req.count = DJROWSZ;        /* the whole row */
     req.flags = CDB_IN;
-    req.buf = (char *) row;
+    req.buf = (UINT8 *) row;
 
     req.cmd[0] = MEMREAD;
     req.cmd[1] = 0;             /* the driver writes the three address */

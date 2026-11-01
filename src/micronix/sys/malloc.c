@@ -31,20 +31,20 @@ extern void rshift();
 #define FULL    3
 #define GROW    7
 
-extern char memwant;
+extern UINT8 memwant;
 
 /*
  * Number of free segments.  Lives in the freed low-memory bss (uhdr.s's
  * _nsegs, 0x260), set in meminit().
  */
-extern UINT nsegs;
+extern UINT16 nsegs;
 
 /*
  * Segment map. Segment n is allocated iff segmap[n] != 0.  Lives in the
  * freed low-memory bss (uhdr.s's _segmap).
  */
-extern char segmap[];
-extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
+extern UINT8 segmap[];
+extern UINT16 lastseg;            /* uhdr.s's _lastseg: the allocator hint */
 
 /*
  * Task map.  Bit n is set while task n is assigned to a process.
@@ -62,7 +62,7 @@ extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
  * map and never the only copy of it.
  */
 #define NTASK	16              /* tasks 1..15 are for processes */
-extern UINT taskmap;            /* uhdr.s's _taskmap: the task bitmap */
+extern UINT16 taskmap;            /* uhdr.s's _taskmap: the task bitmap */
 
 /*
  * Allocate a segment
@@ -71,10 +71,10 @@ extern UINT taskmap;            /* uhdr.s's _taskmap: the task bitmap */
  * pool segments above that, all under MAXSEG.  It fits a byte, so it
  * comes back in A and the callers' checks stay byte comparisons.
  */
-unsigned char
+UINT8
 segalloc()
 {
-    unsigned n; UINT8 limit;
+    UINT16 n; UINT8 limit;
 
     di();
 
@@ -112,7 +112,7 @@ segalloc()
  */
 void
 segfree(n)
-    unsigned n;
+    UINT16 n;
 {
     di();
     if (segmap[n]) {            /* allocated ? */
@@ -134,6 +134,7 @@ segfree(n)
  * oldest and the one waiting on the whole chain.
  */
 static
+INT16
 staler(q, n)
     struct proc *q, *n;
 {
@@ -206,7 +207,7 @@ taskload(p)
     struct proc *p;
 {
     if (p->task)
-        copy(&p->mem[0].seg, (char *)(0x600 + (p->task << 5)), 32);
+        copy(&p->mem[0].seg, (UINT8 *)(0x600 + (p->task << 5)), 32);
 }
 
 /*
@@ -270,7 +271,7 @@ mrelse()
  * Restore the memory of a swapped-out process.
  * Called by swapin(), and also by fork().
  */
-unsigned char
+UINT8
 mget(p)
     struct proc *p;
 {
@@ -307,15 +308,15 @@ mget(p)
  * grow segment if necessary. Sleep for memory.
  * Called by fault() and valid() (below).
  */
-unsigned char
+UINT8
 grow(seg)
-    UINT seg;
+    UINT16 seg;
 {
-    char i, grow;
+    UINT8 i, grow;
     struct mem *m;
 
-#define brakeseg ((UINT)u.brake >> 12)
-#define stackseg ((UINT)u.sp >> 12)
+#define brakeseg ((UINT16)u.brake >> 12)
+#define stackseg ((UINT16)u.sp >> 12)
 
     m = &u.p->mem[seg];
 
@@ -374,9 +375,9 @@ grow(seg)
  * Grow the process as appropriate.
  * Called by read(), stat(), ...
  */
-unsigned char
+UINT8
 valid(addr, count)
-    UINT count, addr;
+    UINT16 count, addr;
 {
     register UINT8 first, last, i;
 
@@ -433,7 +434,7 @@ void
 bankcopy(p)
     struct proc *p;
 {
-    char i;
+    UINT8 i;
     UINT8 gseg, cseg;
 
     /*
@@ -490,7 +491,7 @@ newmap(n)
     map0[2 * USERSEG] = n->mem[16].seg;
     u.p = n;                    /* fork() did not set this */
     u.task = n->task;           /* what gotask writes to the task register */
-    curmem = (char *) n->mem;   /* where mem.s looks up a user page */
+    curmem = (UINT8 *) n->mem;   /* where mem.s looks up a user page */
     ovlremap();                 /* and the driver this process is inside */
     ei();
 }
@@ -504,8 +505,8 @@ newmap(n)
 #define MAPSIZE (NPROC + 2)
 struct map
 {
-    unsigned size;
-    unsigned addr;
+    UINT16 size;
+    UINT16 addr;
 }
 swapmap[MAPSIZE] = 0;
 
@@ -576,12 +577,12 @@ swapinit()
 /*
  * Allocate size (!= 0) blocks of swap space.
  */
-unsigned
+UINT16
 salloc(size)
-    register int size;
+    register INT16 size;
 {
     register struct map *mp;
-    register unsigned blk;
+    register UINT16 blk;
 
     for (mp = swapmap; mp->size != 0; mp++) {
         blk = mp->addr;
@@ -604,8 +605,8 @@ salloc(size)
  */
 void
 sfree(size, blk)
-    int size;
-    unsigned blk;
+    INT16 size;
+    UINT16 blk;
 {
     register struct map *mp;
 

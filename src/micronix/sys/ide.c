@@ -1,11 +1,3 @@
-extern void wakeup();
-extern void sleep();
-extern void brelse();
-extern void iodone();
-static char idefinish();
-static char idestart();
-static unsigned char idewait();
-extern unsigned char dlslice();
 /*
  * Micronix driver for an IDE hard disk behind the S100Computers MYIDE
  * board.  The cpu moves every byte of a transfer itself - programmed I/O,
@@ -145,15 +137,23 @@ extern unsigned char dlslice();
 #include <sys/ide.h>
 #include <sys/ovl.h>
 #include <errno.h>
+extern void wakeup();
+extern void sleep();
+extern void brelse();
+extern void iodone();
+static INT8 idefinish();
+static INT8 idestart();
+static UINT8 idewait();
+extern UINT8 dlslice();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int idebsy();
-static unsigned char idewait();
-static char idestart(), idefinish();
-static int idereset();
+static INT16 idebsy();
+static UINT8 idewait();
+static INT8 idestart(), idefinish();
+static INT16 idereset();
 
 #define NDRIVES 2               /* the board's two drives */
 
@@ -296,16 +296,16 @@ struct ideif
      * first parameter - read it from A.  The pointer type is what tells
      * the call site which convention to use.
      */
-    int (*rd)(UINT8);           /* rd(reg) -> byte */
-    int (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
-    int (*xfer)();              /* xfer(p, nbytes, read) */
-    int (*reset)();             /* reset() */
-    int (*sel)(UINT8);          /* sel(unit) */
-    int (*intr)();              /* intr(on): connect or cut the drive's INTRQ */
+    INT16 (*rd)(UINT8);           /* rd(reg) -> byte */
+    INT16 (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
+    INT16 (*xfer)();              /* xfer(p, nbytes, read) */
+    INT16 (*reset)();             /* reset() */
+    INT16 (*sel)(UINT8);          /* sel(unit) */
+    INT16 (*intr)();              /* intr(on): connect or cut the drive's INTRQ */
 
-    int busy;                   /* a command is out and not yet finished */
-    int done;                   /* ... and the drive has interrupted for it */
-    int status;                 /* what the handler's status read found */
+    INT16 busy;                   /* a command is out and not yet finished */
+    INT16 done;                   /* ... and the drive has interrupted for it */
+    INT16 status;                 /* what the handler's status read found */
 };
 
 /*
@@ -313,11 +313,11 @@ struct ideif
  * off port A, let both go again.  This runs with the 8255 in read mode,
  * which myreset() establishes and mywr()/myxfer() put back.
  */
-static int
+static INT16
 myrd(reg)
     UINT8 reg;
 {
-    static UINT sel, val;
+    static UINT16 sel, val;
 
     sel = REGSEL(reg);
     out(PC, sel);
@@ -334,12 +334,12 @@ myrd(reg)
  * is that round trip, four extra port writes per byte, that keeps the
  * sector data path below out of here.
  */
-static int
+static INT16
 mywr(reg, val)
     UINT8 reg;
     UINT8 val;
 {
-    static UINT sel;
+    static UINT16 sel;
 
     sel = REGSEL(reg);
     out(PCTL, PPI_WR);
@@ -359,13 +359,13 @@ mywr(reg, val)
  * /RD pulses would advance the drive a word each and hand back the low
  * half twice.
  */
-static int
+static INT16
 myxfer(p, n, read)
-    register char *p;
-    UINT n;
-    int read;
+    register UINT8 *p;
+    UINT16 n;
+    INT16 read;
 {
-    static UINT sel, i;
+    static UINT16 sel, i;
 
     sel = REGSEL(DATA);
 
@@ -410,10 +410,10 @@ myxfer(p, n, read)
  * first routine to touch the card, and the read mode it leaves behind is
  * what every read below assumes.
  */
-static int
+static INT16
 myreset()
 {
-    static UINT n;
+    static UINT16 n;
 
     out(PCTL, PPI_RD);
     out(PC, C_RST);
@@ -429,7 +429,7 @@ myreset()
  * was selected when the last transfer finished has nothing to do with
  * which one this transfer wants.
  */
-static int
+static INT16
 mysel(unit)
     UINT8 unit;
 {
@@ -453,11 +453,11 @@ mysel(unit)
  * and two interrupt-mode bits for a kind of interrupt the drive never
  * raises.
  */
-static int
+static INT16
 myintr(on)
-    int on;
+    INT16 on;
 {
-    static UINT sel;
+    static UINT16 sel;
 
     sel = DREGSEL(DCTL);
     out(PCTL, PPI_WR);
@@ -503,16 +503,16 @@ static struct ideif boards[] = {
  */
 struct info
 {
-    UINT tracks;                /* cylinders */
+    UINT16 tracks;                /* cylinders */
     UINT8 heads;
     UINT8 sectors;              /* sectors per track */
 
-    UINT maxblk;                /* dllabel's bound for the first slice opened */
-    UINT spc;                   /* sectors per cylinder */
-    UINT roll;                  /* the slice's d_roll */
-    UINT cylstart;              /* dllabel's offset for the first slice opened */
+    UINT16 maxblk;                /* dllabel's bound for the first slice opened */
+    UINT16 spc;                   /* sectors per cylinder */
+    UINT16 roll;                  /* the slice's d_roll */
+    UINT16 cylstart;              /* dllabel's offset for the first slice opened */
     UINT8 firstsec;             /* first sector number on a track */
-    UINT len;                   /* dllabel's slice length, in cylinders */
+    UINT16 len;                   /* dllabel's slice length, in cylinders */
     UINT8 flags;                /* see below */
 
     /*
@@ -530,12 +530,12 @@ struct info
  * register - and return that status, or -1 if it stayed busy past the
  * spin bound and the driver is giving up on it.
  */
-static int
+static INT16
 idebsy(ip)
     register struct ideif *ip;
 {
     static UINT32 n;
-    static int st;
+    static INT16 st;
 
     for (n = 0; n < SPIN; n++) {
         st = (*ip->rd) (STAT);
@@ -550,13 +550,13 @@ idebsy(ip)
  * drive is in LBA mode, so the geometry never reaches it - it is only
  * used above this to work out which LBA a block is.
  */
-static char
+static INT8
 idecmd(ip, cmd, lba)
     register struct ideif *ip;
     UINT8 cmd;
     UINT32 lba;
 {
-    static int st;
+    static INT16 st;
 
     if ((st = idebsy(ip)) < 0)
         return (-1);
@@ -632,7 +632,7 @@ ideint()
  * that will do, and it is distinct from the board address, so a process
  * waiting here is not woken by the next process waiting for the board.
  */
-static unsigned char
+static UINT8
 idewait(ip)
     register struct ideif *ip;
 {
@@ -662,12 +662,12 @@ idewait(ip)
  * idefinish() is the other half of the pair.  On failure the board is
  * already free and there is nothing to finish.
  */
-static char
+static INT8
 idestart(ip, unit, lba, read)
     register struct ideif *ip;
     UINT8 unit;
     UINT32 lba;
-    int read;
+    INT16 read;
 {
     for (;;) {
         di();
@@ -718,13 +718,13 @@ idestart(ip, unit, lba, read)
  *
  * Returns 0, or -1 if the drive reported an error or stopped answering.
  */
-static char
+static INT8
 idefinish(ip, p, read)
     register struct ideif *ip;
-    register char *p;
-    int read;
+    register UINT8 *p;
+    INT16 read;
 {
-    static int st;
+    static INT16 st;
 
     di();
     (*ip->xfer) (p, 512, read);
@@ -749,12 +749,12 @@ idefinish(ip, p, read)
  * drive left mid-command usable again, and so what lets open trust the
  * label read that follows.
  */
-static int
+static INT16
 idereset(ip, unit)
     register struct ideif *ip;
     UINT8 unit;
 {
-    static int st;
+    static INT16 st;
     static UINT32 n;
 
     (*ip->sel) (unit);
@@ -809,10 +809,10 @@ idereset(ip, unit)
  */
 static UINT32
 idelba(blk, spc, cylstart, roll, len)
-    UINT blk, spc, cylstart, roll, len;
+    UINT16 blk, spc, cylstart, roll, len;
 {
     static UINT32 lba;
-    static UINT cyl;
+    static UINT16 cyl;
 
     /*
      * A drive opened with no label has no geometry and permits block 0
@@ -845,13 +845,14 @@ idelba(blk, spc, cylstart, roll, len)
  * what the label is needed for; sys/dlabel.c does the reading, off block
  * 0 of the drive's own 'c'.
  */
+INT16
 ideopen(dev, mode)
-    UINT dev, mode;
+    UINT16 dev, mode;
 {
     struct info *info;
     struct ideif *ip;
     UINT8 drive;
-    UINT sl;
+    UINT16 sl;
     struct buf *b;
 
     drive = dev & 1;
@@ -942,7 +943,7 @@ ideopen(dev, mode)
  */
 void
 ideclose(dev)
-    int dev;
+    INT16 dev;
 {
     ides[dev & 1].flags &= ~OPEN;
 }
@@ -965,9 +966,9 @@ idestrat(b)
 {
     static struct info *info;
     static struct ideif *ip;
-    static char *p;
+    static UINT8 *p;
     static UINT32 lba;
-    static UINT sl, off, roll, len, maxblk;
+    static UINT16 sl, off, roll, len, maxblk;
 
     info = &ides[b->dev & 1];
     ip = &boards[0];
@@ -1062,9 +1063,9 @@ idestrat(b)
  * (uio.c).  A command with no data phase (SET FEATURES, RECALIBRATE) has
  * nothing to interrupt about, so it is polled to its end instead.
  */
-int
+INT16
 ideioctl(dev, cmd, r, b)
-    UINT dev, cmd;
+    UINT16 dev, cmd;
     register struct cdb *r;
     register struct buf *b;
 {
@@ -1073,8 +1074,8 @@ ideioctl(dev, cmd, r, b)
     };
     static struct info *info;
     static struct ideif *ip;
-    static char *p;
-    static int i, st;
+    static UINT8 *p;
+    static INT16 i, st;
 
     if (r->len != IDELEN) {
         u.error = EINVAL;
@@ -1162,10 +1163,10 @@ struct biovec idebvec = { &ideopen, &ideclose, &idestrat, &ideioctl };
  * the attach loop to find.  The port dance is myrd's, with the other chip
  * select; the PPI has to be reading, so the caller puts it back first.
  */
-static int
+static INT16
 ideastat()
 {
-	static UINT sel, val;
+	static UINT16 sel, val;
 
 	sel = DREGSEL(ASTAT);
 	out(PC, sel);
@@ -1198,12 +1199,13 @@ ideastat()
  * card with no drive in the bay still takes the command and still raises
  * the line; it is the board the probe is testing for, not the medium.
  */
+INT16
 ideprobe(mode)
-	int mode;
+	INT16 mode;
 {
 	register struct ideif *ip;
 	register UINT32 n;
-	register int st;
+	register INT16 st;
 
 	ip = &boards[0];
 	(*ip->sel) (0);

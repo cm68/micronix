@@ -20,6 +20,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <types.h>
 #include <sys/ioctl.h>
 
 #define DEV	  "/dev/net0"

@@ -13,11 +13,11 @@
 #include <types.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
-extern unsigned char inton();
-extern unsigned char pic_eoi();
+extern UINT8 inton();
+extern UINT8 pic_eoi();
 
-extern int in(), out();
-extern int di(), ei();
+extern INT16 in(), out();
+extern INT16 di(), ei();
 
 /*
  * Point the group select at this PIC, where there is one.  The SS1's
@@ -38,9 +38,9 @@ picselect(p)
  * is dismissed on the master's cascade alone.  A slave line dismisses the
  * master's cascade either way.
  */
-unsigned char
+UINT8
 pic_eoi(line)
-    UINT line;
+    UINT16 line;
 {
     struct pic8259 *p;
     UINT8 cascade;
@@ -64,9 +64,9 @@ pic_eoi(line)
  * c1 emits nothing for a shift by a register, so the mask forces the
  * arithmetic that moves it out.
  */
-unsigned char
+UINT8
 inton(a)
-    UINT a;
+    UINT16 a;
 {
     struct pic8259 *p;
     UINT8 m;

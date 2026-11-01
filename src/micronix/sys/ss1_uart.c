@@ -38,7 +38,7 @@
 #define SS1_SPIC1 0x73          /* the slave 8259's IMR (SS1 base + 3) */
 #define IR6     0x40            /* the slave's TxRDY request */
 
-extern int in(), out();
+extern INT16 in(), out();
 
 /*
  * Gate the TxRDY interrupt.  Masking the line, not the transmitter, is
@@ -47,7 +47,7 @@ extern int in(), out();
  */
 void
 ss1_txline(on)
-    int on;
+    INT16 on;
 {
     UINT8 m;
 

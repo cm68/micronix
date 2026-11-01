@@ -14,11 +14,11 @@ extern void run();
 extern void send();
 extern void panic();
 
-long seconds = 0;               /* system time */
-int revel = 0;                  /* seconds to revelie for sleep system call */
-char ticks = 0;
+INT32 seconds = 0;               /* system time */
+INT16 revel = 0;                  /* seconds to revelie for sleep system call */
+UINT8 ticks = 0;
 
-extern char resched, swapping, memwant, /* idle */ ;
+extern UINT8 resched, swapping, memwant, /* idle */ ;
 extern struct proc *swapproc;
 
 /*
@@ -30,7 +30,7 @@ void
 clock()
 {
     register struct proc *p;
-    register int *sec;
+    register INT16 *sec;
 
     timein();                   /* see below */
     resched = 1;
@@ -49,7 +49,7 @@ clock()
          * refuses long * to int *, which is the right refusal to make
          * everywhere except here.
          */
-        sec = (int *) &seconds; /* avoid longs in interrupt code */
+        sec = (INT16 *) &seconds; /* avoid longs in interrupt code */
 
         if (++sec[1] == 0) {    /* NOT PORTABLE */
             ++sec[0];
@@ -87,9 +87,9 @@ clock()
 
 struct tmout
 {
-    int (*func)();
-    int arg;
-    unsigned int ticks;
+    INT16 (*func)();
+    INT16 arg;
+    UINT16 ticks;
 };
 
 struct tmout tlist[NTMOUTS] = 0;        /* timeout list */
@@ -103,9 +103,9 @@ struct tmout tlist[NTMOUTS] = 0;        /* timeout list */
 void
 timein()
 {
-    static char tmbusy = 0;
+    static UINT8 tmbusy = 0;
     register struct tmout *t;
-    int (*f)();
+    INT16 (*f)();
 
     if (tmbusy)
         return;
@@ -134,7 +134,7 @@ timein()
  */
 void
 timeout(func, arg, ticks)
-    int (*func)(), arg, ticks;
+    INT16 (*func)(), arg, ticks;
 {
     register struct tmout *t;
 
