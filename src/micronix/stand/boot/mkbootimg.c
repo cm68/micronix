@@ -89,12 +89,13 @@
 
 /*
  * The target's header, by path rather than by -I: this is a host
- * program and its own stdio has to win.  These two are the target's
- * spellings of a 16 and an 8 bit unsigned, which is all dlabel.h needs
- * of types.h.
+ * program and its own stdio has to win.  These are the target's
+ * spellings of the 8- and 16-bit types, which is all dlabel.h needs of
+ * types.h.
  */
-typedef unsigned short UINT;
 typedef unsigned char UINT8;
+typedef unsigned short UINT16;
+typedef short INT16;
 #include "../../include/sys/dlabel.h"
 #include "../../include/obj.h"
 
