@@ -110,9 +110,27 @@ assignFrmOff(struct name *func)
 			continue;
 		if (n->level < MAXBLKLVL &&
 		    (n->level != prevlvl || n->blkid != prevblk)) {
-			if (n->level > prevlvl)
-				mark[n->level] = off;
-			else
+			if (n->level > prevlvl) {
+				/*
+				 * Entering a deeper block can skip levels:
+				 * a for statement's scope and its body block
+				 * are two, so a local declared in the body
+				 * is two levels below the enclosing block.
+				 * Mark every level crossed with the offset
+				 * its blocks start from.  Marking only the
+				 * deepest left mark[level] at its initial
+				 * zero for a skipped level, and the first
+				 * sibling block at that level rewound the
+				 * frame to zero and handed out a slot that
+				 * was already in use - a nested-block local
+				 * in c1's docall landed on the byte below
+				 * its "direct", and the Z80 compiler built
+				 * from that pass emitted direct calls for
+				 * indirect ones.
+				 */
+				for (i = prevlvl + 1; i <= n->level; i++)
+					mark[i] = off;
+			} else
 				off = mark[n->level];
 			prevlvl = n->level;
 			prevblk = n->blkid;
