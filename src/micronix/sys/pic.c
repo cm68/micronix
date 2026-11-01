@@ -13,6 +13,8 @@
 #include <types.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
+extern unsigned char inton();
+extern unsigned char pic_eoi();
 
 extern int in(), out();
 extern int di(), ei();
@@ -22,6 +24,7 @@ extern int di(), ei();
  * PICs are directly addressed and have no select.
  */
 static
+void
 picselect(p)
     struct pic8259 *p;
 {
@@ -35,6 +38,7 @@ picselect(p)
  * is dismissed on the master's cascade alone.  A slave line dismisses the
  * master's cascade either way.
  */
+unsigned char
 pic_eoi(line)
     UINT line;
 {
@@ -60,6 +64,7 @@ pic_eoi(line)
  * c1 emits nothing for a shift by a register, so the mask forces the
  * arithmetic that moves it out.
  */
+unsigned char
 inton(a)
     UINT a;
 {

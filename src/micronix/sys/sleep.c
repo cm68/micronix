@@ -7,6 +7,11 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
+extern unsigned char next();
+extern void run();
+extern void panic();
+extern void abort();
+extern void newmap();
 
 extern char memwant, swapping;
 extern struct proc *swapproc;
@@ -37,6 +42,7 @@ char resched = 0;
 /*
  * Broadcast a wakeup to all processes waiting on event.
  */
+void
 wakeup(event)
     int event;
 {
@@ -52,6 +58,7 @@ wakeup(event)
  * is managed by next()). Called by wakeup above and by
  * send() in sig.c.
  */
+void
 run(p)
     struct proc *p;
 {
@@ -77,6 +84,7 @@ run(p)
  * holding an int in BC across the sleep - outwait's count, muopen's dev
  * - resumes holding the wrong process's BC.
  */
+void
 sleep(event, pri)
     register int event;
     register UINT8 pri;
@@ -111,6 +119,7 @@ sleep(event, pri)
  * enables fork to distinguish between parent and child.
  * Warning: this is intimately connected with C's stack framing.
  */
+unsigned char
 next(dummy)
     int dummy;      /* unused: forces a 1-argument frame, see setframe in sub8.s */
 {

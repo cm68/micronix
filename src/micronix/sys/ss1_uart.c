@@ -45,6 +45,7 @@ extern int in(), out();
  * what stops the request: the chip must keep sending for the monitor.
  * The driver page calls this through ss1_start/ss1_stop.
  */
+void
 ss1_txline(on)
     int on;
 {
@@ -65,6 +66,7 @@ ss1_txline(on)
  * again by ss1_stop.  This runs from cus() with interrupts off, before
  * the console tty exists, so the line must stay closed here.
  */
+void
 ss1_uart_init()
 {
     out(SS1_UART_CMD, TXEN | RXEN);

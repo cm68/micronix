@@ -13,6 +13,15 @@
 #include <sys/buf.h>
 #include <errno.h>
 #include <sys/pic8259.h>
+extern unsigned char super();
+extern void irelse();
+extern void bopen();
+extern void bdwrite();
+extern void brelse();
+extern void isync();
+extern void iflush();
+extern void iclose();
+extern void idec();
 
 extern int rootdev;
 extern long seconds;
@@ -22,6 +31,7 @@ extern struct inode ilist[];
 /*
  * Mount system call
  */
+void
 mount(ioname, dname, ronly)
     char *ioname, *dname;
     UINT8 ronly;
@@ -171,6 +181,7 @@ tmount(dev, ip, ronly, dname)
 /*
  * Unmount a file system from its inode
  */
+void
 umount(ioname)
     char *ioname;
 {

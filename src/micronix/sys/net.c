@@ -35,11 +35,13 @@
 #include <sys/pic.h>
 #include <sys/ovl.h>
 #include <errno.h>
+extern unsigned char pic_mask();
+extern unsigned char inton();
 
 extern int in(), out();
 extern int copyin(), copyout(); /* mem.s: the user side */
-extern int valid();             /* malloc.c: is this user page there? */
-extern int sleep(), wakeup();
+extern unsigned char valid();             /* malloc.c: is this user page there? */
+extern void sleep(), wakeup();
 extern int di(), ei();
 extern UINT netline;            /* resident: select(2) reopens the line */
 extern int selectchan;          /* resident: select(2)'s event */
@@ -93,6 +95,7 @@ netcard()
 }
 
 static
+void
 netput(b)
     UINT8 b;
 {
@@ -168,6 +171,7 @@ nettick()
  * us.  -1 means the card never attached.
  */
 static
+char
 netwait()
 {
     register int l;
@@ -214,6 +218,7 @@ netattached()
  * operation takes netlock first and the reply read belongs to it.
  */
 static
+void
 netlockon()
 {
     di();
@@ -227,6 +232,7 @@ netlockon()
 }
 
 static
+void
 netlockoff()
 {
     if (netlock) {
@@ -236,6 +242,7 @@ netlockoff()
 }
 
 static
+void
 netframe(type, sock, p, len)
     int type, sock, len;
     UINT8 *p;
@@ -286,6 +293,7 @@ netrecv(hdr, buf, cap)
  * readable for select.
  */
 static
+void
 netstash(sock, p, len)
     int sock, len;
     UINT8 *p;
@@ -312,6 +320,7 @@ netstash(sock, p, len)
  * reply before releasing it.
  */
 static
+void
 netdrain()
 {
     UINT8 hdr[4];
@@ -332,6 +341,7 @@ netdrain()
  * length, and the payload lands in rbuf.  Returns 0 or -1.
  */
 static
+char
 netcmd(op, sock, p, len, rtype, rsock, rbuf, rcap, rlen)
     int op, sock, len;
     UINT8 *p;
@@ -396,7 +406,7 @@ netfree()
  * minor.  iopen() copies u.fdev into the file, and every path after that
  * reaches the driver with this dev, not the node's.
  */
-int
+void
 netopen(dev, mode)
     UINT dev, mode;
 {
@@ -428,7 +438,7 @@ netopen(dev, mode)
     u.fdev = (NET_MAJOR << 8) | (slot + 1);
 }
 
-int
+void
 netclose(dev, mode)
     UINT dev, mode;
 {
@@ -449,7 +459,7 @@ netclose(dev, mode)
  * Read one chunk.  The card is asked only for this socket, so another
  * reader cannot lose a frame; EAGAIN means the selector should wait.
  */
-int
+void
 netread(dev)
     UINT dev;
 {
@@ -510,7 +520,7 @@ netread(dev)
  * Write one chunk.  The card's ACK means accepted for transmission; a
  * full transmit buffer is EAGAIN, which the caller retries.
  */
-int
+void
 netwrite(dev)
     UINT dev;
 {

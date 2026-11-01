@@ -25,12 +25,22 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <sys/pic.h>
+extern void djint();
+extern void pr();
+extern void djack();
+extern void iodone();
+extern void wakeup();
+extern void sleep();
+static unsigned char getstat();
+extern unsigned char busgive();
+extern unsigned char busget();
 
 /*
  * The static routines below, declared before anything calls them.
  */
-static int sio(), djwait(), djstart(), getstat();
-static int memio(), busready(), busplease(), busthanks();
+static void sio(), djwait(), djstart();
+static unsigned char getstat();
+static void memio(), busready(), busplease(), busthanks();
 
 /*
  * From the kernel rather than from a header: the staging page's
@@ -40,7 +50,7 @@ static int memio(), busready(), busplease(), busthanks();
 extern unsigned char segalloc();
 extern UINT8 map0[], bufseg;
 extern int copyin(), copyout();
-extern int bwin(UINT8);
+extern void bwin(UINT8);
 extern int dllabel();
 extern char *swin(UINT8);
 extern void srel();
@@ -200,6 +210,7 @@ djopen(dev, mode)
  * Close the drive, disallowing further access.
  */
 
+void
 djclose(dev)
 	register dev;
 {
@@ -210,6 +221,7 @@ djclose(dev)
  * link the buffer into the queue
  */
 
+void
 djstrat(b)
 	register struct buf *b;
 {
@@ -236,6 +248,7 @@ djstrat(b)
  * label (struct dlgeom above), not a table.
  */
 static
+void
 sio(d, addr, xaddr, op, sec, dev)
 	register unsigned sec;
 	register struct dm *d;
@@ -310,6 +323,7 @@ sio(d, addr, xaddr, op, sec, dev)
  * four in turn; djint() runs the next when one completes.
  */
 static
+void
 fmio(d, addr, xaddr, op, n, dev)
 	register struct dm *d;
 	unsigned addr, xaddr;
@@ -344,6 +358,7 @@ fmio(d, addr, xaddr, op, n, dev)
  */
 
 static
+void
 djwait(a)
 	char *a;
 {
@@ -355,6 +370,7 @@ djwait(a)
 static unsigned char inservice = 0;
 static unsigned char fmsec = 0; /* which fm sector of block 0 is in flight */
 
+void
 djint()
 {
 	static unsigned char op, kw;
@@ -591,6 +607,7 @@ djint()
 }
 
 static
+void
 djstart()
 {
 	di();
@@ -610,6 +627,7 @@ djstart()
  * and the write protect bit, which the status carries.
  */
 static
+unsigned char
 getstat(a)
 	register a;
 {
@@ -670,6 +688,7 @@ getstat(a)
  * memory goes through the command block like everything else (djioctl).
  */
 static
+void
 memio(flag, memaddr, djaddr, count)
 {
 	D[0] = (flag == READ) ? MEMREAD : MEMWRITE;
@@ -698,6 +717,7 @@ memio(flag, memaddr, djaddr, count)
  * tell the PIC we're done with the current interrupt
  */
 
+void
 djack()
 {
 	if (!haltstat)
@@ -716,6 +736,7 @@ djack()
  * is a controller that has stopped talking, and the operation in flight
  * is failed rather than waited on.
  */
+void
 djgoose()
 {
 	if (haltstat && ++djtimer >= DJTHRESHHOLD) {
@@ -732,7 +753,8 @@ djtick()
 	if (++djticker < DJTICKS)
 		return (0);
 	djticker = 0;
-	return (djgoose());
+	djgoose();
+	return (0);
 }
 
 /*
@@ -850,6 +872,7 @@ djioctl(dev, cmd, r, b)
 }
 
 static
+void
 busready()
 {
 	wakeup(busready);
@@ -860,6 +883,7 @@ busready()
  */
 
 static
+void
 busplease()
 {
 	di();
@@ -871,6 +895,7 @@ busplease()
 }
 
 static
+void
 busthanks()
 {
 	busgive(0);

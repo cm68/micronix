@@ -24,10 +24,11 @@
  * down says static - two different linkages for one name.  The error
  * lands on the definition, a page away from the call that caused it.
  */
-static int cinit(), hdinit();
-extern int pic_init();          /* sys/pic_init.c: probe the PICs at boot */
-extern int intr_attach();       /* sys/probe_init.c */
+static void cinit(), hdinit();
+extern unsigned char pic_init();          /* sys/pic_init.c: probe the PICs at boot */
+extern unsigned char intr_attach();       /* sys/probe_init.c */
 
+void
 cus()
 {
 
@@ -69,6 +70,7 @@ cus()
 }
 
 static
+void
 cinit()
 {
     extern char clist[];
@@ -140,6 +142,7 @@ cinit()
  * there - a missing card takes the writes harmlessly.)
  */
 static
+void
 hdinit()
 {
     out(HDCMD, 0);              /* CMD_RAMDATA: acknowledge op-done */

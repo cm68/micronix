@@ -1,3 +1,4 @@
+extern unsigned char ovlcall();
 /*
  * The DMA bus lock, shared by the disk drivers.
  *
@@ -99,6 +100,7 @@ extern UINT busheirseg;
  * Take the bus for func, or register it as the heir if someone else has
  * it.  Returns whether the bus was got.
  */
+unsigned char
 busget(func)
     int *(func) ();
 {
@@ -123,6 +125,7 @@ busget(func)
  * taken; a caller that gets 1 has been replaced and should stop driving
  * the bus, because the heir was called from here and is using it now.
  */
+unsigned char
 busgive(func)
     int *(func) ();
 {

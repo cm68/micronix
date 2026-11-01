@@ -18,6 +18,11 @@
 #include <errno.h>
 #include <sys/signal.h>
 #include <sys/pic8259.h>
+extern void sleep();
+extern void drainques();
+extern void wakeup();
+extern void killall();
+extern void drain();
 
 /*
  * The parts of the line discipline that both copies share - the process
@@ -26,7 +31,7 @@
  * tty.mod and pty.mod, so anything that can be written once is in the
  * resident half instead of twice in a page.
  */
-extern int killfg(), ttynotify(), cstart(), ustart();
+extern void killfg(), ttynotify(), cstart(), ustart();
 extern char ttycbuf[];
 extern int selectchan;          /* select(2): a reader is watching */
 
@@ -189,6 +194,7 @@ cwait(tty)
  * Low level output, called from the terminal's
  * ready-to-print interrupt.
  */
+void
 ttyout(tty)
     register struct tty *tty;
 {
@@ -338,6 +344,7 @@ cookout(tty)
  * called on carrier loss
  */
 
+void
 ttyhangup(t)
     struct tty *t;
 {
@@ -354,6 +361,7 @@ ttyhangup(t)
  * Put the character into the raw input queue, and echo
  * it if necessary.
  */
+void
 ttyin(c, tty)
     register UINT8 c;
     register struct tty *tty;

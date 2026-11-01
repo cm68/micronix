@@ -29,14 +29,30 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <errno.h>
+extern void brelse();
+extern void iodone();
+extern void bsort();
+extern void d3start();
+extern void reset();
+extern void advque();
+extern void newdrv();
+extern void rwint();
+extern void issue();
+extern void newrw();
+extern void panic();
+extern unsigned char inton();
+extern unsigned char dlslice();
+extern unsigned char d3wait();
+extern unsigned char busgive();
+extern unsigned char busget();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
  * default and the definition says static.
  */
-static int d3error();
+static void d3error();
 static void d3link();
-static int d3specify(UINT8);    /* drive is curdrv: dev & 3 */
+static unsigned char d3specify(UINT8);    /* drive is curdrv: dev & 3 */
 static UINT32 d3addr();
 
 #define NDRIVES 4               /* Number of drives */
@@ -172,6 +188,7 @@ disk3open(dev, mode)
  * Device close.  The cache has been flushed; nothing else to do - the
  * board has no light to turn off and no heads to park.
  */
+void
 disk3close(dev)
     int dev;
 {
@@ -184,6 +201,7 @@ disk3close(dev)
 /*
  * Strategy
  */
+void
 disk3strat(b)
     register struct buf *b;
 {
@@ -229,6 +247,7 @@ disk3strat(b)
  * Goose the lower half.  The first request brings the board up and sends
  * GLOBAL; after that each request picks the drive and reads or writes.
  */
+void
 d3start()
 {
     if (!busget(&d3start))
@@ -254,6 +273,7 @@ d3start()
  * Stop the controller.  It halts on its own after a command without the
  * continue bit, so stopping is just the state and the bus.
  */
+void
 d3stop()
 {
     d3state = STOPPED;
@@ -263,6 +283,7 @@ d3stop()
 /*
  * Interrupt service begins here.
  */
+void
 disk3int()
 {
     if (d3state == STOPPED || d3state == INTRPT || iopb.status == D3_BUSY)
@@ -276,6 +297,7 @@ disk3int()
  * command went; 0xff is success, and anything else is an error - except
  * that a drive that dropped ready is a terminal error rather than a retry.
  */
+void
 rwint()
 {
     if (iopb.status == D3_OK) {
@@ -300,6 +322,7 @@ rwint()
 /*
  * Advance the queue to the next request
  */
+void
 advque()
 {
     struct buf *f;
@@ -321,6 +344,7 @@ advque()
  * first time it has been selected.  Both are polled; the board steps and
  * seeks on its own.
  */
+void
 newdrv()
 {
     curdrv = d3buf->dev & 3;
@@ -357,6 +381,7 @@ newdrv()
  * product is 24 bits on a large drive, so it is built in a UINT32 and
  * spread across ARG2-ARG5 low byte first.
  */
+void
 newrw()
 {
     UINT32 abs, dma;
@@ -412,6 +437,7 @@ d3cyl(blk, spc, off, roll, len)
  * Flag an error
  */
 static
+void
 d3error()
 {
     d3buf->flags |= BERROR;
@@ -422,7 +448,7 @@ d3error()
  * is a data object in this module, so the board is handed its physical
  * address in the IOPB's DATA field - d3addr, below.
  */
-static int
+static unsigned char
 d3specify(drive)
     UINT8 drive;        /* newdrv: curdrv = dev & 3 */
 {
@@ -503,6 +529,7 @@ d3link()
  * only its LINK, and the second fetches and runs the real IOPB.  That
  * double attention is only needed once after a reset.
  */
+void
 reset()
 {
     extern char map0[];
@@ -527,6 +554,7 @@ reset()
 /*
  * Kick the controller: mark the IOPB busy and write the attention port.
  */
+void
 attn()
 {
     iopb.status = D3_BUSY;
@@ -536,6 +564,7 @@ attn()
 /*
  * Issue a command whose completion will be serviced by an interrupt.
  */
+void
 issue()
 {
     di();
@@ -552,6 +581,7 @@ issue()
  * caller is told so instead of the one-second watchdog having to shoot
  * the request down.
  */
+unsigned char
 d3wait()
 {
     UINT32 i;
@@ -574,6 +604,7 @@ d3wait()
  * INTRPT change nothing; a request in flight counts its ticks and only a
  * board that has really stopped answering reaches TOOLATE.
  */
+void
 disk3check()
 {
     di();

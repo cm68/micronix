@@ -44,13 +44,16 @@
 #include <sys/con.h>
 #include <sys/pty.h>
 #include <errno.h>
+extern void wakeup();
+extern void sleep();
 
-extern int ttyread(), ttywrite(), ttymode(), ttyopen(), ttyclose();
-extern int cstart(), ustart(), drainques(), qinit(), sendque();
-extern int pty_start(), pty_put();
-extern int nulldev();          /* the kernel's empty entry */
-extern int ptyioctl();
-extern int ptyhang();            /* the process-table walk, resident */
+extern int ttyread();
+extern void ttywrite(), ttymode(), ttyopen(), ttyclose();
+extern void cstart(), ustart(), drainques(), qinit(), sendque();
+extern void pty_start(), pty_put();
+extern void nulldev();          /* the kernel's empty entry */
+extern void ptyioctl();
+extern void ptyhang();            /* the process-table walk, resident */
 extern int selectchan;          /* select(2): a reader may be watching */
 
 /*
@@ -58,6 +61,7 @@ extern int selectchan;          /* select(2): a reader may be watching */
  * ends differ only in mode and device number, so both come through
  * here; the pty leaf half's init calls it too.
  */
+void
 ttyinit1(t, dev, mode, ms)
     register struct tty *t;
     int dev;
@@ -90,7 +94,7 @@ ttyinit1(t, dev, mode, ms)
 /*
  * Put the pair back to the state a fresh terminal has.
  */
-int
+void
 ptyinit(i)
     int i;
 {
@@ -100,6 +104,7 @@ ptyinit(i)
     ptyinfo[i].hung = 0;
 }
 
+void
 ptyopen(dev, mode)
     int dev;
 {
@@ -162,6 +167,7 @@ ptyopen(dev, mode)
     p->mopen++;
 }
 
+void
 ptyclose(dev, mode)
     int dev;
 {
@@ -267,6 +273,7 @@ ptyread(dev)
  * Master write: ordinary ttywrite() on the raw master; its put() hands
  * each byte to the slave's line discipline.
  */
+void
 ptywrite(dev)
     int dev;
 {

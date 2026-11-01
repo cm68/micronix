@@ -19,6 +19,8 @@
 #include <sys/ovl.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
+extern unsigned char ovlcall();
+extern unsigned char pic_eoi();
 
 extern int in(), out();
 
@@ -41,6 +43,7 @@ struct ovlintr ovlint[MAXNOVLINE]; /* not static: probe_init.c's attach writes i
  * it.  A line nothing claimed returns without doing anything - the
  * interrupt from a card that never attached, or a spurious one.
  */
+unsigned char
 ovlntr(line)
     UINT line;
 {
@@ -91,7 +94,7 @@ intrline(fn, seg)
  * interrupts already off.  A process-context caller would have to keep
  * its read-modify-write of the IMR from racing the handler's.
  */
-int
+unsigned char
 pic_mask(line)
     UINT line;
 {

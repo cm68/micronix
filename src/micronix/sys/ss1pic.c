@@ -9,6 +9,8 @@
  */
 #include <types.h>
 #include <sys/pic.h>
+extern unsigned char inton();
+extern unsigned char pic_eoi();
 
 extern int in(), out();
 extern int di(), ei();
@@ -29,6 +31,7 @@ extern int di(), ei();
  * master alone.  Line 7 is the slave: it is dismissed first, then the
  * master's cascade (IR7), which stays asserted until the slave is told.
  */
+unsigned char
 pic_eoi(line)
 {
     if (line >= 7) {
@@ -46,6 +49,7 @@ pic_eoi(line)
  * shifting by a register, so the mask forces the arithmetic that moves it
  * out.
  */
+unsigned char
 inton(a)
 {
     di();

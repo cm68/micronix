@@ -15,6 +15,18 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+extern unsigned char block();
+extern void bwrite();
+extern void sleep();
+extern void strat();
+extern void bwait();
+extern void brelse();
+extern void wakeup();
+extern void perror();
+extern void pr();
+extern void prdev();
+extern void bzero();
+extern void panic();
 
 extern long seconds;            /* see clock.c */
 extern UINT nbuf;                /* initialized in binit(), main.c */
@@ -119,6 +131,7 @@ bget(blk, dev)
 /*
  * Lock a block if possible.
  */
+unsigned char
 block(b)
     struct buf *b;
 {
@@ -161,6 +174,7 @@ bread(blk, dev)
 /*
  * Read a block asyncronously. Used for read-ahead by iread (fio.c)
  */
+void
 aread(blk, dev)
     UINT blk, dev;
 {
@@ -216,6 +230,7 @@ getsb(dev)
  * been released) since process switching cannot occurr inside
  * the kernel except across sleep.
  */
+void
 bwrite(b)
     register struct buf *b;
 {
@@ -232,6 +247,7 @@ bwrite(b)
  * device messages to console. Iodone
  * will release the buffer.
  */
+void
 bawrite(b)
     struct buf *b;
 {
@@ -242,6 +258,7 @@ bawrite(b)
 /*
  * Mark the buffer for later writeout and release it.
  */
+void
 bdwrite(b)
     struct buf *b;
 {
@@ -252,6 +269,7 @@ bdwrite(b)
 /*
  * Release the buffer
  */
+void
 brelse(b)
     register struct buf *b;
 {
@@ -292,6 +310,7 @@ char quelen = 0;
  * Sort a queue of block I/O requests into a reasonable order.
  * For use by strategy routines. Must be di()'ed.
  */
+void
 bsort(h, b)
     struct buf *h, *b;
 {
@@ -317,6 +336,7 @@ bsort(h, b)
 /*
  * Access the strategy routine to read or write a buffer
  */
+void
 strat(bp)
     struct buf *bp;
 {
@@ -334,6 +354,7 @@ strat(bp)
 /*
  * Access a block device open routine.
  */
+void
 bopen(dev, mode)
     UINT dev, mode;
 {
@@ -343,6 +364,7 @@ bopen(dev, mode)
 /*
  * Access a block device close routine.
  */
+void
 bclose(dev, mode)
     UINT dev, mode;
 {
@@ -389,7 +411,7 @@ bclose(dev, mode)
  * scratch window may not, because mem.s borrows that one for the copies
  * themselves.
  */
-int
+char
 bioctl(fd, cmd, arg)
     UINT8 fd;
     UINT cmd;
@@ -487,6 +509,7 @@ bmajor(dev)
  * If io was synchronous, issue wakeup.
  * If io was asynchronous, release buffer.
  */
+void
 iodone(bp)
     struct buf *bp;
 {
@@ -508,6 +531,7 @@ iodone(bp)
 /*
  * Print an I/O error message at the console
  */
+void
 perror(b)
     struct buf *b;
 {
@@ -521,6 +545,7 @@ perror(b)
 /*
  * Wait for io completion on buffer
  */
+void
 bwait(b)
     struct buf *b;
 {
@@ -550,6 +575,7 @@ geterror(b)
  * danger that anyone else will access the device while
  * this is going on (as long as there is only one inode).
  */
+void
 bflush(dev)
     UINT dev;
 {
@@ -580,6 +606,7 @@ bflush(dev)
  * spin there forever.  A driver that drops a buffer it read (mwclose) is
  * the case this guards.
  */
+void
 bzero(b)
     struct buf *b;
 {
@@ -597,6 +624,7 @@ bzero(b)
 /*
  * Sync the blist. Called from sync().
  */
+void
 bsync()
 {
     register struct buf *b;
@@ -672,6 +700,7 @@ bdrain()
  * a header in this page would be read back as buffer data for as long
  * as a hold is up, and holds are taken all over the filesystem.
  */
+void
 bwin(seg)
     UINT8 seg;
 {

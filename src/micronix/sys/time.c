@@ -8,6 +8,11 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
+extern void timein();
+extern void wakeup();
+extern void run();
+extern void send();
+extern void panic();
 
 long seconds = 0;               /* system time */
 int revel = 0;                  /* seconds to revelie for sleep system call */
@@ -21,6 +26,7 @@ extern struct proc *swapproc;
  * 8 HERTZ clock
  * We assume that HERTZ is a power of 2.
  */
+void
 clock()
 {
     register struct proc *p;
@@ -94,6 +100,7 @@ struct tmout tlist[NTMOUTS] = 0;        /* timeout list */
  * that are ready.  In case the invocations take longer
  * than a clock period, the tmbusy flag prevents stumbling.
  */
+void
 timein()
 {
     static char tmbusy = 0;
@@ -125,6 +132,7 @@ timein()
  * Timeout(func, arg, ticks) arranges that after >= ticks,
  * the clock interrupt will in turn call (*func)(arg).
  */
+void
 timeout(func, arg, ticks)
     int (*func)(), arg, ticks;
 {

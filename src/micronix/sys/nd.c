@@ -24,8 +24,13 @@
 #include <sys/net.h>
 #include <sys/ovl.h>
 #include <errno.h>
+extern void iodone();
+extern void sleep();
+extern unsigned char inton();
+static char exclude();
 
-extern int in(), out(), inton();
+extern int in(), out();
+extern unsigned char inton();
 
 struct nd ndinfo[NND];
 
@@ -108,7 +113,7 @@ ndwdat(p)
  * table: the card serves one request at a time, and a request that finds
  * it busy is queued on the single drive.
  */
-static int
+static char
 exclude(np)
 	struct nd *np;
 {

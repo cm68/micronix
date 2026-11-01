@@ -21,6 +21,7 @@
 #include <sys/fs.h>
 #include <sys/con.h>
 #include <errno.h>
+extern void pipe();
 
 extern long seconds;
 
@@ -33,14 +34,15 @@ extern int arg[];               /* in-line arguments from system() */
  * reason r_seek hands back two words - would arrive as its low half.
  */
 extern UINT32 seek(UINT8 fd, UINT disp, unsigned from);
-extern int ftruncate(UINT8 fd, UINT32 length);
-extern int close(UINT8);
-extern int cioctl(UINT8, int, char *);
-extern int bioctl(UINT8, UINT, char *);
+extern char ftruncate(UINT8 fd, UINT32 length);
+extern void close(UINT8);
+extern char cioctl(UINT8, int, char *);
+extern char bioctl(UINT8, UINT, char *);
 
 /*
  * First, pass registers across the system interface
  */
+void
 r_system()
 {
     system();
@@ -51,11 +53,13 @@ r_system()
         u.af &= ~ERRBIT;
 }
 
+void
 r_close()
 {
     close(u.hl);
 }
 
+void
 r_fork()
 {
     int id;
@@ -76,6 +80,7 @@ r_fork()
  * success and failure on the carry, not on the value, so a failure has
  * to raise it and put the reason in hl for the stub to store in errno.
  */
+void
 r_ioctl()
 {
     register struct file *fp;
@@ -102,6 +107,7 @@ r_ioctl()
     }
 }
 
+void
 r_pipe()
 {
     int vec[2];
@@ -126,6 +132,7 @@ r_pipe()
  * frame to this call.  Keeping the whole answer in HL':HL costs the
  * stub nothing and is a convention old binaries are already safe under.
  */
+void
 r_seek()
 {
     UINT32 off;
@@ -141,6 +148,7 @@ r_seek()
     }
 }
 
+void
 r_ftruncate()
 {
     UINT32 length;
@@ -162,6 +170,7 @@ r_ftruncate()
     }
 }
 
+void
 r_time()
 {
     u.de = ((UINT *) &seconds)[1];

@@ -29,9 +29,11 @@
 #include <sys/signal.h>
 #include <sys/con.h>
 #include <sys/pty.h>
+extern void send();
+extern void wakeup();
 
 extern UINT8 map0[];
-extern int drainques();
+extern void drainques();
 extern int selectchan;          /* select(2): a hung-up tty reads EOF */
 
 /*
@@ -60,6 +62,7 @@ char ttycbuf[TTYHOG];
  * the shell must not reach it.  An explicit kill still does; this only
  * filters what the tty generates.
  */
+void
 killfg(tty, sig)
     register struct tty *tty;
     UINT8 sig;
@@ -87,6 +90,7 @@ killfg(tty, sig)
  * shell here: a program that calls wait() but never asked for the
  * signal is left alone.
  */
+void
 ttynotify(tty)
     register struct tty *tty;
 {
@@ -115,7 +119,7 @@ ttynotify(tty)
  * close with a slave still open), and the pty page has no bytes to
  * spare for it.
  */
-int
+void
 ptyhang(i)
     int i;
 {
@@ -147,6 +151,7 @@ ptyhang(i)
  * Called on wrong baud rate detection.  The resident interrupt stubs
  * call this; it touches nothing in the driver's page.
  */
+void
 ttyerror(t)
     struct tty *t;
 {
@@ -156,6 +161,7 @@ ttyerror(t)
 /*
  * Called on carrier present detection.
  */
+void
 ttyconnect(t)
     struct tty *t;
 {
@@ -171,6 +177,7 @@ ttyconnect(t)
  * to whichever page the caller is running in, which is the page this
  * helper was called from.
  */
+void
 cstart(tty)
     register struct tty *tty;
 {
@@ -181,6 +188,7 @@ cstart(tty)
 /*
  * Unconditionally start output.
  */
+void
 ustart(tty)
     register struct tty *tty;
 {
@@ -207,6 +215,7 @@ static int (*ttyout_m) (struct tty *);
 static int (*mumint_m) (struct tty *);
 static UINT ttyready;           /* the console tty is initialized and open */
 
+unsigned char
 ttypub(seg, in, out, mum)
     UINT seg;
     int (*in) (UINT8, struct tty *);

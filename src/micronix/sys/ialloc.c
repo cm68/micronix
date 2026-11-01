@@ -13,6 +13,15 @@
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <errno.h>
+extern void irelse();
+extern void bdwrite();
+extern void isync();
+extern void brelse();
+extern void itrunc();
+extern void ifree();
+extern void indfree();
+extern void bfree();
+extern unsigned char ifill();
 
 extern char *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
@@ -37,7 +46,7 @@ static unsigned lastiblock = 2;
  * to release it.  In core is the truth; never offer a number the kernel
  * already owns.
  */
-static int
+static unsigned char
 iincore(inum, dev)
     int inum, dev;
 {
@@ -129,6 +138,7 @@ ialloc(dev)
 /*
  * Put some inumbers in the superblock's inode freelist
  */
+unsigned char
 ifill(sb, dev)
     struct buf *sb;
     int dev;
@@ -219,6 +229,7 @@ ifill(sb, dev)
  * Free the inode if count == 0 && nlinks == 0,
  * and release it.
  */
+void
 idec(ip)
     register struct inode *ip;
 {
@@ -233,6 +244,7 @@ idec(ip)
 /*
  * Add an inode to the freelist
  */
+void
 ifree(ip)
     struct inode *ip;
 {
@@ -267,6 +279,7 @@ ifree(ip)
 /*
  * Free all blocks addressed by the inode
  */
+void
 itrunc(ip)
     register struct inode *ip;
 {
@@ -294,6 +307,7 @@ itrunc(ip)
  * indirect block ind on device dev. Then free ind.
  * (A 0-th level indirect block is a data block.)
  */
+void
 indfree(ind, level, dev)
     UINT ind;
     int dev;
@@ -341,6 +355,7 @@ indfree(ind, level, dev)
  * indirect blocks.  Freed entries are zeroed, so a block that is kept
  * stays consistent on the disk.
  */
+void
 indfreetail(ind, level, start, dev)
     UINT ind;
     UINT8 level;
@@ -376,6 +391,7 @@ indfreetail(ind, level, start, dev)
  * Truncate an inode to length bytes, freeing the blocks beyond it.
  * A length of zero is itrunc().
  */
+void
 itruncat(ip, length)
     register struct inode *ip;
     UINT32 length;

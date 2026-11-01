@@ -20,6 +20,17 @@ typedef char INT8;
 typedef unsigned char UINT8;
 
 /*
+ * A truth value.  Predicates and flags take one of these, and TRUE and
+ * FALSE are the only two values it is meant to hold.  An unsigned char
+ * because that is the width the kernel returns a byte in - a boolean is
+ * a byte and nothing more - and unsigned so a caller widening it cannot
+ * pull a sign in with it.
+ */
+typedef unsigned char BOOL;
+#define TRUE	1
+#define FALSE	0
+
+/*
  * The Whitesmith's spelling for an unsigned char.  stdio.h has always
  * supplied it (as a macro), and the formatters want it without dragging
  * in the rest of stdio, so it belongs here.  It is a macro rather than

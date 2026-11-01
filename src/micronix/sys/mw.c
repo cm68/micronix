@@ -17,13 +17,32 @@
 #include <sys/dlabel.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+extern void brelse();
+extern void bzero();
+extern void iodone();
+extern void bsort();
+extern void mwstart();
+extern void reset();
+extern void issue();
+extern void mwwait();
+extern void rwint();
+extern void newdrv();
+extern void advque();
+extern void newrw();
+extern void rwcmd();
+extern void panic();
+extern void wakeup();
+extern void sleep();
+extern unsigned char dlslice();
+extern unsigned char busgive();
+extern unsigned char busget();
 
 /*
  * Declared before anything calls it: an undeclared call is extern int
  * by default and the definition says static.
  */
-static int error();
-static int mwlink();
+static void error();
+static void mwlink();
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
@@ -284,6 +303,7 @@ mwopen(dev, mode)
  * Attempt to move the heads to the inside track.
  * Note that at this point, the cache has been flushed.
  */
+void
 mwclose(dev)
     int dev;
 {
@@ -313,6 +333,7 @@ mwclose(dev)
 /*
  * Strategy
  */
+void
 mwstrat(b)
     register struct buf *b;
 {
@@ -367,6 +388,7 @@ mwstrat(b)
 /*
  * Goose the lower half
  */
+void
 mwstart()
 {
     if (!busget(&mwstart))
@@ -386,6 +408,7 @@ mwstart()
  * and a stop command that carried the head, precompensation and write
  * current bits of somebody else's command would not be this driver's own.
  */
+void
 mwstop()
 {
     mwstate = STOPPED;
@@ -403,6 +426,7 @@ mwstop()
  * ability to screen further controller interrupts
  * until the current service is done.
  */
+void
 mwint()
 {
     if (mwstate == STOPPED || mwstate == INTRPT || cmd.stat == BUSY)
@@ -419,6 +443,7 @@ mwint()
 /*
  * Service a read/write interrupt
  */
+void
 rwint()
 {
     if (cmd.stat == OK) {
@@ -446,6 +471,7 @@ rwint()
 /*
  * Advance the queue to the next request
  */
+void
 advque()
 {
     struct buf *f;
@@ -465,6 +491,7 @@ advque()
 /*
  * Select a new drive
  */
+void
 newdrv()
 {
     curdrv = mwbuf->dev & 3;
@@ -504,6 +531,7 @@ newdrv()
 /*
  * Set up a new read/write command
  */
+void
 newrw()
 {
     /*
@@ -527,6 +555,7 @@ newrw()
 /*
  * Issue (or re-issue) a read/write command
  */
+void
 rwcmd()
 {
     static UINT track, head, sector;
@@ -597,6 +626,7 @@ mwcyl(blk, spc, off, roll, len)
  * Flag an error
  */
 static
+void
 error()
 {
     mwbuf->flags |= BERROR;
@@ -650,6 +680,7 @@ mwinit(seg)
 /*
  * Reset (initialize) the controller
  */
+void
 reset()
 {
     extern char map0[];
@@ -678,6 +709,7 @@ reset()
 /*
  * Kick the controller
  */
+void
 attn()
 {
     cmd.stat = BUSY;
@@ -688,6 +720,7 @@ attn()
  * Issue a command whose completion will be
  * serviced by an interrupt.
  */
+void
 issue()
 {
     di();
@@ -700,6 +733,7 @@ issue()
 /*
  * Issue a command and wait for completion
  */
+void
 mwwait()
 {
     attn();
@@ -727,6 +761,7 @@ mwwait()
  * a second on no particular phase, so without that count a command issued
  * a moment before the tick would be shot down after a moment in flight.
  */
+void
 mwcheck()
 {
     di();
@@ -767,6 +802,7 @@ mwcheck()
  * itself in carries the probe instead of a line number.
  */
 static
+void
 mwbusready()
 {
     wakeup(mwbusready);
@@ -778,6 +814,7 @@ mwbusready()
  * ends when busgive calls it back.
  */
 static
+void
 mwbusplease()
 {
     di();
@@ -858,6 +895,7 @@ mwbusplease()
  * pointer-to-object, which is what &cmd is.
  */
 static
+void
 mwlink()
 {
     char *cp;

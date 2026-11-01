@@ -17,6 +17,8 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 #include <sys/tty.h>
+extern unsigned char intoff();
+extern unsigned char pic_init();
 
 extern int in(), out();
 extern int di(), ei();
@@ -35,6 +37,7 @@ extern int spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
  * Write one vector entry: jp <fn>, padded to the 8259's four bytes.
  */
 static
+void
 vecset(v, fn)
     UINT v;
     int (*fn) ();
@@ -52,6 +55,7 @@ vecset(v, fn)
  * The Wunderbus/MultIO master: IR0..IR7 are the eight resident stubs.
  */
 static
+void
 master_vectors()
 {
     vecset(0x200, int0);
@@ -70,6 +74,7 @@ master_vectors()
  * itself (the slave vectors itself).
  */
 static
+void
 ss1_mvec()
 {
     vecset(0x200, int0);
@@ -87,6 +92,7 @@ ss1_mvec()
  * and the FPU lines are spurious.
  */
 static
+void
 ss1_svec()
 {
     vecset(0x220, ovlint7);
@@ -104,7 +110,8 @@ extern int ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
 extern int upd_clockinit(), upd_rtcinit(), upd_rtcwrite();
 
 /* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
-extern int ss1_putc(), ss1_start(), ss1_stop(), ss1_set(), ss1_uart_init();
+extern void ss1_putc(), ss1_uart_init();
+extern int ss1_start(), ss1_stop(), ss1_set();
 extern int ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
 
 /* the CompuPro SS1's two CAS-cascaded 8259s */
@@ -132,6 +139,7 @@ extern int ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
  * Point the group select at this PIC, where there is one.
  */
 static
+void
 picselect(p)
     struct pic8259 *p;
 {
@@ -167,6 +175,7 @@ picprobe(p)
  * base.  The clock (IR7) and, with a slave, the cascade (IR2) are left
  * unmasked; the attach loop opens the VI lines.
  */
+unsigned char
 pic_init()
 {
     register int base;
@@ -305,6 +314,7 @@ pic_init()
 /*
  * Mask line a.
  */
+unsigned char
 intoff(a)
     UINT a;
 {

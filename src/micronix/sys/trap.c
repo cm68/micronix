@@ -8,6 +8,12 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
+extern unsigned char next();
+extern void set0();
+extern void main();
+extern void r_system();
+extern void send();
+extern void fault();
 
 /*
  * Firmware constants, defined in uhdr.s
@@ -17,7 +23,8 @@ extern UINT trapvec, trapstack;
 
 extern char resched;            /* sleep.c defines and initializes it */
 
-extern int fork(), expand_bufs(), swap();
+extern int fork();
+extern void expand_bufs(), swap();
 
 /*
  * Permission masks.
@@ -55,6 +62,7 @@ extern int fork(), expand_bufs(), swap();
  * for tasks 1 and 0 are identical.
  * The stack pointer has been set.
  */
+void
 start()
 {
     extern int task0();
@@ -85,9 +93,11 @@ start()
  * but we still are executing from the same
  * physical memory.
  */
+void
 task0_body()
 {
-    extern int trap(), retask();
+    extern void trap();
+    extern int retask();
 
     /*
      * Set traps appropriately for
@@ -188,6 +198,7 @@ task0_body()
 
 char cause = 0;                 /* saved trap status */
 
+void
 trap()
 {
     cause = status;             /* save status for debugging */
@@ -235,6 +246,7 @@ trap()
  * Set traps and firmware registers
  * appropriately for task 0
  */
+void
 set0()
 {
     disable();

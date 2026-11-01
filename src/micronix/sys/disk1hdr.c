@@ -36,7 +36,8 @@
 #include <sys/disk1.h>
 #include <sys/ovl.h>
 
-extern int disk1open(), disk1close(), disk1strat(), disk1ioctl();
+extern int disk1open(), disk1ioctl();
+extern void disk1close(), disk1strat();
 extern int disk1probe(), disk1int(), disk1check();
 extern struct biovec disk1bvec;
 

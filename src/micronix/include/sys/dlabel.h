@@ -216,7 +216,7 @@ extern int dllabel();
  * Returns 0, or ENXIO for a slice that is not carved or runs off the
  * drive.
  */
-extern int dlslice();
+extern unsigned char dlslice();
 
 /*
  * Reload the label out of the buffer being written to block 0 of 'c',

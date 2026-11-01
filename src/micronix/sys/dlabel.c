@@ -17,12 +17,14 @@
 #include <sys/proc.h>
 #include <sys/dlabel.h>
 #include <errno.h>
+extern void brelse();
 
 /*
  * Decode the label lp points at into *g, *table and *tm.  The buffer it
  * is in is held by the caller.  Returns 1 for a readable label, else 0.
  */
 static
+unsigned char
 dlabel_decode(lp, g, table, tm)
     struct dlabel *lp;
     struct dlgeom *g;
@@ -182,7 +184,7 @@ dllabel(cdev, sl, g, table, tm)
  * dllabel() cached.  Returns 0, or ENXIO for a slice that is not carved
  * or runs off the drive.
  */
-int
+unsigned char
 dlslice(g, table, sl, offp, rollp, lenp, maxblkp)
     register struct dlgeom *g;
     struct slicemap *table;

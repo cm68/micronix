@@ -39,8 +39,10 @@
 #include <sys/dj.h>
 #include <sys/ovl.h>
 
-extern int djopen(), djclose(), djstrat(), djioctl();
-extern int djinit(), djtick(), djint(), djprobe();
+extern int djopen(), djioctl();
+extern void djclose(), djstrat();
+extern int djinit(), djtick(), djprobe();
+extern void djint();
 extern unsigned char djcomm[];
 extern struct biovec djbvec;
 

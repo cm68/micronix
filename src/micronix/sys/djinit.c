@@ -36,9 +36,11 @@
 #include <sys/con.h>
 #include <sys/dj.h>
 #include <sys/ovl.h>
+extern unsigned char inton();
 
 extern UINT8 map0[];
-extern int out(), inton();
+extern int out();
+extern unsigned char inton();
 
 djinit(seg)
     UINT seg;

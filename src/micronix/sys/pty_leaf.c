@@ -26,7 +26,7 @@
 #include <sys/sgtty.h>
 #include <errno.h>
 
-extern int ttyout(struct tty *), ttyin(UINT8, struct tty *), ttymode();
+extern void ttyout(struct tty *), ttyin(UINT8, struct tty *), ttymode();
 
 /*
  * Pair and side of a device number; -1 for a minor that is not one of
@@ -56,7 +56,7 @@ ptyidx(dev)
  * ustart(), and cstart() tests it and ustart() clears it (sys/ttyres.c).
  * t->start is reached no other way.
  */
-int
+void
 pty_start(t)
     register struct tty *t;
 {
@@ -71,7 +71,7 @@ pty_start(t)
  * One cooked byte from this end becomes one for the other end to read,
  * through the same ttyin() a board port's interrupt calls.
  */
-int
+void
 pty_put(t, c)
     struct tty *t;
     char c;
@@ -83,7 +83,7 @@ pty_put(t, c)
  * sgtty on the slave is the terminal's; on the master there is no
  * terminal, so let stty say so.
  */
-int
+void
 ptyioctl(dev, cmd, arg)
     int dev, cmd;
     char *arg;

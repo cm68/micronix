@@ -12,6 +12,16 @@
 #include <sys/ovl.h>
 #include <errno.h>
 #include <sys/pic8259.h>
+extern void mumcontrol();
+extern void mumstatus();
+extern void muenable();
+extern void sleep();
+extern void ttyopen();
+extern void wakeup();
+extern void ttyclose();
+extern void ttywrite();
+extern void ttymode();
+extern void ttyhangup();
 
 /*
  * The static routines below, declared before anything calls them.
@@ -21,7 +31,7 @@
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-int ttinit();
+extern void ttinit();
 
 #define NMIO    TTY_SLOTS       /* struct tty slots, not minors (see tty.h) */
 #define MBASE 0x48
@@ -97,13 +107,14 @@ int ttinit();
  * Hardware fiddlers in mio.s, and the SS1's 2651 in ss1_uart.c
  */
 extern int ace_start(), ace_stop(), ace_putc(), ace_set();
-extern int ss1_start(), ss1_stop(), ss1_putc(), ss1_set();
-extern int ss1_uart_open();
-extern int ttypub();            /* publish the page's doors (sys/ttyres.c) */
-extern int ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
-extern int ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
-extern int outwait(struct tty *, int);  /* drain the output queue (sys/ttysys.c) */
-int mumint();                   /* below, and an entry point the resident half calls */
+extern int ss1_start(), ss1_stop(), ss1_set();
+extern void ss1_putc();
+extern void ss1_uart_open();
+extern unsigned char ttypub();            /* publish the page's doors (sys/ttyres.c) */
+extern void ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
+extern void ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
+extern void outwait(struct tty *, int);  /* drain the output queue (sys/ttysys.c) */
+extern void mumint();                   /* below, and an entry point the resident half calls */
 
 /*
  * Tty structures for the four ports: the SS1's 2651 and the three
@@ -151,6 +162,7 @@ ttdev(dev)
  * Open a MULT I/O tty.
  * Initialize tty structure and hardware.
  */
+void
 muopen(dev, mode)
     register dev;
 {
@@ -251,6 +263,7 @@ muopen(dev, mode)
 /*
  * Close
  */
+void
 muclose(dev)
 {
     register struct tty *t;
@@ -284,6 +297,7 @@ muclose(dev)
 /*
  * Read a multiboard tty
  */
+void
 muread(dev)
 {
     ttyread(ttdev(dev));
@@ -292,6 +306,7 @@ muread(dev)
 /*
  * Write a multiboard tty
  */
+void
 muwrite(dev)
 {
     ttywrite(ttdev(dev));
@@ -301,6 +316,7 @@ muwrite(dev)
  * A request to a multiboard tty.  Getting and setting its status are
  * the two the library's stty(3) and gtty(3) send.
  */
+void
 muioctl(dev, cmd, arg)
     int dev, cmd;
     char *arg;
@@ -317,6 +333,7 @@ muioctl(dev, cmd, arg)
  * Initialize a tty structure
  * This could be done by copying in a prototype structure.
  */
+void
 ttinit(tty, dev)
     register struct tty *tty;
 {
@@ -347,6 +364,7 @@ ttinit(tty, dev)
     }
 }
 
+void
 muselect(t)
     struct tty *t;
 {
@@ -361,6 +379,7 @@ muselect(t)
  * mumint - multio modem status change interrupt service routine
  */
 
+void
 mumint(t)
     struct tty *t;
 {
@@ -404,6 +423,7 @@ mumint(t)
  * Currently, the only line we play with here is DTR.
  */
 
+void
 mumcontrol(dev)
 {
     unsigned char a;
@@ -435,6 +455,7 @@ mumcontrol(dev)
  * on other than the first mult I/O board.
  */
 
+void
 mumstatus(dev)
 {
     unsigned char s;
@@ -490,6 +511,7 @@ mumstatus(dev)
  * Write a value to the interrupt enable register.
  */
 
+void
 muenable(dev, mode)
 {
     struct tty *t;

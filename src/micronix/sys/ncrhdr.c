@@ -37,8 +37,10 @@
 #include <sys/ncr.h>
 #include <sys/ovl.h>
 
-extern int ncropen(), ncrclose(), ncrstrat();
-extern int ncrinit(), ncrint(), ncrprobe();
+extern int ncropen();
+extern void ncrclose(), ncrstrat();
+extern int ncrinit(), ncrprobe();
+extern void ncrint();
 extern struct biovec ncrbvec;
 
 struct ovlhdr ncrhdr = { 5, &ncrinit, 0, 0, &ncrbvec, 0, &ncrprobe, &ncrint,

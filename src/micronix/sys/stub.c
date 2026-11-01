@@ -29,6 +29,7 @@
 #include <sys/con.h>
 #include <sys/proc.h>
 #include <sys/ovl.h>
+extern void iodone();
 
 /*
  * The driver's private data.  A real driver keeps its board state here -

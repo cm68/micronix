@@ -14,6 +14,23 @@
 #include <sys/signal.h>
 #include <obj.h>
 #include <errno.h>
+extern void sleep();
+extern void mrelse();
+extern void arginstall();
+extern void setusr();
+extern void readin();
+extern void send();
+extern void argfree();
+extern void irelse();
+extern void wakeup();
+extern unsigned char valid();
+extern unsigned char argbuild();
+extern unsigned char argalloc();
+extern unsigned char argscan();
+extern unsigned char fit();
+extern unsigned char rdhdr();
+extern unsigned char xchk();
+extern unsigned char access();
 
 #define HALT	0x76            /* system call trap */
 
@@ -70,8 +87,8 @@ extern int zerouser();
 extern int out();
 extern int getbyte(), getword();
 extern unsigned char segalloc();
-extern int segfree(unsigned);
-extern int newmap(), taskload();
+extern void segfree(unsigned);
+extern void newmap(), taskload();
 extern UINT nsegs;              /* free 4K segments (malloc.c) */
 
 static struct obj hdr = 0;
@@ -87,6 +104,7 @@ char zpage[512] = 0;   /* zero page for clearing bss */
  * therefore starts with no variables; through call 56, with the ones
  * its caller handed over.
  */
+void
 doexec(name, args, env)
     char *name, **args, **env;
 {
@@ -143,12 +161,14 @@ doexec(name, args, env)
  * The two entries.  exec keeps its original two arguments and gets an
  * empty environment; execve adds the vector the shell builds.
  */
+void
 exec(name, args)
     char *name, **args;
 {
     doexec(name, args, 0);
 }
 
+void
 execve(name, args, env)
     char *name, **args, **env;
 {
@@ -158,6 +178,7 @@ execve(name, args, env)
 /*
  * Get the inode and check access.
  */
+unsigned char
 xchk(name)
     char *name;
 {
@@ -186,6 +207,7 @@ xchk(name)
 /*
  * Read the header
  */
+unsigned char
 rdhdr()
 {
     u.offset = 0;
@@ -208,6 +230,7 @@ rdhdr()
  * that wraps would look small and let an image run past the end of
  * user memory.
  */
+unsigned char
 fit()
 {
     UINT brake, tbrake, sp;
@@ -274,6 +297,7 @@ ulen(s)
  * argsize is argc (2) + the two null terminators (4) + a pointer for
  * every string + the strings themselves.
  */
+unsigned char
 argscan(args, env)
     char **args, **env;
 {
@@ -395,7 +419,7 @@ argputw(addr, v)
  * page; running out before the null means the list does not fit, which
  * is E2BIG rather than a write off the end.
  */
-static int
+static unsigned char
 argcopy(s, dp, roomp)
     UINT s; UINT *dp, *roomp;
 {
@@ -425,6 +449,7 @@ argcopy(s, dp, roomp)
  * Check the free count first and answer ENOMEM rather than panicking in
  * segalloc().
  */
+unsigned char
 argalloc()
 {
     UINT p, n;
@@ -448,6 +473,7 @@ argalloc()
  * argsize and everything below it is left to the image.  The strings
  * are copied once here; argscan() has already measured them.
  */
+unsigned char
 argbuild(args, env)
     char **args, **env;
 {
@@ -506,6 +532,7 @@ big:
  * old image.  mrelse() keeps page 15 - the old stack - so free it here,
  * now that nothing reads it, and install the pages the block uses.
  */
+void
 arginstall()
 {
     UINT p, n;
@@ -531,6 +558,7 @@ arginstall()
  * Release whatever a failed exec reserved.  On success the entries were
  * cleared by arginstall().
  */
+void
 argfree()
 {
     UINT p;
@@ -548,6 +576,7 @@ argfree()
 /*
  * Set up user's pc, id's, and signals.
  */
+void
 setusr()
 {
     static int *sp, *st;
@@ -563,6 +592,7 @@ setusr()
 /*
  * Read in the text and data segments
  */
+void
 readin()
 {
     extern char rst1[];

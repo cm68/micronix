@@ -8,7 +8,11 @@
 #include <types.h>
 #include <std.h>
 #include <time.h>
+extern void write();
+extern void close();
+extern void exit();
 
+void
 main()
 {
 	long clock;

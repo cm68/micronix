@@ -35,8 +35,10 @@
 #include <sys/mw.h>
 #include <sys/ovl.h>
 
-extern int mwopen(), mwclose(), mwstrat();
-extern int mwcheck(), mwint(), mwprobe();
+extern int mwopen();
+extern void mwclose(), mwstrat();
+extern void mwcheck(), mwint();
+extern int mwprobe();
 extern int mwinit();
 extern struct biovec mwbvec;
 

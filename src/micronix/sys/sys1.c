@@ -14,13 +14,23 @@
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <errno.h>
+extern unsigned char ronly();
+extern unsigned char super();
+extern void idec();
+extern void irelse();
+extern void isync();
+extern void bsync();
+extern void pr();
+extern unsigned char valid();
+extern unsigned char access();
 
 extern char oalloc();       /* open.c: a descriptor or ERROR */
-extern int close(UINT8);    /* open.c */
+extern void close(UINT8);    /* open.c */
 
 /*
  * Break system call
  */
+void
 brake(addr)
     int addr;
 {
@@ -38,6 +48,7 @@ brake(addr)
 /*
  * Chdir system call
  */
+void
 chdir(name)
     char *name;
 {
@@ -62,6 +73,7 @@ chdir(name)
 /*
  * Chmod system call
  */
+void
 chmod(name, mode)
     char *name;
     int mode;
@@ -83,6 +95,7 @@ chmod(name, mode)
 /*
  * Chown system call
  */
+void
 chown(name, owner)
     char *name;
     UINT owner;
@@ -105,6 +118,7 @@ chown(name, owner)
  * Dup system call.  The descriptor arrives in u.hl, and the new one
  * goes back the same way.
  */
+void
 dup()
 {
     register struct file *fp;
@@ -134,6 +148,7 @@ dup()
  * the same way.  dup2(fd, fd) is a successful no-op, and an invalid
  * fd is refused before fd2 is touched.
  */
+void
 dup2(fd2)
     UINT8 fd2;
 {
@@ -159,6 +174,7 @@ dup2(fd2)
 /*
  * Sync system call
  */
+void
 sync()
 {
     isync();
@@ -169,6 +185,7 @@ sync()
 /*
  * Reboot system call
  */
+void
 reboot(howto)
     int howto;
 {
@@ -201,6 +218,7 @@ reboot(howto)
 /*
  * Getuid system call
  */
+void
 getuid()
 {
     u.hl = (u.u_gid << 8) | u.u_uid;
@@ -209,6 +227,7 @@ getuid()
 /*
  * Setuid system call
  */
+void
 setuid()
 {
     register char uid, gid;
@@ -229,6 +248,7 @@ setuid()
 /*
  * Nice system call
  */
+void
 nice()
 {
     register char nice;

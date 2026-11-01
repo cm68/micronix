@@ -13,6 +13,11 @@
 #include <sys/proc.h>
 #include <sys/signal.h>
 #include <errno.h>
+extern void ilock();
+extern void irelse();
+extern void send();
+extern void sleep();
+extern unsigned char valid();
 
 extern int rdwri(UINT8, UINT8, int, int);	/* below; rw and fd are bytes */
 
@@ -24,6 +29,7 @@ extern int rdwri(UINT8, UINT8, int, int);	/* below; rw and fd are bytes */
 /*
  * Read system call
  */
+void
 read(buf, count)
     int buf, count;
 {
@@ -33,6 +39,7 @@ read(buf, count)
 /*
  * Write system call
  */
+void
 write(buf, count)
     int buf, count;
 {

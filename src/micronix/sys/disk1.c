@@ -37,6 +37,20 @@
 #include <sys/dlabel.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+extern void brelse();
+extern void iodone();
+extern void bsort();
+extern void d1start();
+extern void newdrv();
+extern void newrw();
+extern void d1putb();
+extern void d1dma();
+extern void advque();
+extern void wakeup();
+extern void sleep();
+extern unsigned char dlslice();
+extern unsigned char busgive();
+extern unsigned char busget();
 
 extern int in(), out();
 
@@ -181,6 +195,7 @@ disk1open(dev, mode)
  * Device close.  The cache has been flushed; the board keeps the motors
  * turning until its own timer stops them.
  */
+void
 disk1close(dev)
     int dev;
 {
@@ -190,6 +205,7 @@ disk1close(dev)
 /*
  * Strategy
  */
+void
 disk1strat(b)
     register struct buf *b;
 {
@@ -247,6 +263,7 @@ disk1strat(b)
  * Goose the lower half.  The first request brings the controller up;
  * after that each request picks a drive and reads or writes.
  */
+void
 d1start()
 {
     if (!busget(&d1start))
@@ -258,6 +275,7 @@ d1start()
  * Stop the controller.  The 8272 has nothing to halt and the motors run
  * on their own timer, so stopping is the state and the bus.
  */
+void
 d1stop()
 {
     d1state = STOPPED;
@@ -270,6 +288,7 @@ d1stop()
  * has been used.  Homing is a RECALIBRATE, which has no result phase -
  * its interrupt is the whole answer and disk1int follows it.
  */
+void
 newdrv()
 {
     curdrv = d1buf->dev & 7;
@@ -295,6 +314,7 @@ newdrv()
  * cylinder, then issue the command.  One sector per command, because a
  * buffer is 512 bytes and one sector is one block.
  */
+void
 newrw()
 {
     static UINT spc, csec, head, sect;
@@ -385,6 +405,7 @@ d1cmd(head, sect)
  * makes (uio.c says why at bhold) and the same one the hwsim card
  * unpicks.
  */
+void
 d1dma()
 {
     UINT32 a;
@@ -463,6 +484,7 @@ disk1int()
 /*
  * Advance the queue to the next request
  */
+void
 advque()
 {
     struct buf *f;
@@ -578,6 +600,7 @@ d1motor(drive)
  * short: the 8272 asks for a byte within microseconds of getting the
  * previous one.
  */
+void
 d1putb(c)
     UINT c;
 {
@@ -645,7 +668,7 @@ d1res(op)
  * never does is a fault, and the caller is told so rather than left
  * spinning.
  */
-static int
+static unsigned char
 d1wait()
 {
     static UINT32 i;
@@ -657,6 +680,7 @@ d1wait()
 }
 
 static
+void
 d1ready()
 {
     wakeup(d1ready);
@@ -668,6 +692,7 @@ d1ready()
  * finish - and the wait is a sleep, so the register is taken first.
  */
 static
+void
 d1busplease()
 {
     di();

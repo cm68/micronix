@@ -19,6 +19,8 @@
 #include <sys/proc.h>
 #include <sys/tty.h>
 #include <errno.h>
+extern unsigned char super();
+extern void wakeup();
 
 UINT8 jctl[NPROC];
 
@@ -30,6 +32,7 @@ UINT8 jctl[NPROC];
  * (or the super-user), and it may not name itself: a process cannot
  * stop the process that is stopping things.
  */
+void
 jobctl(op)
     int op;
 {

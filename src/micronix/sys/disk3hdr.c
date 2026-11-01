@@ -38,8 +38,10 @@
 #include <sys/disk3.h>
 #include <sys/ovl.h>
 
-extern int disk3open(), disk3close(), disk3strat();
-extern int disk3init(), disk3int(), disk3check(), disk3probe();
+extern int disk3open();
+extern void disk3close(), disk3strat();
+extern int disk3init(), disk3probe();
+extern void disk3int(), disk3check();
 extern struct biovec disk3bvec;
 
 struct ovlhdr disk3hdr = { 8, &disk3init, &disk3check, 0, &disk3bvec, 0,

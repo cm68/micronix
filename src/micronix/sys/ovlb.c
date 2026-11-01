@@ -17,7 +17,7 @@
 #include <errno.h>
 
 extern unsigned bmajor();
-extern int nodev(), iodone();
+extern void nodev(), iodone();
 extern struct biovec ovlbvec[];
 
 /*

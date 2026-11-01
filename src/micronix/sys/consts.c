@@ -11,17 +11,11 @@
 struct syscall
 {
     char nbytes;                /* no. of bytes in arguments */
-    int (*call)();              /* address of system call */
+    void (*call)();             /* address of system call */
 };
 
-extern int indir(), exit(), r_fork(), read(), write(), open(),
-    r_close(), wait(), creat(), link(), unlink(), exec(), execve(), chdir(),
-    r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(),
-    getpid(), mount(), umount(), setuid(), getuid(), stime(),
-    unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), stty(), gtty(),
-    r_ioctl(),
-    permission(), nice(), snooze(), sync(), reboot(), kill(),
-    dup(), dup2(), r_pipe(), signal(), jobctl(), select();
+extern void indir(), exit(), r_fork(), read(), write(), open(), r_close(), wait(), link(), unlink(), exec(), execve(), chdir(), r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(), getpid(), mount(), umount(), setuid(), getuid(), stime(), unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), s_stty(), s_gtty(), r_ioctl(), permission(), nice(), snooze(), sync(), reboot(), kill(), dup(), dup2(), r_pipe(), signal(), jobctl(), select();
+extern void creat();
 
 /*
  * System call branch table.  Arguments from registers, and returns to
@@ -61,8 +55,8 @@ struct syscall syssw[] = {
     2, &fstat,                  /* 28 */
     0, &pause,                  /* 29 */
     0, &badcall,                /* */
-    2, &stty,                   /* 31 */
-    2, &gtty,                   /* 32 */
+    2, &s_stty,                 /* 31 */
+    2, &s_gtty,                 /* 32 */
     4, &permission,             /* 33 */
     0, &nice,                   /* 34 */
     0, &snooze,                 /* 35 */
@@ -100,9 +94,54 @@ int ncalls = sizeof(syssw) / sizeof(struct syscall);
 #include <types.h>
 #include <sys/con.h>
 #include <sys/ovl.h>
+extern void exit();
+extern void indir();
+extern void open();
+extern void r_fork();
+extern void read();
+extern void write();
+extern void chdir();
+extern void exec();
+extern void execve();
+extern void link();
+extern void r_close();
+extern void unlink();
+extern void wait();
+extern void brake();
+extern void chmod();
+extern void chown();
+extern void mknod();
+extern void r_seek();
+extern void r_time();
+extern void stat();
+extern void getpid();
+extern void getuid();
+extern void mount();
+extern void setuid();
+extern void stime();
+extern void umount();
+extern void alarm();
+extern void badcall();
+extern void fstat();
+extern void pause();
+extern void r_ftruncate();
+extern void unimp();
+extern void r_ioctl();
+extern void kill();
+extern void nice();
+extern void permission();
+extern void reboot();
+extern void snooze();
+extern void sync();
+extern void dup();
+extern void dup2();
+extern void jobctl();
+extern void r_pipe();
+extern void select();
+extern void signal();
 
-extern int nodev(), nulldev(), nullwrite();
-extern int memread(), memwrite();
+extern void nodev(), nulldev(), nullwrite();
+extern void memread(), memwrite();
 extern int ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern int ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();
 

@@ -12,11 +12,17 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/proc.h>
+extern void cread();
+extern void aread();
+extern void brelse();
+extern void cwrite();
+extern void bawrite();
+extern void bdwrite();
 
 extern long seconds;
 
 extern char zpage[];            /* exec.c: a 512-byte zero page */
-extern int iomove(unsigned char, char *, int);	/* the flag is a byte */
+extern void iomove(unsigned char, char *, int);	/* the flag is a byte */
 
 /*
  * Read a file from its inode. The transfer parameters
@@ -150,6 +156,7 @@ iwrite(ip, dev)
  * user space (u.segflg == USER), but it may be in kernel
  * space (u.segflg == KSEG).
  */
+void
 iomove(flag, buf, count)
     UINT8 flag;
     register char *buf;

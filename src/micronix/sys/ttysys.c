@@ -23,10 +23,18 @@
 #include <sys/proc.h>
 #include <errno.h>
 #include <sys/signal.h>
+extern void cstart();
+extern void drain();
+extern void fillque();
+extern void killfg();
+extern void sendque();
+extern void sleep();
+extern void wakeup();
+extern void outwait();
 
-extern int fillque(), cstart(), cookin(), sendque(), killfg(), drain(),
-    sleep(), wakeup();
-extern int iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
+extern void fillque(), cstart(), sendque(), killfg(), drain(), sleep(), wakeup();
+extern int cookin();
+extern void iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
 extern int selectchan;          /* select(2)'s event, sys/select.c */
 
 /*
@@ -34,6 +42,7 @@ extern int selectchan;          /* select(2)'s event, sys/select.c */
  * Currently, this simply sets the process'
  * controlling tty.
  */
+void
 ttyopen(tty)
     struct tty *tty;
 {
@@ -47,6 +56,7 @@ ttyopen(tty)
 /*
  * Close a tty. Called by device close routine.
  */
+void
 ttyclose(tty)
     register struct tty *tty;
 {
@@ -63,6 +73,7 @@ ttyclose(tty)
 /*
  * High level output. Write characters to the terminal.
  */
+void
 ttywrite(tty)
     register struct tty *tty;
 {
@@ -127,6 +138,7 @@ ttyread(tty)
 /*
  * Get/set tty status (for an sgtty routine)
  */
+void
 ttymode(tty, flag)
     register struct tty *tty;
     UINT8 flag;
@@ -144,6 +156,7 @@ ttymode(tty, flag)
  * Wait for output queue to drain.
  * Called by ttyclose, ttymode, and ttywrite().
  */
+void
 outwait(tty, count)
     register struct tty *tty;
     register int count;

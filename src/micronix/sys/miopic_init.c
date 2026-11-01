@@ -15,6 +15,8 @@
  */
 #include <types.h>
 #include <sys/pic.h>
+extern unsigned char intoff();
+extern unsigned char pic_init();
 
 extern int in(), out();
 extern int di(), ei();
@@ -45,6 +47,7 @@ extern int vecalign();          /* sys/picvec.c */
  * polled, a zero vector base.  The clock (IR7) and cascade (IR6) are left
  * unmasked; the attach loop opens the VI lines.
  */
+unsigned char
 pic_init()
 {
     register int base;
@@ -81,6 +84,7 @@ pic_init()
     return (0);
 }
 
+unsigned char
 intoff(a)
 {
     di();

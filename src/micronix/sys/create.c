@@ -11,12 +11,19 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern unsigned char super();
+extern void irelse();
+extern void itrunc();
+extern void ilock();
+extern void ilink();
+extern unsigned char access();
 
 extern char iopen();          /* open.c: a descriptor or ERROR */
 
 /*
  * Creat system call.
  */
+void
 creat(name, mode)
     char *name;
     int mode;
@@ -30,7 +37,7 @@ creat(name, mode)
      */
     if ((ip = iname(name)) == 0) {
         if ((ip = imkfile(mode & 07777)) == 0)
-            return ERROR;
+            return;
     } else {
         /*
          * file exists
@@ -38,11 +45,11 @@ creat(name, mode)
         if ((ip->i_mode & IFMT) == IFDIR) {
             u.error = EISDIR;
             irelse(ip);
-            return ERROR;
+            return;
         }
         if (!access(ip, IWRITE)) {
             irelse(ip);
-            return ERROR;
+            return;
         }
         itrunc(ip);             /* itrunc ignores special files */
     }
@@ -53,6 +60,7 @@ creat(name, mode)
 /*
  * Mknod system call
  */
+void
 mknod(name, mode, dev)
     char *name;
     int mode, dev;

@@ -11,6 +11,16 @@
 #include <sys/con.h>
 #include <sys/signal.h>
 #include <errno.h>
+extern unsigned char block();
+extern void sleep();
+extern void send();
+extern void pr();
+extern void sfree();
+extern void bwait();
+extern void brelse();
+extern unsigned char swapin();
+extern unsigned char swapout();
+extern unsigned char mget();
 
 char memwant = 0;              /* someone wants memory, so look for a
                                  * swapout */
@@ -21,11 +31,11 @@ char swapping = 0;             /* run status of swap process */
  * forking the login process, the power-up process falls
  * into this code, becoming the swapping process.
  */
-int
+void
 swap()
 {
     register struct proc *n;
-    extern int mfree();
+    extern void mfree();
 
     /*
      * The swap map was built by swapinit() during system initialization
@@ -106,6 +116,7 @@ findout()
  * Swap out process p. Called from swap() above and from fork().
  */
 
+unsigned char
 swapout(p)
     register struct proc *p;
 {
@@ -126,6 +137,7 @@ swapout(p)
  * Swap in process p.
  */
 
+unsigned char
 swapin(p)
     register struct proc *p;
 {

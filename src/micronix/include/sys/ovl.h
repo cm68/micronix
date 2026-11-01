@@ -185,14 +185,14 @@ struct ovlhdr {
 extern struct ovlhdr *ovlbmap(); /* ovlbmap(major): map that block module */
 extern struct ovlhdr *ovlcmap(); /* ovlcmap(major): map that char module */
 extern struct biovec ovlbvec[]; /* entries the block modules registered */
-extern int ovlremap();          /* ovlremap(): put this process's driver back */
+extern void ovlremap();          /* ovlremap(): put this process's driver back */
 extern char *ovldata();         /* ovldata(major): the driver's data, or 0;
                                  * block first, then char */
-extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
+extern unsigned char ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
 extern int ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
-extern int ovlattach(UINT);     /* ovlattach(seg): place a module, run its init */
+extern char ovlattach(UINT);     /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */
-extern int ovlntr();            /* ovlntr(line): call the handler on a line */
-extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
+extern unsigned char ovlntr();            /* ovlntr(line): call the handler on a line */
+extern char intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
 extern int intrline();          /* intrline(fn, seg): the line a handler was wired to */
-extern int intr_attach();       /* intr_attach(): tickle each card, wire ovlint */
+extern unsigned char intr_attach();       /* intr_attach(): tickle each card, wire ovlint */

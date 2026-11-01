@@ -7,7 +7,7 @@
 #define BYTESPERWORD	(sizeof(char *))
 
 TYPE char	CHAR;
-TYPE char	BOOL;
+/* BOOL comes from <types.h>; a second typedef here wins the include race */
 TYPE int	UFD;
 TYPE int	INT;
 TYPE int	REAL;

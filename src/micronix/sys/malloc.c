@@ -15,6 +15,17 @@
 #include <sys/ovl.h>
 #include <sys/signal.h>
 #include <errno.h>
+extern void pr();
+extern void panic();
+extern void mwake();
+extern void wakeup();
+extern void newmap();
+extern void send();
+extern void sleep();
+extern void ovlremap();
+extern void bopen();
+extern void lshift();
+extern void rshift();
 
 #define NONE    0               /* Decision cpu memory-access bits */
 #define FULL    3
@@ -99,6 +110,7 @@ segalloc()
 /*
  * Free a segment
  */
+void
 segfree(n)
     unsigned n;
 {
@@ -136,6 +148,7 @@ staler(q, n)
  * want its map back soon, whose task field is cleared; it is loaded
  * from mem[] again the next time it is switched in (newmap).
  */
+void
 taskalloc(p)
     struct proc *p;
 {
@@ -167,6 +180,7 @@ taskalloc(p)
  * Free a task slot.  Called with the segments themselves (mfree), so
  * what the table holds means nothing after this.
  */
+void
 taskfree(p)
     struct proc *p;
 {
@@ -187,6 +201,7 @@ taskfree(p)
  * trap returns to user mode - and to the process's own task - without
  * one (trap.c), and a fault grows the process inside a trap.
  */
+void
 taskload(p)
     struct proc *p;
 {
@@ -198,6 +213,7 @@ taskload(p)
  * Free a process' memory.
  * Called by exit(), swapout().
  */
+void
 mfree(p)
     struct proc *p;
 {
@@ -216,6 +232,7 @@ mfree(p)
 /*
  * Wake up memory sleepers
  */
+void
 mwake()
 {
     if (memwant)
@@ -227,6 +244,7 @@ mwake()
  * Free memory, reset permissions, and distribute
  * a grow segment. Called by exec().
  */
+void
 mrelse()
 {
     UINT8 i, grow;
@@ -252,6 +270,7 @@ mrelse()
  * Restore the memory of a swapped-out process.
  * Called by swapin(), and also by fork().
  */
+unsigned char
 mget(p)
     struct proc *p;
 {
@@ -288,6 +307,7 @@ mget(p)
  * grow segment if necessary. Sleep for memory.
  * Called by fault() and valid() (below).
  */
+unsigned char
 grow(seg)
     UINT seg;
 {
@@ -354,6 +374,7 @@ grow(seg)
  * Grow the process as appropriate.
  * Called by read(), stat(), ...
  */
+unsigned char
 valid(addr, count)
     UINT count, addr;
 {
@@ -376,6 +397,7 @@ valid(addr, count)
  * Memory fault handler.
  * Called from trap() (trap.c).
  */
+void
 fault()
 {
     register UINT8 tseg, pseg, temp;
@@ -407,6 +429,7 @@ fault()
  * Copy the core image of the current process to a new process.
  * Called from procopy (fork.c).
  */
+void
 bankcopy(p)
     struct proc *p;
 {
@@ -448,6 +471,7 @@ bankcopy(p)
  * the only supervisor task and is what the kernel runs in, so this is
  * task 0's entry for the page whichever task the process returns to.
  */
+void
 newmap(n)
     struct proc *n;
 {
@@ -491,6 +515,7 @@ swapmap[MAPSIZE] = 0;
  * and a map with a size in it that nobody computed is a map that has the
  * first child killed.
  */
+void
 swapinit()
 {
     struct dlgeom g;
@@ -577,6 +602,7 @@ salloc(size)
 /*
  * Add a segment of swap space to the swap map
  */
+void
 sfree(size, blk)
     int size;
     unsigned blk;
@@ -598,6 +624,7 @@ sfree(size, blk)
 /*
  * Shift the map left, overwriting *mp
  */
+void
 lshift(mp)
     register struct map *mp;
 {
@@ -610,6 +637,7 @@ lshift(mp)
 /*
  * Shift the map right, duplicating *mp
  */
+void
 rshift(mp)
     struct map *mp;
 {

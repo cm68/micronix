@@ -10,6 +10,14 @@
 #include <sys/tty.h>
 #include <sys/signal.h>
 #include <errno.h>
+extern unsigned char super();
+extern void killall();
+extern void send();
+extern void run();
+extern void drainall();
+extern void write();
+extern void close();
+extern unsigned char valid();
 
 #define TERMIN	0               /* code for terminate */
 #define IGNORE	1               /* code for ignore */
@@ -17,6 +25,7 @@
 /*
  * Signal system call
  */
+void
 signal(sig, func)
     int sig;
     register int (*func) ();
@@ -39,6 +48,7 @@ signal(sig, func)
 /*
  * Kill system call.
  */
+void
 kill(sig)
     int sig;
 {
@@ -61,6 +71,7 @@ kill(sig)
 /*
  * Signal all processes with the given controlling tty.
  */
+void
 killall(tty, sig)
     struct tty *tty;
     UINT8 sig;
@@ -75,6 +86,7 @@ killall(tty, sig)
 /*
  * Send a signal to a process.
  */
+void
 send(p, sig)
     register struct proc *p;
     register UINT8 sig;
@@ -109,6 +121,7 @@ send(p, sig)
  * will be ignored, and an attempt to read a
  * a tty will return eof.
  */
+void
 setback(p)
     register struct proc *p;
 {
@@ -199,6 +212,7 @@ core()
  * If priority is low and a signal is waiting,
  * abort the current system call. Called by sleep.
  */
+void
 abort(dummy)
     int dummy;      /* unused: forces a 1-argument frame, see setframe */
 {

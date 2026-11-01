@@ -51,6 +51,13 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <errno.h>
+extern void brelse();
+extern void iodone();
+extern void bsort();
+extern void d2start();
+extern unsigned char dlslice();
+extern unsigned char busgive();
+extern unsigned char busget();
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
@@ -173,6 +180,7 @@ disk2open(dev, mode)
  * board has no light to turn off and the heads are not parked by this
  * controller.
  */
+void
 disk2close(dev)
     int dev;
 {
@@ -182,6 +190,7 @@ disk2close(dev)
 /*
  * Strategy
  */
+void
 disk2strat(b)
     register struct buf *b;
 {
@@ -230,6 +239,7 @@ disk2strat(b)
  * this board is in flight, which is why the request in flight and the
  * queue are the same list.
  */
+void
 d2start()
 {
     if (!busget(&d2start))

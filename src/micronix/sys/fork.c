@@ -13,8 +13,18 @@
 #include <sys/file.h>
 #include <sys/con.h>
 #include <errno.h>
+extern unsigned char next();
+extern void pr();
+extern void bankcopy();
+extern void run();
+extern void wakeup();
+extern void mfree();
+extern void sleep();
+extern unsigned char swapout();
+extern unsigned char mget();
+extern unsigned char procopy();
 
-extern int close(UINT8);    /* open.c */
+extern void close(UINT8);    /* open.c */
 
 extern struct proc *initproc, *swapproc;
 
@@ -65,6 +75,7 @@ fork()
  * Then return 1. Later, the copy will be activated
  * by next() and will return from this level with 0.
  */
+unsigned char
 procopy(child)
     register struct proc *child;    /* see comments to next (sleep.c) */
 {
@@ -158,6 +169,7 @@ newpid(a)
  * If the exit was caused by a core-dump signal,
  * then core is dumped.
  */
+void
 exit()
 {
     register UINT8 fd;
@@ -189,6 +201,7 @@ exit()
 /*
  * Wait system call
  */
+void
 wait()
 {
     char child;                 /* children detection flag */

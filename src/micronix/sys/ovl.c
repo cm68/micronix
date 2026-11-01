@@ -19,11 +19,13 @@
 #include <sys/ioctl.h>
 #include <sys/ovl.h>
 #include <sys/proc.h>
+extern void timeout();
+extern char intrset();
 
 extern UINT nbdev, ncdev;
 extern UINT8 map0[];
 extern unsigned bmajor(), cmajor();
-extern int nodev(), noioctl();
+extern void nodev(), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
 
@@ -95,7 +97,7 @@ UINT busheirseg = 0;		/* the segment busheir lives in */
  * really in.  The caller's goes back with its page, so a driver that
  * returns from here and sleeps later in its own code is still right.
  */
-int
+unsigned char
 ovlcall(fn, seg)
     int (*fn) ();
     UINT seg;
@@ -153,6 +155,7 @@ ovlcall1(fn, seg, arg)
  * the current segment is u.drv.  Zero is resident code - nothing to map.
  */
 static
+unsigned char
 ovlmapseg(seg)
     UINT seg;
 {
@@ -216,6 +219,7 @@ ovlcmap(maj)
  * leaving a stale page mapped costs nothing because no resident code reads
  * OVLBASE.
  */
+void
 ovlremap()
 {
     if (u.drv)
@@ -333,6 +337,7 @@ ovlcioctl(dev, cmd, arg)
  * has.
  */
 static
+char
 bvecset(maj, open, close, strat, ioctl)
     UINT maj;
     int (*open) ();
@@ -350,6 +355,7 @@ bvecset(maj, open, close, strat, ioctl)
 }
 
 static
+char
 cvecset(maj, open, close, read, write, ioc)
     UINT maj;
     int (*open) ();
@@ -390,6 +396,7 @@ cvecset(maj, open, close, read, write, ioc)
 #define	TICKINT	HERTZ			/* resident tick, once a second */
 
 static
+void
 ovltick()
 {
     register UINT i;
@@ -406,6 +413,7 @@ ovltick()
  * driver running has no timer of its own in tlist[] at all.
  */
 static
+unsigned char
 ovlarm()
 {
     if (ovltickarmed)
@@ -421,6 +429,7 @@ ovlarm()
  * Zero withdraws the request.
  */
 static
+char
 tickset(fn, seg)
     int (*fn) ();
     UINT seg;
@@ -455,6 +464,7 @@ tickset(fn, seg)
  * cost of the page and nothing else.
  */
 static
+char
 ovlplace(hdr, seg)
     struct ovlhdr *hdr;
     UINT seg;
@@ -524,7 +534,7 @@ ovlplace(hdr, seg)
  * at OVLBASE by definition, so a pointer to one says only which page is
  * mapped at the moment, which is not necessarily the page being placed.
  */
-int
+char
 ovlattach(seg)
     UINT seg;
 {

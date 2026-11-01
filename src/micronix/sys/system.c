@@ -9,13 +9,32 @@
 #include <sys/proc.h>
 #include <sys/signal.h>
 #include <errno.h>
+extern void brake();
+extern void chdir();
+extern void chmod();
+extern void chown();
+extern void sync();
+extern void dup();
+extern void dup2();
+extern void getuid();
+extern void nice();
+extern void setuid();
+extern void alarm();
+extern void getpid();
+extern void pause();
+extern void stat();
+extern void stime();
+extern void fstat();
+extern void snooze();
+extern void pr();
+extern void send();
 
 extern char resched;
 
 /*
  * extern struct proc * hier; 
  */
-extern int nulldev();
+extern void nulldev();
 
 char trace = 0;                 /* debugging switch */
 
@@ -25,7 +44,7 @@ char trace = 0;                 /* debugging switch */
 struct syscall
 {
     char nbytes;                /* no. of bytes in arguments */
-    int (*call)();              /* address of system call */
+    void (*call)();             /* address of system call */
 };
 
 #define BADCALL 47              /* index of a bad call entry in syssw */
@@ -36,7 +55,7 @@ struct syscall
  * Everything the table below takes the address of.
  *
  * Written the way con.c writes the same thing for its device
- * switches: as int-returning functions, grouped by the file that
+ * switches: as functions returning nothing, grouped by the file that
  * defines them, because that is the fact a reader wants.  None of
  * this was declared at all before; Whitesmith's took an unknown name
  * for an external int and an "&" of one for its address, which is why
@@ -45,25 +64,24 @@ struct syscall
  *
  * indir, unimp and badcall are in this file, below the table.
  */
-extern int indir(), unimp(), badcall();
+extern void indir(), unimp(), badcall();
 
-extern int brake(), chdir(), chmod(), chown(), sync(),
-    dup(), dup2(), getuid(), setuid(), nice();            /* sys1.c */
-extern int pause(), stat(), alarm(), getpid(), stime(),
-    fstat(), snooze();                                      /* sys2.c */
-extern int permission();                                    /* access.c */
-extern int mount(), umount();                               /* mount.c */
-extern int link(), unlink();                                /* link.c */
-extern int exec();                                          /* exec.c */
-extern int mknod(), creat();                                /* create.c */
-extern int open();                                          /* open.c */
-extern int read(), write();                                 /* rdwri.c */
-extern int exit(), wait();                                  /* fork.c */
-extern int kill(), signal();                                /* sig.c */
-extern int stty(), gtty();                                  /* cio.c */
+extern void brake(), chdir(), chmod(), chown(), sync(), dup(), dup2(), getuid(), setuid(), nice();            /* sys1.c */
+extern void pause(), stat(), alarm(), getpid(), stime(), fstat(), snooze();                                      /* sys2.c */
+extern void permission();                                    /* access.c */
+extern void mount(), umount();                               /* mount.c */
+extern void link(), unlink();                                /* link.c */
+extern void exec();                                          /* exec.c */
+extern void mknod();
+extern void creat();                               /* create.c */
+extern void open();                                          /* open.c */
+extern void read(), write();                                 /* rdwri.c */
+extern void exit(), wait();                                  /* fork.c */
+extern void kill(), signal();                                /* sig.c */
+extern void s_stty(), s_gtty();                              /* cio.c */
 
-extern int r_close(), r_fork(), r_ioctl();         /* reg.c */
-extern int r_pipe(), r_seek(), r_ftruncate(), r_time();
+extern void r_close(), r_fork(), r_ioctl();         /* reg.c */
+extern void r_pipe(), r_seek(), r_ftruncate(), r_time();
 
 /*
  * These two are entries 49 and 50 and NOTHING DEFINES THEM.  reg.c
@@ -91,7 +109,7 @@ extern int r_lock(), r_unlock();
  */
 extern struct syscall syssw[];
 extern int ncalls;
-extern int valid();             /* sys/malloc.c: make the page grown */
+extern unsigned char valid();             /* sys/malloc.c: make the page grown */
 
 /*
  * Entry point for system calls. A typical call:
@@ -99,6 +117,7 @@ extern int valid();             /* sys/malloc.c: make the page grown */
  * "hlt".
  * See trap() for the stack setup.
  */
+void
 system()
 {
     u.p->mode |= SYS;
@@ -169,6 +188,7 @@ docall(addr, direct)
 /*
  * Indirect system call
  */
+void
 indir(addr)
     char *addr;
 {
@@ -178,6 +198,7 @@ indir(addr)
 /*
  * Unimplemented call
  */
+void
 unimp()
 {
     u.error = EINVAL;
@@ -186,6 +207,7 @@ unimp()
 /*
  * Bad call
  */
+void
 badcall()
 {
     u.error = EINVAL;

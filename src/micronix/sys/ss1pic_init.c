@@ -15,6 +15,8 @@
  */
 #include <types.h>
 #include <sys/pic.h>
+extern unsigned char intoff();
+extern unsigned char pic_init();
 
 extern int in(), out();
 extern int di(), ei();
@@ -35,6 +37,7 @@ extern int vecalign();          /* sys/picvec.c */
  * is told the cascade is IR7 (ICW3 = 0x80).  Each has its own vector
  * table, moved to a boundary and named in ICW1/ICW2.
  */
+unsigned char
 pic_init()
 {
     register int base;
@@ -56,6 +59,7 @@ pic_init()
     return (0);
 }
 
+unsigned char
 intoff(a)
 {
     di();

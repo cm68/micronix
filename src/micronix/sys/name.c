@@ -12,6 +12,11 @@
 #include <sys/stat.h>
 #include <sys/inode.h>
 #include <errno.h>
+extern void ilock();
+extern void irelse();
+extern void brelse();
+extern unsigned char direqu();
+extern unsigned char access();
 
 extern struct inode *rootdir;
 
@@ -153,6 +158,7 @@ dlook(ip, np)
 /*
  * Check equality of two directory entries
  */
+unsigned char
 direqu(a, b)
     char *a, *b;
 {

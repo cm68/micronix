@@ -1,3 +1,10 @@
+extern void wakeup();
+extern void sleep();
+extern void brelse();
+extern void iodone();
+static char scsistart();
+static char scsiselect();
+extern unsigned char dlslice();
 /*
  * Micronix driver for a SCSI host adapter built on the NCR 5380.
  *
@@ -161,8 +168,10 @@
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int scsibsy(), scsistart(), scsifinish();
-static int scsireset(), scsiselect();
+static int scsibsy(), scsifinish();
+static char scsistart();
+static int scsireset();
+static char scsiselect();
 
 /*
  * How many targets the bus can hold, and so how many rows scs[] below
@@ -526,7 +535,7 @@ scsibsy(ip)
  * The poll is REQ in the bus and status register.  Returns 0, or -1 at
  * the first byte that never came.
  */
-static int
+static char
 scsiio(p, n, snd)
     register char *p;
     UINT n;
@@ -593,7 +602,7 @@ scsiio(p, n, snd)
  * caller has already taken the card, so the failure path here only has
  * to leave the bus alone.
  */
-static int
+static char
 scsiselect(ip, target)
     register struct scsiif *ip;
     UINT8 target;
@@ -632,7 +641,7 @@ scsiselect(ip, target)
 /*
  * The command phase: hand the CDB over, one byte per handshake.
  */
-static int
+static char
 scsicmd(ip)
     register struct scsiif *ip;
 {
@@ -692,6 +701,7 @@ scsibuild(ip, read, lba, nblk)
  * even been called.  So the flag is only set when a command really is in
  * flight.
  */
+void
 ncrint()
 {
     register struct scsiif *ip;
@@ -750,7 +760,7 @@ scsibegin(ip)
  * discipline in uio.c forbids sleeping with a buffer held, which is why
  * bhold() sits in ncrstrat() and not here.
  */
-static int
+static char
 scsistart(ip, target, read, lba, nblk)
     register struct scsiif *ip;
     UINT8 target;
@@ -1027,6 +1037,7 @@ ncropen(dev, mode)
  * a SCSI disk spins itself down on its own schedule, and a command that
  * has been finished has already left the bus free.
  */
+void
 ncrclose(dev)
     int dev;
 {
@@ -1055,6 +1066,7 @@ ncrclose(dev)
  * handler never touches it, so an interrupt taken mid-byte costs nothing
  * but the interrupt.
  */
+void
 ncrstrat(b)
     register struct buf *b;
 {

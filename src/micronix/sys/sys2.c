@@ -13,13 +13,20 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <sys/pic8259.h>
+extern unsigned char super();
+extern void istat();
+extern void ilock();
+extern void irelse();
+extern void sleep();
+extern unsigned char valid();
 
 extern long seconds;
-extern int itruncat();
+extern void itruncat();
 
 /*
  * Stat system call
  */
+void
 stat(name, buf)
     char *name, *buf;
 {
@@ -33,6 +40,7 @@ stat(name, buf)
 /*
  * Fstat system call
  */
+void
 fstat(buf)
     char *buf;
 {
@@ -47,6 +55,7 @@ fstat(buf)
 /*
  * Common code for stat and fstat
  */
+void
 istat(ip, buf)
     struct inode *ip;
     int *buf;
@@ -61,6 +70,7 @@ istat(ip, buf)
 /*
  * Getpid system call
  */
+void
 getpid()
 {
     u.hl = procid(u.p);
@@ -69,6 +79,7 @@ getpid()
 /*
  * Stime system call
  */
+void
 stime()
 {
     if (!super())
@@ -166,6 +177,7 @@ seek(fd, disp, from)
  * Shrinks only: a length at or past the current size is a no-op.  The
  * file must be open for writing and be a regular file.
  */
+char
 ftruncate(fd, length)
     UINT8 fd;
     UINT32 length;
@@ -197,6 +209,7 @@ ftruncate(fd, length)
 /*
  * Sleep system call (not internal sleep)
  */
+void
 snooze()
 {
     register unsigned int secs;
@@ -224,6 +237,7 @@ snooze()
  * Signal is sent in clock() (time.c).
  */
 
+void
 alarm()
 {
     static UINT old;
@@ -237,6 +251,7 @@ alarm()
 /*
  * Pause system call
  */
+void
 pause()
 {
     sleep(&pause, PRIUSER);

@@ -8,7 +8,6 @@
  */
 
 #include	"defs.h"
-#include	<types.h>
 #include	<sys/fs.h>
 #define DIRSIZ 15
 #include	<sys/stat.h>

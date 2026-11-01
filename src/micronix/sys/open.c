@@ -13,6 +13,18 @@
 #include <sys/file.h>
 #include <sys/con.h>
 #include <errno.h>
+extern void irelse();
+extern void copen();
+extern void ilock();
+extern void bopen();
+extern void fclose();
+extern void wakeup();
+extern void cclose();
+extern void iclose();
+extern void bflush();
+extern void bclose();
+extern void idec();
+extern unsigned char access();
 
 /*
  * A descriptor is one byte, and ERROR is -1 - the same byte as 0xff.
@@ -31,6 +43,7 @@ char iopen();                   /* the same */
  * is masked before it is translated, and O_APPEND is remembered in the
  * file structure for rdwri() to honour on every write.
  */
+void
 open(name, flags)
     char *name;
     unsigned int flags;
@@ -54,6 +67,7 @@ open(name, flags)
 /*
  * Pipe system call.
  */
+void
 pipe(vec)
     int *vec;
 {
@@ -143,6 +157,7 @@ iopen(ip, mode)
 /*
  * Close system call
  */
+void
 close(fd)
     UINT8 fd;
 {
@@ -158,6 +173,7 @@ close(fd)
  * Close a file, from close and exit.
  * Clear all region locks on last close.
  */
+void
 fclose(fp)
     register struct file *fp;
 {
@@ -191,6 +207,7 @@ fclose(fp)
        /*
         * Close an inode, from fclose and umount.
         */
+void
 iclose(ip, writ, dev)
     register struct inode *ip;
     UINT8 writ;

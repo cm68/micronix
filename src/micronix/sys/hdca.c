@@ -28,8 +28,16 @@
 #include <sys/hdca.h>
 #include <sys/ovl.h>
 #include <errno.h>
+extern void iodone();
+extern void wakeup();
+extern void sleep();
+static char exclude();
+extern unsigned char inton();
+extern unsigned char dlslice();
 
-extern int in(), out(), timeout(), inton();
+extern int in(), out();
+extern void timeout();
+extern unsigned char inton();
 
 struct hd hdinfo[NHD];
 
@@ -274,7 +282,7 @@ getsec(blk, hp)
  * request that finds it busy is queued on its drive's h_next.  phase00()
  * below is called with the controller free.
  */
-static int
+static char
 exclude(hp)
 	struct hd *hp;
 {
@@ -717,7 +725,7 @@ hdclose(dev)
  * polled to completion with interrupts off; a wedge here hangs, which is
  * what the original formatter did.
  */
-static int
+static char
 hdfmt(hp, c, b, drive)
 	struct hd *hp;
 	struct hdca_cmd *c;

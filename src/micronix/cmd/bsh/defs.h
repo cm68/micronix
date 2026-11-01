@@ -81,6 +81,7 @@
 /* arg list terminator */
 #define ENDARGS	0
 
+#include	<types.h>
 #include	"mac.h"
 #include	"mode.h"
 #include	"name.h"

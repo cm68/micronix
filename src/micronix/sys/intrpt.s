@@ -123,7 +123,7 @@ cascade:
 	add	a,2		; the line number, 2..4
 	ld	l,a
 	ld	h,0
-	call	_ovlntr		; dispatch that line's handlers
+	call	p,_ovlntr	; dispatch that line's handlers
 	ret
 
 ;

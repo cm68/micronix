@@ -27,6 +27,20 @@
 #include <sys/ovl.h>
 
 #include "build.h"
+extern char ovlattach();
+extern void pr();
+extern void brelse();
+extern void cus();
+extern void plogo();
+extern void pinit();
+extern void meminit();
+extern void binit();
+extern void pcon();
+extern void bopen();
+extern void panic();
+extern void irelse();
+extern void ovlplaceall();
+extern unsigned char intr_attach();
 
 /*
  * resident data, defined in main_data.c (and malloc.c / con.c)
@@ -43,8 +57,8 @@ extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
 extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
-extern int swapinit();          /* malloc.c */
-extern int nodev();             /* con.c */
+extern void swapinit();          /* malloc.c */
+extern void nodev();             /* con.c */
 extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
 
 /*
@@ -96,6 +110,7 @@ drvprobe(major, name, ndrv)
 /*
  * System initialization
  */
+void
 main()
 {
     char ronly = 0;
@@ -198,6 +213,7 @@ main()
  * is restored with a literal.
  */
 static
+void
 putblk(bp, seg, off)
     struct buf *bp;
     UINT8 seg;
@@ -222,6 +238,7 @@ putblk(bp, seg, off)
  * the page as zeros.
  */
 static
+void
 putzero(seg, off)
     UINT seg, off;
 {
@@ -256,6 +273,7 @@ putzero(seg, off)
  * the frame is spoken for.  The page is built through the frame itself
  * rather than through the scratch window (putblk below).
  */
+void
 ovlplaceall()
 {
     struct obj hdr;
@@ -363,6 +381,7 @@ ovlplaceall()
 /*
  * Initialize the first proc structure
  */
+void
 pinit()
 {
     UINT8 i;
@@ -395,6 +414,7 @@ pinit()
 /*
  * Print the logo
  */
+void
 plogo()
 {
     pr("\nMicronix 2.0\n");
@@ -409,6 +429,7 @@ plogo()
 /*
  * Check that there is enough memory to run.
  */
+void
 pcon()
 {
     if (totmem < 128 || (totmem < 256 && swapdev == 0))
@@ -433,6 +454,7 @@ pcon()
  * Set nsegs to the number of 4K segments, and set segmap[n] to 1 if the
  * nth segment is missing.
  */
+void
 meminit()
 {
     int n;
@@ -459,6 +481,7 @@ meminit()
 /*
  * Initialize the blist. Called once from main().
  */
+void
 binit()
 {
     struct buf *b;

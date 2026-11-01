@@ -13,10 +13,18 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern void ilock();
+extern void irelse();
+extern void sleep();
+extern void panic();
+extern void pr();
+extern void brelse();
+extern void bdwrite();
+extern void wakeup();
 
 struct inode ilist[];
 
-extern int iio(unsigned char, struct inode *);	/* below; flag is a byte */
+extern unsigned char iio(unsigned char, struct inode *);	/* below; flag is a byte */
 
 /*
  * Return a pointer to a locked inode.
@@ -69,6 +77,7 @@ iget(num, dev)
 /*
  * Lock an inode
  */
+void
 ilock(ip)
     struct inode *ip;
 {
@@ -85,6 +94,7 @@ ilock(ip)
  * Read or write the inode.
  * Inode should be busy.
  */
+unsigned char
 iio(flag, ip)
     UINT8 flag;
     register struct inode *ip;
@@ -128,6 +138,7 @@ iio(flag, ip)
  * Release the inode and wakeup
  * anyone waiting for it.
  */
+void
 irelse(i)
     register struct inode *i;
 {
@@ -159,6 +170,7 @@ itime()
  * Flush the ilist. Used by umount to flush dev's inodes
  * and remove them from the cache.
  */
+void
 iflush(dev)
     int dev;
 {
@@ -177,6 +189,7 @@ iflush(dev)
 /*
  * Sync the ilist. Called from sync().
  */
+void
 isync()
 {
     register struct inode *ip;

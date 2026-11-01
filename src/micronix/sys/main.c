@@ -25,6 +25,7 @@
 #include <sys/con.h>
 #include <sys/ovl.h>
 #include <sys/signal.h>
+extern void pr();
 
 /*
  * Kernel configuration, formerly con.c.  These are resident globals:
@@ -59,7 +60,7 @@ char lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
 extern UINT8 nbufs;             /* uhdr.s's _nbufs: the published count */
 
 extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
-extern int nodev();             /* con.c */
+extern void nodev();             /* con.c */
 
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
@@ -85,6 +86,7 @@ extern int nodev();             /* con.c */
  * The signon report: the machine summary, printed once the buffer cache
  * is at its final size, so the cache-block count is the one that matters.
  */
+void
 signon()
 {
     char i;
@@ -126,6 +128,7 @@ signon()
  * mem.s.  highmem is parked at _ebss and may run over the scratch - it
  * never borrows it - so it reaches the driver page, but the pool cannot.
  */
+void
 expand_bufs()
 {
     struct buf *b;

@@ -19,8 +19,8 @@
 #include <sys/pic8259.h>
 
 extern struct tty *ttdev();     /* minor -> slot (sys/multio.c) */
-extern int ttinit(), ttyopen();
-extern int ss1_txline(), ss1_uart_init();
+extern void ttinit(), ttyopen();
+extern void ss1_txline(), ss1_uart_init();
 
 #define SS1_UART_DATA   0x7c
 #define SS1_UART_STAT   0x7d
@@ -39,6 +39,7 @@ extern int in(), out();
  * caller (the tty output path) already holds interrupts off, so the
  * write is the whole of it.
  */
+void
 ss1_putc(tty, c)
     struct tty *tty;
     UINT8 c;
@@ -82,6 +83,7 @@ ss1_set(tty)
  * open is just the tty bring-up and the uart enable.  The console tty is
  * the MultIO's (major 1 lives in that array); the 2651 is the one port.
  */
+void
 ss1_uart_open(dev, mode)
     register dev;
 {

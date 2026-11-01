@@ -25,7 +25,7 @@
 #define INTERN	static
 #define FAST	register
 typedef char TEXT, TINY;
-typedef int BOOL;
+/* BOOL comes from <types.h>, which this header includes above */
 typedef short COUNT;
 typedef unsigned char UTINY;
 typedef unsigned short UCOUNT;

@@ -11,6 +11,12 @@
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern void pr();
+extern void panic();
+extern void bdwrite();
+extern void prdev();
+extern void bawrite();
+extern unsigned char bcheck();
 
 extern char *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
@@ -197,6 +203,7 @@ balloc(dev)
 /*
  * Add block number bn to the freelist on device dev.
  */
+void
 bfree(bn, dev)
     UINT bn;
     int dev;
@@ -256,6 +263,7 @@ bfree(bn, dev)
  * the error says whether the bad number came off the free list (balloc)
  * or was handed in to be freed (bfree).
  */
+unsigned char
 bcheck(bn, sup, dev, who)
     UINT bn;
     int dev;

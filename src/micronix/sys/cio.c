@@ -14,12 +14,14 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern unsigned char valid();
 
 extern struct file *falloc();   /* open.c */
 
 /*
  * Access ciosw to open a character device
  */
+void
 copen(dev, mode)
     int dev;
     UINT8 mode;
@@ -30,6 +32,7 @@ copen(dev, mode)
 /*
  * Access ciosw to close a character device
  */
+void
 cclose(dev, mode)
     int dev;
     UINT8 mode;
@@ -40,6 +43,7 @@ cclose(dev, mode)
 /*
  * Access ciosw to read a character device
  */
+void
 cread(dev)
     int dev;
 {
@@ -49,6 +53,7 @@ cread(dev)
 /*
  * Access ciosw to write a character device
  */
+void
 cwrite(dev)
     int dev;
 {
@@ -61,6 +66,7 @@ cwrite(dev)
  * the parent's descriptor is still the listener.
  */
 static
+char
 cioswap(fd, fp, dev)
     UINT8 fd;
     int dev;
@@ -90,6 +96,7 @@ cioswap(fd, fp, dev)
  * A driver that changes u.fdev is handing the descriptor a different
  * device - a clone's accept - and cioswap()s this process's file to it.
  */
+char
 cioctl(fd, cmd, arg)
     UINT8 fd;
     int cmd;
@@ -126,9 +133,12 @@ cioctl(fd, cmd, arg)
  * The old system calls, kept for binaries built before the library
  * moved them onto ioctl.  They are the same two requests with the
  * system call's register and carry convention; new programs use the
- * library wrappers (lib/libc/gtty.c, stty.c).
+ * library wrappers (lib/libc/gtty.c, stty.c).  The workers carry
+ * the s_ prefix the library names do not, so a shared header can
+ * declare both without the two colliding.
  */
-gtty(addr)
+void
+s_gtty(addr)
     char *addr;
 {
     if (u.error) {
@@ -138,7 +148,8 @@ gtty(addr)
         u.af &= ~ERRBIT;
 }
 
-stty(addr)
+void
+s_stty(addr)
     char *addr;
 {
     if (u.error) {
@@ -162,6 +173,7 @@ cmajor(dev)
 /*
  * Do-nothing entry for biosw or ciosw
  */
+void
 nulldev()
 {
 }
@@ -169,6 +181,7 @@ nulldev()
 /*
  * Error entry for biosw or ciosw
  */
+void
 nodev()
 {
     u.error = ENXIO;
@@ -177,6 +190,7 @@ nodev()
 /*
  * An ioctl the device does not have.
  */
+void
 noioctl()
 {
     u.error = ENOTTY;
@@ -185,6 +199,7 @@ noioctl()
 /*
  * Null write. Pretend to write all characters.
  */
+void
 nullwrite()
 {
     u.count = 0;

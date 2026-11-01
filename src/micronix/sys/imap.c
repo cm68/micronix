@@ -12,6 +12,8 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern void bdwrite();
+extern void brelse();
 
 /*
  * Return the physical block number for logical block log,

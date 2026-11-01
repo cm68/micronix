@@ -1,3 +1,11 @@
+extern void wakeup();
+extern void sleep();
+extern void brelse();
+extern void iodone();
+static char idefinish();
+static char idestart();
+static unsigned char idewait();
+extern unsigned char dlslice();
 /*
  * Micronix driver for an IDE hard disk behind the S100Computers MYIDE
  * board.  The cpu moves every byte of a transfer itself - programmed I/O,
@@ -142,7 +150,9 @@
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int idebsy(), idewait(), idestart(), idefinish();
+static int idebsy();
+static unsigned char idewait();
+static char idestart(), idefinish();
 static int idereset();
 
 #define NDRIVES 2               /* the board's two drives */
@@ -540,7 +550,7 @@ idebsy(ip)
  * drive is in LBA mode, so the geometry never reaches it - it is only
  * used above this to work out which LBA a block is.
  */
-static int
+static char
 idecmd(ip, cmd, lba)
     register struct ideif *ip;
     UINT8 cmd;
@@ -593,6 +603,7 @@ idecmd(ip, cmd, lba)
  * been given the command.  So the flag is only set when a command really
  * is in flight and the status really does report the drive's answer.
  */
+void
 ideint()
 {
     register struct ideif *ip;
@@ -621,7 +632,7 @@ ideint()
  * that will do, and it is distinct from the board address, so a process
  * waiting here is not woken by the next process waiting for the board.
  */
-static int
+static unsigned char
 idewait(ip)
     register struct ideif *ip;
 {
@@ -651,7 +662,7 @@ idewait(ip)
  * idefinish() is the other half of the pair.  On failure the board is
  * already free and there is nothing to finish.
  */
-static int
+static char
 idestart(ip, unit, lba, read)
     register struct ideif *ip;
     UINT8 unit;
@@ -707,7 +718,7 @@ idestart(ip, unit, lba, read)
  *
  * Returns 0, or -1 if the drive reported an error or stopped answering.
  */
-static int
+static char
 idefinish(ip, p, read)
     register struct ideif *ip;
     register char *p;
@@ -929,6 +940,7 @@ ideopen(dev, mode)
  * finished, so there is nothing to tell it and no geometry needed to
  * tell it with.
  */
+void
 ideclose(dev)
     int dev;
 {
@@ -947,6 +959,7 @@ ideclose(dev)
  * to be the right one anyway: the hold is as short as it can be, and no
  * other process is kept off the window while this one waits for a disk.
  */
+void
 idestrat(b)
     register struct buf *b;
 {

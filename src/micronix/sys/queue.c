@@ -9,6 +9,12 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
+extern void drainques();
+extern void ustart();
+extern void drain();
+extern void qinit();
+static unsigned char qfree();
+static unsigned char qalloc();
 
 /*
  * The static routines below, declared before anything calls them.
@@ -18,7 +24,8 @@
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-static int qalloc(), qrelse(), qfree();
+static unsigned char qalloc(), qfree();
+static void qrelse();
 
 /*
  * queue protocol
@@ -57,6 +64,7 @@ struct cblock *cfree = 0;    /* free list */
  * Drain all queues and flush the output.
  * Called from sig().
  */
+void
 drainall(tty)
     struct tty *tty;
 {
@@ -71,6 +79,7 @@ drainall(tty)
  * Called above and from ttyout when tty is closed
  * and output que empties.
  */
+void
 drainques(tty)
     register struct tty *tty;
 {
@@ -87,6 +96,7 @@ drainques(tty)
 /*
  * Empty a queue, discarding its contents
  */
+void
 drain(q)
     register struct que *q;
 {
@@ -124,6 +134,7 @@ drain(q)
  * drain(q) fast struct que *q; { di(); while (q->count) getc(q); ei(); } 
  */
 
+void
 fillque(q)
     struct que *q;
 {
@@ -191,6 +202,7 @@ fillque(q)
  * bulk copy from que to user space
  */
 
+void
 sendque(q)
     register struct que *q;
 {
@@ -277,6 +289,7 @@ getc(q)
 }
 
 static
+unsigned char
 qalloc(q)
     register struct que *q;
 {
@@ -310,6 +323,7 @@ qalloc(q)
 }
 
 static
+void
 qrelse(q)
     register struct que *q;
 {
@@ -326,6 +340,7 @@ qrelse(q)
 }
 
 static
+unsigned char
 qfree(q)
     register struct que *q;
 {
@@ -356,6 +371,7 @@ qfree(q)
     }
 }
 
+void
 qinit(q)
     register struct que *q;
 {

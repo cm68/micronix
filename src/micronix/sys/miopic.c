@@ -9,6 +9,8 @@
  */
 #include <types.h>
 #include <sys/pic.h>
+extern unsigned char inton();
+extern unsigned char pic_eoi();
 
 extern int in(), out();
 extern int di(), ei();
@@ -31,6 +33,7 @@ extern int di(), ei();
  * master alone.  A slave line (3-5) is dismissed by the master's cascade
  * EOI - the slave's poll was its own acknowledge.
  */
+unsigned char
 pic_eoi(line)
 {
     if (line >= 3)
@@ -46,6 +49,7 @@ pic_eoi(line)
  * sits in BC and c1 emits nothing for a shift by a register, so the mask
  * forces the arithmetic that moves it out.
  */
+unsigned char
 inton(a)
 {
     di();

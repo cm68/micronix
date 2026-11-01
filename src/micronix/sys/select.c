@@ -58,9 +58,11 @@
 #include <sys/pty.h>
 #include <sys/net.h>
 #include <errno.h>
+extern unsigned char inton();
 
-extern int sleep(), wakeup();
-extern int in(), inton();
+extern void sleep(), wakeup();
+extern int in();
+extern unsigned char inton();
 extern struct tty mttys[];
 extern struct tty *ptyslave[], *ptymaster[];
 extern UINT console_minor;
@@ -135,6 +137,7 @@ devready(dev)
 /*
  * select(mask in HL): the readable subset in HL.
  */
+void
 select()
 {
     register UINT mask, bit, r;

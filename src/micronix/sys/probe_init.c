@@ -17,6 +17,10 @@
 #include <sys/ovl.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
+extern void panic();
+extern unsigned char intoff();
+extern unsigned char inton();
+extern unsigned char pic_eoi();
 
 /*
  * The same definition as sys/probe.c's, and it has to stay the same to
@@ -54,6 +58,7 @@ static UINT8 nintrdone;
  * the handler - plus the segment the driver was placed in.  Nothing is
  * wired yet: the line is not known until the card is tickled.
  */
+char
 intrset(probe, fn, seg)
     int (*probe) ();
     int (*fn) ();
@@ -125,6 +130,7 @@ bitline(mask)
  * above is machine-wide and would otherwise close the lines the first
  * pass opened.  A line is live exactly when it has a handler.
  */
+unsigned char
 intr_attach()
 {
     register UINT i;

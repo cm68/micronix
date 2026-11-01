@@ -12,10 +12,17 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
+extern unsigned char super();
+extern void irelse();
+extern void ilink();
+extern void ilock();
+extern void idec();
+extern unsigned char access();
 
 /*
  * Link system call
  */
+void
 link(old, new)
     char *old, *new;
 {
@@ -67,6 +74,7 @@ link(old, new)
  * U->offset has already been set by iname.
  * Called from link above and from imkfile (create.c).
  */
+void
 ilink(inum)
     int inum;
 {
@@ -87,6 +95,7 @@ ilink(inum)
 /*
  * Unlink system call.
  */
+void
 unlink(name)
     char *name;
 {

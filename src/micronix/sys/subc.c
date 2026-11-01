@@ -8,11 +8,15 @@
 #include <sys/sys.h>
 #include <sys/con.h>
 #include <sys/ovl.h>
+extern void sync();
+extern void pr();
+extern void prn();
+extern void prs();
 
 /*
  * panic stop
  */
-int
+void
 
 panic(s)
     char *s;
@@ -27,6 +31,7 @@ panic(s)
  * Print " on device <devname>/minor"
  */
 
+void
 prdev(s, dev)
     char *s;
     UINT dev;
@@ -39,6 +44,7 @@ prdev(s, dev)
  * 10, %o as octal, %x or %h as hex (all unsigned ints), and %s as string.
  */
 
+void
 pr(fmt, args)
     char *fmt;
     int args;                   /* may have any number of args */
@@ -79,6 +85,7 @@ pr(fmt, args)
  * Print an unsigned integer in base b
  */
 
+void
 prn(n, b)
     register unsigned n, b;
 {
@@ -96,6 +103,7 @@ prn(n, b)
  * Print a string
  */
 
+void
 prs(s)
     char *s;
 {
