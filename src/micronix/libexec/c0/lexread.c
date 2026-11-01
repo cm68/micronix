@@ -30,6 +30,7 @@
 #define O_RDONLY 0
 #define SEEK_SET 0
 extern int open();
+extern long lseek(unsigned char, long, int);
 #else
 #include <fcntl.h>
 #include <unistd.h>

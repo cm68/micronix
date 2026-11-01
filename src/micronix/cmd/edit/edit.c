@@ -30,8 +30,8 @@
  * edit has an io primitive of its own by that name (below), which the
  * redeclaration would collide with.
  */
-long	lseek();
 extern int read(), write(), open(), close(), creat(), unlink();
+extern long lseek(unsigned char, long, int);	/* fd is a byte, in A */
 
 #define	EOS	'\0'
 #define	NEWLINE	'\n'

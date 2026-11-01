@@ -5,6 +5,8 @@
  */
 
 #include "fp.h"
+#include <unistd.h>
+
 
 /*
  * devopen - open the volume and read its superblock.  The device is

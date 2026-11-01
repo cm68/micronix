@@ -69,7 +69,9 @@ static struct buf argbuf;
 extern int zerouser();
 extern int out();
 extern int getbyte(), getword();
-extern int segalloc(), segfree(), newmap(), taskload();
+extern unsigned char segalloc();
+extern int segfree(unsigned);
+extern int newmap(), taskload();
 extern UINT nsegs;              /* free 4K segments (malloc.c) */
 
 static struct obj hdr = 0;

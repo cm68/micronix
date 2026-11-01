@@ -17,7 +17,7 @@ PROC TREPTR	term();
 PROC TREPTR	makelist();
 PROC TREPTR	list();
 PROC REGPTR	syncase();
-PROC TREPTR	item();
+PROC TREPTR	item(BOOL);
 PROC VOID	skipnl();
 PROC VOID	prsym();
 PROC VOID	synbad();

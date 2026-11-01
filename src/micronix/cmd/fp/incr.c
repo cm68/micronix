@@ -8,6 +8,8 @@
  */
 
 #include "fp.h"
+#include <unistd.h>
+
 
 /*
  * tabread - read the dump table and return the dump time for the given

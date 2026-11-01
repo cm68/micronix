@@ -100,6 +100,7 @@ memwrite(dev)
  */
 
 extern char zpage[];            /* exec.c: a 512-byte zero page */
+extern int iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
 
 static
 krw(dev, rw)

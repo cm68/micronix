@@ -5,6 +5,8 @@
 #include <sys/mw.h>
 #include <sys/dlabel.h>
 
+int hdc_command(UINT8);		/* below; the opcode rides in A */
+
 struct drivespec {
 	UINT cylinders;
 	UINT8 heads;

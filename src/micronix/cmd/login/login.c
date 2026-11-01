@@ -38,6 +38,8 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <crypt.h>
+#include <unistd.h>
+
 
 /*
  * The records login reads and writes.  <pwd.h> is the tree's and the

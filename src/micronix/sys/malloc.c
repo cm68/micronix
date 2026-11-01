@@ -55,7 +55,12 @@ extern UINT taskmap;            /* uhdr.s's _taskmap: the task bitmap */
 
 /*
  * Allocate a segment
+ *
+ * A segment number is one page's index: 0..15 for the low 64K, and the
+ * pool segments above that, all under MAXSEG.  It fits a byte, so it
+ * comes back in A and the callers' checks stay byte comparisons.
  */
+unsigned char
 segalloc()
 {
     unsigned n; UINT8 limit;

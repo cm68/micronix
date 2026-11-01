@@ -9,8 +9,9 @@
  */
 
 #include <setjmp.h>
+#include <unistd.h>
 
-extern long lseek();
+
 
 long
 tell(fd)

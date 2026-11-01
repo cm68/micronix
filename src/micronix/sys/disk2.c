@@ -57,7 +57,11 @@
  * default and the definition says static.
  */
 static void d2begin(), d2done(), d2error(), d2fin(), d2home(), d2load(),
-    d2rw(), d2sc(), d2seek(), d2sel(), d2settle(), d2step();
+    d2rw(), d2sc(), d2seek(), d2settle();
+/* the two with a byte first parameter: the declaration is what tells
+ * the calls above their definition which register it arrives in */
+static void d2sel(UINT8, UINT8);
+static void d2step(UINT8, UINT);
 
 #define NDRIVES 4               /* Number of drives */
 #define RETRIES 10              /* no. of retries on r/w error */
@@ -475,7 +479,7 @@ d2sc(b, writemem)
  */
 static void
 d2sel(drive, head)
-    UINT drive, head;
+    UINT8 drive, head;   /* both masked to four bits by d2sel */
 {
     out(D2_CTL, D2_ATTN | D2_REG_DRIVE | (drive & 3));
     out(D2_DATA, (UINT8) ((1 << (drive + 4)) | (head & 0xf)));

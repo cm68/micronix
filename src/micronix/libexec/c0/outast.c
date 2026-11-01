@@ -337,7 +337,7 @@ emitExpr(struct expr *e)
 		for (ep = right; ep; ep = ep->next)
 			n++;
 		emit1(CALL);
-		emit1(c);
+		emit1(c | ((e->flags & E_AARG) ? 0x80 : 0));
 		emit1(n);
 		emitChild(left);
 		for (ep = right; ep; ep = ep->next)

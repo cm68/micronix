@@ -250,8 +250,20 @@ reads(char *insn)
 		return allregs(op);
 	if (strcmp(m, "pop") == 0)
 		return 0;
-	if (strcmp(m, "call") == 0)
+	if (strcmp(m, "call") == 0) {
+		/*
+		 * c1 prefixes a direct call with its reserved calling
+		 * convention marker: "call po,name", "call pe,name" or
+		 * "call p,name".  The first argument rides in A, which
+		 * isdead() accounts for by name, and the rest are on the
+		 * stack: the call reads no register.
+		 */
+		if (op[0] == 'p' &&
+		    (op[1] == ',' ||
+		     ((op[1] == 'o' || op[1] == 'e') && op[2] == ',')))
+			return 0;
 		return iscfn(op) ? 0 : R_CALL;
+	}
 	if (strcmp(m, "ret") == 0)
 		return R_HL | R_F;		/* the return value, and the condition */
 	if (strcmp(m, "ex") == 0)
@@ -411,6 +423,25 @@ deadmarked(int i)
 }
 
 /*
+ * A call whose first argument the prototype passes in A reads A.  c1
+ * marks those call lines with ";@argA".  Without the mark the model
+ * says a call reads no registers - the stack convention - and a rule
+ * could move a clobber across the call and feed it the wrong argument.
+ */
+static int
+argamarked(int i)
+{
+	char *p;
+
+	if (!win[i].text)
+		return 0;
+	for (p = win[i].text; *p; p++)
+		if (*p == ';' && strncmp(p, ";@argA", 6) == 0)
+			return 1;
+	return 0;
+}
+
+/*
  * Is every bit of reg overwritten before any of it is read?
  *
  * Partial writes are why this accumulates rather than testing one
@@ -446,6 +477,8 @@ isdead(int reg, int from)
 		}
 		if (win[i].kind != L_INSN)
 			continue;
+		if ((reg & R_A) && argamarked(i))
+			return 0;	/* the call consumes the A argument */
 		/*
 		 * Spelled without the complement: pass2 has no rule yet
 		 * for ~ inside a condition, and what it does with a shape

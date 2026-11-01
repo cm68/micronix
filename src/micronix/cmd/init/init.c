@@ -48,6 +48,8 @@
 #include <utmp.h>
 #include <mtab.h>
 #include <errno.h>
+#include <unistd.h>
+
 
 extern int errno;
 

@@ -16,6 +16,15 @@ C
 .in +5
 .br
 .bd
+int printf(char *format, ...);
+.br
+.bd
+int fprintf(FILE *stream, char *format, ...);
+.br
+.bd
+int sprintf(char *s, char *format, ...);
+.sp 2
+.bd
 # include <stdio.h>
 .sp
 .bd 2
@@ -117,8 +126,8 @@ u
 to indicate correspondence with a long integer argument.  The
 same thing may be accomplished with a capitalized conversion code.
 
-Anù characteò maù bå giveî thaô specifieó thå typå oæ conversioî 
-tï bå executed.
+Anï¿½ characteï¿½ maï¿½ bï¿½ giveï¿½ thaï¿½ specifieï¿½ thï¿½ typï¿½ oï¿½ conversioï¿½ 
+tï¿½ bï¿½ executed.
 .in -4
 .sp 2
 The conversion characters are listed and described below:
@@ -146,8 +155,8 @@ is converted to decimal notation in the following format:
 .bd
 [-]ddd.ddd
 
-Thå precisioî specificatioî determineó thå amounô oæ "d"s®  Á 
-precisioî oæ 0 results in no digits; defaulô is
+Thï¿½ precisioï¿½ specificatioï¿½ determineï¿½ thï¿½ amounï¿½ oï¿½ "d"sï¿½  ï¿½ 
+precisioï¿½ oï¿½ 0 results in no digits; defaulï¿½ is
 six digits.
 .sp 2
 .ti -1

@@ -1,3 +1,4 @@
+#include <unistd.h>
 /*
  * fd2 command from PWB
  *

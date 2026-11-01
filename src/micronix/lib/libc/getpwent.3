@@ -16,6 +16,21 @@ C
 .in +5
 .br
 .bd
+struct passwd *getpwent(void);
+.br
+.bd
+struct passwd *getpwuid(int uid);
+.br
+.bd
+struct passwd *getpwnam(char *name);
+.br
+.bd
+int setpwent(void);
+.br
+.bd
+int endpwent(void);
+.sp 2
+.bd
 #include <pwd.h>
 .sp
 .bd
@@ -63,8 +78,8 @@ getpwnam
 .sp 
 .fi
 .in -8
-Eacè pointeò containó thå broken-ouô fieldó oæ á linå iî thå 
-passworä file®				
+Eacï¿½ pointeï¿½ containï¿½ thï¿½ broken-ouï¿½ fieldï¿½ oï¿½ ï¿½ linï¿½ iï¿½ thï¿½ 
+passworï¿½ fileï¿½				
 
 Two fields, 
 .bd

@@ -25,6 +25,7 @@ struct expr {
 #define E_RESOLVED	0x02
 #define	E_FUNARG    0x04
 #define E_POSTFIX   0x08
+#define E_AARG      0x10	/* first argument is passed in A */
 	unsigned char op;
 	struct expr *left;
 	struct expr *right;

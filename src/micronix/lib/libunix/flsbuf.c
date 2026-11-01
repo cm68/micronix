@@ -4,9 +4,9 @@
  */
 
 #include	<stdio.h>
+#include <unistd.h>
 
 extern int	write(int, void *, int);
-extern long	lseek(int, long, int);
 
 _flsbuf(c, f)
 register FILE *	f;

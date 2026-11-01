@@ -63,6 +63,8 @@
 #include <sys/signal.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
 
 #define	PASSWD	"/etc/passwd"
 #define	LOCK	"/etc/passwdL"

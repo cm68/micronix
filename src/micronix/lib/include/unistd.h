@@ -24,26 +24,33 @@
 #endif
 
 /* System call prototypes */
-extern char access(char *pathname, unsigned char mode);
+/*
+ * The hand-written stubs take these arguments in HL and return in HL;
+ * the declarations say int so the compiler leaves them on the word
+ * convention.  The functions written in C - lseek, seek - keep their
+ * unsigned char fd and the A convention, consistent with their own
+ * definitions.
+ */
+extern int access(char *pathname, int mode);
 extern unsigned int alarm(unsigned int seconds);
 extern int chdir(char *path);
 extern int chmod(char *path, int mode);
 extern int chown(char *path, int owner);
-extern int close(unsigned char fd);
+extern int close(int fd);
 extern int creat(char *path, int mode);
-extern int dup(unsigned char fd);
-extern int dup2(unsigned char fd, unsigned char fd2);
+extern int dup(int fd);
+extern int dup2(int fd, int fd2);
 extern int exec(char *path, char *argv[]);
 extern int execve(char *path, char *argv[], char *envp[]);
 extern int execv(char *path, char *argv[]);
 extern char **	environ;
 extern void exit(int status);
 extern int fork(void);
-extern int fstat(unsigned char fd, char *buf);
-extern int ftruncate(unsigned char fd, long length);
+extern int fstat(int fd, char *buf);
+extern int ftruncate(int fd, long length);
 extern int getpid(void);
 extern int getuid(void);
-extern int gtty(unsigned char fd, char *buf);
+extern int gtty(int fd, char *buf);
 extern int kill(int pid, int sig);
 extern int link(char *oldpath, char *newpath);
 extern long lseek(unsigned char fd, long offset, int whence);
@@ -53,7 +60,7 @@ extern int nice(int inc);
 extern int open(char *, int, ...);
 extern int pause(void);
 extern int pipe(int *fds);
-extern int read(unsigned char fd, char *buf, int count);
+extern int read(int fd, char *buf, int count);
 extern int seek(unsigned char fd, int offset, int whence);
 extern int select(unsigned int mask);
 extern int setuid(int uid);
@@ -61,13 +68,13 @@ extern void *sbrk(int incr);
 extern int brk(void *addr);
 extern int stat(char *path, char *buf);
 extern int stime(long *tp);
-extern int stty(unsigned char fd, char *buf);
+extern int stty(int fd, char *buf);
 extern void sync(void);
 extern int time(long *tp);
 extern int umount(char *target);
 extern int unlink(char *pathname);
 extern int wait(int *status);
-extern int write(unsigned char fd, char *buf, int count);
+extern int write(int fd, char *buf, int count);
 extern int sleep(unsigned int seconds);
 
 #endif /* _UNISTD_H */

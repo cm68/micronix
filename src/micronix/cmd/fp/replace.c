@@ -9,6 +9,8 @@
  */
 
 #include "fp.h"
+#include <unistd.h>
+
 
 void repname();
 void repone();

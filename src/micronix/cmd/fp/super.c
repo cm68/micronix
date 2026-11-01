@@ -8,6 +8,8 @@
  */
 
 #include "fp.h"
+#include <unistd.h>
+
 
 int
 readsuper()

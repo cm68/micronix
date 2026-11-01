@@ -49,6 +49,8 @@
 #include <sys/dir.h>
 #include <obj.h>
 
+int conout(UINT8);		/* below; the character rides in A */
+
 /*
  * Whitesmith's will not link a bss symbol without an explicit
  * initialiser, and ccc is happy either way, so everything here says

@@ -12,7 +12,7 @@
 #include <sys/proc.h>
 #include <errno.h>
 
-extern char *swin();            /* uio.c: the scratch window */
+extern char *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
 
 /*

@@ -102,7 +102,7 @@ stime()
  */
 UINT32
 seek(fd, disp, from)
-    int fd;
+    UINT8 fd;
     register UINT disp;         /* block numbers are unsigned short */
     register UINT8 from;
 {
@@ -110,12 +110,21 @@ seek(fd, disp, from)
     static UINT32 offset;       /* file positions are unsigned (to ~15M) */
 
     if ((fp = ofile(fd)) == 0)
-        return (-1);            /* ofile set u.error = EBADF */
+        goto bad;               /* ofile set u.error = EBADF */
     if (fp->mode & PIPE) {
         u.error = ESPIPE;
-        return (-1);
+        goto bad;
     }
-    from %= 6;
+    /*
+     * The whences are 0..5 and nothing else.  "from %= 6" mapped
+     * 6, 7, ... onto them and quietly accepted a whence the caller
+     * never wrote, and it cost a sixteen-bit divide to do it.  A byte
+     * range test rejects the lot for two bytes.
+     */
+    if (from >= 6) {
+        u.error = EINVAL;
+        goto bad;
+    }
     offset = disp;
     if (from >= 3)
         offset <<= 9;
@@ -141,6 +150,15 @@ seek(fd, disp, from)
      */
     fp->rwptr = offset;
     return (offset);
+    /*
+     * One long -1 for all three failures.  Each return of it would
+     * otherwise be the two 0xffff words and the two exx that put them
+     * in HL' and HL - eight bytes - and a jump to the exit; three
+     * copies cost more than the three gotos and this block, and every
+     * path here has u.error set already.
+     */
+  bad:
+    return (-1);
 }
 
 /*
@@ -149,7 +167,7 @@ seek(fd, disp, from)
  * file must be open for writing and be a regular file.
  */
 ftruncate(fd, length)
-    int fd;
+    UINT8 fd;
     UINT32 length;
 {
     register struct file *fp;

@@ -25,7 +25,8 @@
 #include <sys/signal.h>
 
 extern int fillque(), cstart(), cookin(), sendque(), killfg(), drain(),
-    iomove(), sleep(), wakeup();
+    sleep(), wakeup();
+extern int iomove(unsigned char, char *, int);	/* fio.c: flag is a byte */
 extern int selectchan;          /* select(2)'s event, sys/select.c */
 
 /*

@@ -26,6 +26,8 @@
  */
 #include "ar.h"
 #include <obj.h>
+#include <unistd.h>
+
 
 struct	stat	stbuf;
 
@@ -57,7 +59,6 @@ char	*opt	=	{ "uvnbail" };
 
 int	signum[] = {SIGHUP, SIGINT, SIGQUIT, 0};
 int	sigdone();
-long	lseek();
 int	rcmd();
 int	dcmd();
 int	xcmd();

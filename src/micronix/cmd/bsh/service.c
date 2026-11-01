@@ -8,6 +8,8 @@
  */
 
 #include	"defs.h"
+#include <unistd.h>
+
 
 
 PROC VOID	gsort();

@@ -15,6 +15,9 @@
 #include <sys/reboot.h>
 #include <errno.h>
 
+extern char oalloc();       /* open.c: a descriptor or ERROR */
+extern int close(UINT8);    /* open.c */
+
 /*
  * Break system call
  */
@@ -105,12 +108,19 @@ chown(name, owner)
 dup()
 {
     register struct file *fp;
-    int fd;
+    UINT8 fd;
 
     fd = u.hl;
     if ((fp = ofile(fd)) == 0)
         return;
-    if ((fd = oalloc()) == ERROR)
+    /*
+     * oalloc() hands back a byte, and ERROR is -1 in that byte.  As
+     * an unsigned char fd promotes to 0x00ff, which is not the
+     * 0xffff an int -1 promotes to, so the comparison has to stay in
+     * the byte too - the cast is what keeps the compiler from
+     * widening both sides and testing the wrong answer.
+     */
+    if ((fd = oalloc()) == (UINT8) ERROR)
         return;
     u.olist[fd] = fp;
     fp->count++;
@@ -125,15 +135,15 @@ dup()
  * fd is refused before fd2 is touched.
  */
 dup2(fd2)
-    int fd2;
+    UINT8 fd2;
 {
     register struct file *fp;
-    int fd;
+    UINT8 fd;
 
     fd = u.hl;
     if ((fp = ofile(fd)) == 0)
         return;
-    if (fd2 < 0 || fd2 >= NOPEN) {
+    if (fd2 >= NOPEN) {
         u.error = EBADF;
         return;
     }

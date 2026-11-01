@@ -111,9 +111,8 @@ done:
 
 flush:
 	push	iy			;the file argument, on the stack
-	ld	l,c
-	ld	h,b			;the character rides in hl
-	call	__flsbuf		;returns the character or EOF
+	ld	a,c			;the character rides in a
+	call	pe,__flsbuf		;arg8: the marked call, ld makes it call nn
 	pop	de			;the argument off again
 	jr	done
 

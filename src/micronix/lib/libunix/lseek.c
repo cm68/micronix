@@ -28,7 +28,7 @@
 #define CSEEK 3			/* v6's block-granular SEEK_SET */
 
 extern int errno;
-extern long seekraw(unsigned char fd, unsigned offset, int whence);
+extern long seekraw(int fd, unsigned offset, int whence);
 
 /*
  * Move to an absolute position, in as many calls as it takes.

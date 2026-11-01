@@ -32,6 +32,8 @@
 #include <sys/dlabel.h>
 
 #include "mkfs.h"
+#include <unistd.h>
+
 
 extern int mknod(), unlink();
 

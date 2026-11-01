@@ -88,6 +88,8 @@
 #include <stdio.h>
 #include <sys/signal.h>
 #include <sys/sgtty.h>
+#include <unistd.h>
+
 
 #define CRLF "\r\n"
 #define wrc(ds) write(ds,&c,1)

@@ -26,6 +26,8 @@
 
 #include <sys/signal.h>
 #include <setjmp.h>
+#include <unistd.h>
+
 #define	NULL	0
 #define	FNSIZE	64
 #define	LBSIZE	512
@@ -71,7 +73,6 @@ char	*linebp;
 int	ninbuf;
 int	io;
 int	pflag;
-long	lseek();
 int	(*oldhup)();
 int	(*oldquit)();
 int	vflag	= 1;

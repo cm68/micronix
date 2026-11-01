@@ -46,7 +46,7 @@ static struct ciovec ovlcvec[OVLMAJ];
 #define	NTICK	12
 static struct tickrec {
     int (*fn) ();
-    UINT seg;
+    UINT8 seg;          /* a segment number: 0..15 */
 } ovlticks[NTICK];
 static UINT novltick;
 static char ovltickarmed = 0;		/* the resident tick is running */

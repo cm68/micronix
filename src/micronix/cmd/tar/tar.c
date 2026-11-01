@@ -67,6 +67,9 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <sys/signal.h>
+/* the fd is byte-wide and rides in A; no unistd.h here because its
+ * other declarations disagree with this file's older ones */
+extern long lseek(unsigned char, long, int);
 #endif
 
 #define TBLOCK	512
@@ -219,7 +222,6 @@ char	*usefile;
 char	magtape[] = "/dev/mt0";
 char	*malloc();
 long	time();
-long	lseek();
 long	telldir();
 char	*ctime();
 char	*rindex();

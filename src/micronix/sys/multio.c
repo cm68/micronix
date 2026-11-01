@@ -101,7 +101,7 @@ extern int ss1_start(), ss1_stop(), ss1_putc(), ss1_set();
 extern int ss1_uart_open();
 extern int ttypub();            /* publish the page's doors (sys/ttyres.c) */
 extern int ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
-extern int ttyin(), ttyout();   /* the line discipline, same page (sys/tty.c) */
+extern int ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
 int mumint();                   /* below, and an entry point the resident half calls */
 
 /*

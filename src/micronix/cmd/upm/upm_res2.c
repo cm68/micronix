@@ -12,6 +12,12 @@
 #include "upm.h"
 
 /*
+ * seek is upm's own syscall stub (upmsys.s), not libunix's: its
+ * arguments ride the word convention that stub reads, so it is not
+ * declared here and the compiler leaves the call on that convention.
+ */
+
+/*
  * cname - a micronix name into the FCB's name and type.
  *
  * The name up to the dot goes into the eight-byte name field, the three

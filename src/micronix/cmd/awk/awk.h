@@ -48,6 +48,9 @@ typedef	AWKFLOAT	awkfloat;
 awkfloat fcmp();
 #define fatof(s)  atol(s)
 
+/* b.c: the first parameter is a character, so it rides in A. */
+int member(char, char *);
+
 /* integer replacements for the math builtins and number formatting */
 AWKFLOAT isqrt(AWKFLOAT);
 AWKFLOAT ilog(AWKFLOAT);

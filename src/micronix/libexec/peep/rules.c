@@ -53,6 +53,7 @@ int n_masknoop = 0;
 int n_reuse = 0;
 int n_pushsrc = 0;
 int n_ptrload = 0;
+int n_ldhla = 0;
 int n_ixcopy = 0;
 int n_autozero = 0;
 int n_xordup = 0;
@@ -64,6 +65,8 @@ int n_ccall = 0;
 int n_cret = 0;
 int n_jpnext = 0;
 int n_hlarg = 0;
+int n_idxbase = 0;
+int n_exadd = 0;
 int n_shiftrun = 0;
 int n_noframe = 0;
 long saved = 0;
@@ -695,6 +698,19 @@ r_ccall(void)
 	i = hopcc(j2);
 	if (i < 0)
 		return 0;			/* unconditional hop: not ours */
+
+	/*
+	 * po, pe and p are reserved for the ABI marker c1 puts on a
+	 * direct call (lower.c, docall); a conditional call with one of
+	 * those conditions would be read as that marker by ld.  Leave
+	 * this jp/call/label sequence as it is - the call is then
+	 * checked as the ordinary call it is.  The carry conditions stay
+	 * available here.
+	 */
+	if (strcmp(ccinv[i + 1], "po") == 0 ||
+	    strcmp(ccinv[i + 1], "pe") == 0 ||
+	    strcmp(ccinv[i + 1], "p") == 0)
+		return 0;
 
 	sprintf(buf, "\tcall %s,%s\n", ccinv[i + 1], win[j1].key + 5);
 	replace2(j1, buf);
@@ -1659,6 +1675,149 @@ r_reload(void)
 	return 1;
 }
 
+/*
+ * A global array's address with the base parked on the stack while the
+ * subscript is worked out in HL:
+ *
+ *	ld hl,BASE
+ *	push hl
+ *	<subscript in HL>
+ *	pop de
+ *
+ * The push and pop carry BASE across the subscript and nothing else -
+ * and nothing between them may touch the stack, DE, or a branch, all
+ * checked below.  With that proved, BASE can go into DE at the top
+ * instead and the pair goes: the code after the pop sees exactly the
+ * state it did before, HL holding the subscript and DE the base.
+ *
+ * HL is the register the subscript works in, so taking BASE out of it
+ * is safe only if the subscript writes both halves before it reads
+ * either, and it has to write both - the address would otherwise have
+ * used half of BASE as part of itself.
+ *
+ * This is the shape c1 emits for "u.olist[fd]": the lhs is a global
+ * and the scaled subscript does not fit a rule's operand patterns, so
+ * the sum falls to the general path that stages the base on the stack.
+ */
+int
+r_idxbase(void)
+{
+	int j, pop, rh, rl;
+	char *op;
+	char buf[KLEN + 8];
+
+	if (!starts(0, "ld hl,"))
+		return 0;
+	op = win[0].key + 6;
+	/* ld de,(M) is a byte longer, and a register move is not this */
+	if (op[0] == '\0' || op[0] == '(' || regat(op) != 0)
+		return 0;
+	if (!is(1, "push hl"))
+		return 0;
+
+	rh = rl = 0;
+	pop = -1;
+	for (j = 2; j < nwin; j++) {
+		if (win[j].kind != L_INSN)
+			return 0;		/* a label or data: no entry */
+		if (starts(j, "pop ")) {
+			if (popreg(j) != R_DE)
+				return 0;
+			pop = j;
+			break;
+		}
+		if (starts(j, "push ") || starts(j, "call ") ||
+		    isbranch(win[j].key) || starts(j, "ld sp,") ||
+		    starts(j, "inc sp") || starts(j, "dec sp") ||
+		    starts(j, "ex (sp)"))
+			return 0;
+		if ((reads(win[j].key) | writes(win[j].key)) & R_DE)
+			return 0;
+		if (!rh && (reads(win[j].key) & R_H))
+			return 0;
+		if (!rl && (reads(win[j].key) & R_L))
+			return 0;
+		if (writes(win[j].key) & R_H)
+			rh = 1;
+		if (writes(win[j].key) & R_L)
+			rl = 1;
+	}
+	if (pop < 0 || !rh || !rl)
+		return 0;
+
+	sprintf(buf, "\tld de,%s\n", op);
+	delline(pop, 1);
+	delline(1, 1);			/* push hl */
+	replace(1, buf);		/* ld hl,BASE -> ld de,BASE */
+	n_idxbase++;
+	saved += 2;
+	return 1;
+}
+
+/*
+ * ex de,hl / add hl,de - the exchange only puts the operands the way
+ * round the add was handed.  Addition is commutative and its flags are
+ * symmetric, so the sum and flags are the same with the exchange gone;
+ * only DE is left holding the other operand, which is why the pair
+ * needs DE dead after it.
+ *
+ * The shape is what r_idxbase leaves behind once the stack staging is
+ * gone: the base in DE and the index in HL, swapped so HL has the base.
+ */
+int
+r_exadd(void)
+{
+	if (!is(0, "ex de,hl") && !is(0, "ex hl,de"))
+		return 0;
+	if (!is(1, "add hl,de"))
+		return 0;
+	if (!isdead(R_DE, 2))
+		return 0;
+
+	delline(0, 1);
+	n_exadd++;
+	saved += 1;
+	return 1;
+}
+
+/*
+ * ld hl,(M) / ld a,l  ->  ld a,(M)
+ *
+ * The word load is there only to hand its low byte to A.  When HL is
+ * dead from the byte read on, only the byte is wanted, and it can come
+ * straight from memory: one absolute byte load instead of a word load
+ * and a register move, one byte saved.  c1 makes this shape wherever a
+ * byte argument is taken from a word expression - a call's first
+ * argument out of u.hl, a descriptor's low byte - so it is common.
+ * ld touches no flags, so the two forms are exactly equivalent.
+ *
+ * The instructions must be adjacent: a label between them could make
+ * the load somebody's jump target.  isdead() also refuses across an
+ * unmarked label or a window it cannot see the end of.
+ */
+int
+r_ldhla(void)
+{
+	char buf[KLEN + 8];
+	int nxt;
+
+	if (win[0].kind != L_INSN)
+		return 0;
+	if (strncmp(win[0].key, "ld hl,(", 7) != 0)
+		return 0;
+	nxt = nextinsn(0);
+	if (nxt < 0 || !is(nxt, "ld a,l"))
+		return 0;
+	if (!isdead(R_HL, nxt + 1))
+		return 0;
+	/* "ld hl,(M)" -> "ld a,(M)" */
+	sprintf(buf, "\tld a,%s\n", win[0].key + 6);
+	replace2(nxt, buf);
+	n_ldhla++;
+	saved += 1;
+	return 1;
+}
+
 int
 applyrules(void)
 {
@@ -1667,6 +1826,8 @@ applyrules(void)
 	switch (k[0]) {
 	case 'e':
 		if (r_exx())
+			return 1;
+		if (r_exadd())
 			return 1;
 		return r_exde();
 	case 'a':
@@ -1712,6 +1873,10 @@ applyrules(void)
 			return 1;		/* ld (M),r ; ld r,(M) */
 		if (k[3] == 's')
 			return r_fexit();	/* ld sp,iy */
+		if (k[3] == 'h' && r_idxbase())	/* ld hl,BASE ; push hl ... pop de */
+			return 1;
+		if (k[3] == 'h' && r_ldhla())	/* ld hl,(M) ; ld a,l -> ld a,(M) */
+			return 1;
 		if (k[3] == 'h' && r_outi())	/* ld hl,n -> oarg */
 			return 1;
 		if (k[3] == 'd' && r_m1cmp())	/* ld de,-1 */
@@ -1771,7 +1936,8 @@ report(void)
 		"  shiftrun %d\n",
 		n_exde, n_ldazero, n_bitset, n_pushswap, n_pushsave,
 		n_bytestore, n_astore, n_reload, n_shiftrun);
-	fprintf(stderr, "peep: masknoop %d\n", n_masknoop);
+	fprintf(stderr, "peep: masknoop %d  ldhla %d  idxbase %d  exadd %d\n",
+		n_masknoop, n_ldhla, n_idxbase, n_exadd);
 }
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

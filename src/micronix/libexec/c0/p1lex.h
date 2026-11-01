@@ -57,6 +57,7 @@ extern int exitCode;
 
 /* cc1.c */
 extern void gripe(error_t errcode);
+extern void warn(char *msg);
 extern void fatal(error_t errcode);
 extern char *galloc(unsigned int size);
 extern char *permalloc(unsigned int n);

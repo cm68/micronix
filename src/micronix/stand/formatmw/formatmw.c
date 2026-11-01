@@ -50,6 +50,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys.h>
+#include <unistd.h>
+
 
 typedef unsigned char	UTINY;
 typedef unsigned int	UCOUNT;

@@ -13,6 +13,8 @@
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
 /* the PWB names for the two mode bits the shell tests */
 #define	IFMT	S_IFMT
 #define	IFDIR	S_IFDIR

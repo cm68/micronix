@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <sys/sgtty.h>
 
+int outc(char);			/* the character is byte-wide, passed in A */
+
 #define	LINES	24
 #define	COLS	80
 

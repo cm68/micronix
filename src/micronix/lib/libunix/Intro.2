@@ -125,6 +125,126 @@ so that it remains available across message writes, etc.
 
 .ce
 .bd
+C Calling Conventions
+
+A function passes its first argument in a register when the prototype
+says that parameter is an 8-bit scalar, that is a
+.bd
+char
+or
+.bd
+unsigned char
+and not a pointer, array, function or aggregate.  That argument
+travels in the
+.bd
+A
+register; the remaining arguments are pushed on the stack in the
+usual order.  A function whose result is an 8-bit scalar returns it
+in
+.bd
+A
+as well.  Every other argument, and every other result, travels in
+.bd
+hl
+- for a
+.bd
+long,
+the high half in
+.bd
+hl'
+and the low half in
+.bd
+hl.
+Passing a byte in
+.bd
+A
+saves the marshalling into
+.bd
+hl
+and back, but the two ends must agree about it.
+
+The convention is chosen at the call site from the prototype.  A
+call made with no prototype in view is assumed to use the ordinary
+word convention, so a callee whose first parameter is a byte will
+not receive it as one.  Prototype functions that take or return an
+8-bit scalar.
+
+To catch a disagreement at link time, the compiler records the
+callee's convention and marks the call with the one it used.  The
+assembler puts two bits in the function's object symbol, declared
+with
+
+.bd
+.abi name,bits
+
+where bit 1 says the first parameter is 8-bit and bit 2 says the
+return is 8-bit.  The compiler writes this declaration for every
+function it compiles.  A direct call is marked with a reserved
+conditional-call opcode:
+
+.ta 12
+.nf
+.bd
+call po	arg8/ret8	(0xE4)
+.br
+.bd
+call pe	arg8/ret16	(0xEC)
+.br
+.bd
+call p	arg16/ret8	(0xF4)
+.br
+.bd
+call	arg16/ret16	(0xCD)
+.fi
+
+.bd
+ld
+compares the marker with the callee's two bits.  They agree: the
+marker becomes an ordinary
+.bd
+call.
+They do not: the link fails, naming the function and both
+conventions, rather than running a program that passes the wrong
+register.  The
+.bd
+nz, z, nc, c
+and
+.bd
+m
+conditions are untouched; only
+.bd
+po, pe
+and
+.bd
+p
+are reserved this way.
+
+Hand-written assembly takes part in the same contract.  Put a byte
+first argument in
+.bd
+A
+and write the marked call:
+
+.bd
+call pe,name
+
+for a byte argument and a word result, or
+.bd
+call po,name
+for a byte result as well.  A function written in assembly declares
+its own convention with
+.bd
+.abi
+so callers compiled from C can check against it.  Leaving the
+declaration off means arg16/ret16, and any marked call to it fails
+the link - which is the point.  A call to a label local to the same
+assembly module is a segment relocation, not a symbol one: there is
+no declaration to compare, so the linker only turns the marker into
+a plain call.
+
+
+.ce
+.bd
 Assembly Language System Calls
 
 Syntax is given for A-Natural (Whitesmith's)

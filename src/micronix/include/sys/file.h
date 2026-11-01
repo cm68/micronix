@@ -17,5 +17,12 @@ struct file {
 #define PIPE	IEXEC           /* must include inode.h before this */
 
 /*
+ * The open file a descriptor names.  The descriptor is a byte - the
+ * syscall contract puts it in the low byte of u.hl - so the caller hands
+ * ofile that byte in A and the table is indexed at byte width.
+ */
+struct file *ofile(UINT8);
+
+/*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */

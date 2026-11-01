@@ -47,7 +47,7 @@
 
 #define RSH_PORT  514
 
-extern long lseek();            /* the kernel's seek, which returns the offset */
+/* lseek is declared by <unistd.h>, which this file includes. */
 
 /* one card-level request and its reply (include/sys/net.h) */
 struct netcard {

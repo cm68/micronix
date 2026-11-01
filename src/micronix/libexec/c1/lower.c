@@ -43,7 +43,8 @@ extern short verbose;
 
 
 Expr * donehl(Expr *e, unsigned char op);
-int ispow2(unsigned long n);
+Expr * donea(Expr *e, unsigned char op);
+unsigned char ispow2(unsigned long n);
 void matflag(unsigned char r);
 void normtree(Expr *e);
 Expr * step(Expr *e);
@@ -62,7 +63,7 @@ Expr * valtohl(Expr *e);
  * pass1's isBasicType emitted no comparison at all and jumped on
  * whatever flags the conjunct before it had left.
  */
-int
+unsigned char
 issymish(Expr *e)
 {
 	if (!e)
@@ -84,14 +85,14 @@ issymish(Expr *e)
  * arithmetic, which lands in HL and costs a register like any other
  * computed subexpression.
  */
-static int
+static unsigned char
 farslot(Expr *e)
 {
 	return e && e->op == LOCALVAR &&
 	    (e->u.var.off < -126 || e->u.var.off > 124);
 }
 
-int
+unsigned char
 islocdesc(Expr *e)
 {
 	if (!e)
@@ -166,7 +167,7 @@ keepchain(Expr *e)
  * the first is in HL when the second goes to load through it.  The
  * caller uses this to run the second one first.
  */
-int
+unsigned char
 needshl(Expr *e)
 {
 	if (!e || e->op != DEREF)
@@ -181,7 +182,7 @@ needshl(Expr *e)
  * check at the end of rewrite() asks the same question - this is that
  * test, named, so the places that have to ask it earlier can.
  */
-int
+unsigned char
 reduced(Expr *e)
 {
 	if (!e)
@@ -216,7 +217,7 @@ reduced(Expr *e)
  * register.  Only meaningful before the lvalue is reduced; afterwards
  * the same node means an address that was worked out.
  */
-int
+unsigned char
 isdestreg(Expr *e)
 {
 	if (!e)
@@ -258,7 +259,7 @@ baseop(unsigned char op)
 /*
  * Does evaluating this tree do anything besides produce a value?
  */
-int
+unsigned char
 sideeffect(Expr *e)
 {
 	if (!e)
@@ -302,7 +303,7 @@ dupableloc(Expr *e)
  * *(u+545)+8, the DEREF being the load of u.p.  A DEREF over a register
  * pointer or a literal address is not: the pointer is already in hand.
  */
-static int
+static unsigned char
 hasptrload(Expr *e)
 {
 	while (e) {
@@ -449,7 +450,7 @@ lowercompound(Expr *e)
  * here is the same widening RETURN gives a byte result.
  */
 void
-branchval(Expr *v, char w, int abyte)
+branchval(Expr *v, char w, unsigned char abyte)
 {
 	Expr *r, *asn;
 
@@ -755,7 +756,7 @@ docompound(Expr *e)
 {
 	unsigned char op = baseop(e->op);
 	char w = e->width;
-	int isbyte = ISBYTE(w);
+	unsigned char isbyte = ISBYTE(w);
 	Expr *addr, *val, *rhs, *sum, *n;
 	int keep;
 
@@ -787,7 +788,7 @@ docompound(Expr *e)
 	 */
 	if (isbyte && e->right->op == NUMBER) {
 		long m = e->right->u.val;
-		int bit;
+		unsigned char bit;
 
 		if (op == OR && (bit = ispow2(m & 0xff)) > 0) {
 			out("\tset ");
@@ -1014,7 +1015,7 @@ trybitset(Expr *e)
 	char w = e->width;
 	Expr *loc, *n;
 	long m;
-	int bit, isres;
+	unsigned char bit, isres;
 	unsigned char reg = 0;	/* index register, 0 = none */
 	int off = 0;
 	int hl = 0;		/* the address is (or has moved to) HL */
@@ -1145,6 +1146,32 @@ landarg(Expr *a)
 }
 
 /*
+ * Land a call's first argument in A, for a prototype whose first
+ * parameter is an 8-bit scalar.  c0 has already narrowed the argument
+ * to that type, so it is a byte; naming A as the place reuses the byte
+ * assignment rules, and the callee's entry stub puts the value back in
+ * the slot above the return address.  No marshalling into HL and no
+ * widening to a word: that is the whole saving.
+ */
+char
+landarga(Expr *a)
+{
+	Expr *ar, *asn;
+	char w;
+
+	if (!a)
+		return 0;
+	w = ISBYTE(a->width) ? a->width : 'b';
+
+	ar = mkcode(w, R_A);
+	ar->op = INA;
+	asn = mkbinary(ASSIGN, w, ar, a);
+	setdest(asn, DEST_VALUE);
+	freeexpr(rewrite(asn));
+	return w;
+}
+
+/*
  * Push one call argument, returning the stack bytes it consumed.
  * Only arguments after the first come here: the first rides to the
  * callee in HL.
@@ -1176,7 +1203,7 @@ pusharg(Expr *a)
  * back as a register node, or as a CODE that has not been converted
  * yet; either way the high word is in HL.
  */
-int
+unsigned char
 islongreg(Expr *e)
 {
 	if (!e)
@@ -1216,7 +1243,7 @@ longincomplete(Expr *e)
 #endif
 }
 
-int
+unsigned char
 islongop(Expr *e)
 {
 	if (!e || !e->left || !e->right)
@@ -1454,9 +1481,9 @@ Expr *
 dolongbin(Expr *e)
 {
 	unsigned char op = e->op;
-	int iscmp = (longflag(op, 1) != 0);
+	unsigned char iscmp = (longflag(op, 1) != 0);
 	Expr *opnd = iscmp ? e->left : e;
-	int swap = (op == GT || op == LE);
+	unsigned char swap = (op == GT || op == LE);
 	int sign;
 	char *fn;
 	Expr *l, *r, *n;
@@ -1643,7 +1670,18 @@ docall(Expr *e)
 	Expr *first = 0;
 	int nbytes = 0;
 	int i;
-	int direct;
+	unsigned char direct;
+
+
+	/*
+	 * The A-argument bit is read from the node each time it is
+	 * wanted, not cached in a local.  A local assigned before the
+	 * argument loop and used after it is a live range across a
+	 * dozen calls, and c0's frame-slot reuse gave it the same slot
+	 * as a later local - so the cached value came back as that
+	 * local's value.  The node does not move and its nored byte
+	 * does not change here, so the test is just as cheap.
+	 */
 
 	/*
 	 * A name resolves to a SYMREF and emits nothing, so it can be
@@ -1706,9 +1744,42 @@ docall(Expr *e)
 	e->right = 0;
 
 	if (direct) {
-		if (first)
-			landarg(first);
-		outf("\tcall %s\n", symname(namekind(fn), fn->u.symref.name));
+		if (first) {
+			if (e->nored & NR_AARG)
+				landarga(first);
+			else
+				landarg(first);
+		}
+		{
+			char *cc;
+
+			/*
+			 * Mark the call with the convention it uses, so the
+			 * linker can compare it with the callee's
+			 * definition.  The parity and sign conditions are
+			 * reserved for this; the carry and zero conditions
+			 * stay available to the peephole.  ld turns a
+			 * marker into call nn once the two agree, and fails
+			 * the link if they do not.
+			 */
+			if ((e->nored & NR_AARG) && ISBYTE(e->width))
+				cc = "po";	/* 0xE4: A arg, A return */
+			else if (e->nored & NR_AARG)
+				cc = "pe";	/* 0xEC: A arg, HL return */
+			else if (ISBYTE(e->width))
+				cc = "p";	/* 0xF4: HL arg, A return */
+			else
+				cc = 0;
+			if (cc)
+				outf("\tcall %s,%s", cc,
+				    symname(namekind(fn), fn->u.symref.name));
+			else
+				outf("\tcall %s",
+				    symname(namekind(fn), fn->u.symref.name));
+		}
+		if (e->nored & NR_AARG)
+			out("\t;@argA");
+		outc('\n');
 	} else {
 		/*
 		 * Through a pointer.  The Z80 can jump to the address in HL
@@ -1729,8 +1800,13 @@ docall(Expr *e)
 		landarg(fn);
 		if (first) {
 			out("\tpush hl\n");
-			landarg(first);
-			out("\tpop de\n\tcall trampde\n");
+			if (e->nored & NR_AARG)
+				landarga(first);
+			else
+				landarg(first);
+			out((e->nored & NR_AARG) ?
+			    "\tpop de\n\tcall trampde\t;@argA\n" :
+			    "\tpop de\n\tcall trampde\n");
 		} else
 			out("\tcall tramp\n");
 	}
@@ -1751,8 +1827,12 @@ docall(Expr *e)
 	 * keep popping however many words it takes.
 	 */
 	if (nbytes > 0 && (nbytes <= 12 || ISLONG(e->width))) {
+		/*
+		 * A byte result is in A, so the drop must not use AF:
+		 * DE is dead after a call and costs the same byte.
+		 */
 		for (i = 0; i + 1 < nbytes; i += 2)
-			out("\tpop af\n");
+			out(ISBYTE(e->width) ? "\tpop de\n" : "\tpop af\n");
 		if (nbytes & 1)
 			out("\tinc sp\n");
 	} else if (nbytes > 0) {
@@ -1760,9 +1840,12 @@ docall(Expr *e)
 		    nbytes);
 	}
 
-	/* Result is in HL.  Hand back an INHL rather than a bare CODE:
-	 * we return straight to the caller, skipping the step() loop that
-	 * would otherwise do the CODE -> IN* conversion for us. */
+	/* Result is in HL, or A for a byte return.  Hand back the
+	 * register node rather than a bare CODE: we return straight to
+	 * the caller, skipping the step() loop that would otherwise do
+	 * the CODE -> IN* conversion for us. */
+	if (ISBYTE(e->width))
+		return donea(e, INA);
 	return donehl(e, INHL);
 }
 
@@ -2262,7 +2345,7 @@ rewrite1(Expr *e)
 	if (e->op == LAND || e->op == LOR) {
 		int out_lbl = labelcnt++;
 		int end_lbl = labelcnt++;
-		int isand = (e->op == LAND);
+		unsigned char isand = (e->op == LAND);
 		char *cc;
 
 		e->left->dest = DEST_FLAGS;
@@ -2323,7 +2406,7 @@ rewrite1(Expr *e)
 		unsigned char dest = e->dest;
 		unsigned char tgt = e->tgt ? e->tgt : R_HL;
 		char *cc;
-		int abyte;
+		unsigned char abyte;
 		char w;
 
 		/*
@@ -2379,8 +2462,9 @@ rewrite1(Expr *e)
 		if ((sh->op == RSHIFT && sh->left && sh->right &&
 		     sh->right->op == NUMBER) || sh->op == DEREF) {
 			Expr *cell;
-			int k;
-			int reg, off, boff;
+			unsigned char k;
+			unsigned char reg;
+			int off, boff;
 
 			if (sh->op == RSHIFT) {
 				long cnt = sh->right->u.val;
@@ -2431,7 +2515,7 @@ rewrite1(Expr *e)
 	 */
 	if ((e->width == 'l' || e->width == 'L') && e->left && e->right) {
 		char *helper = 0;
-		int iscompare = 0;
+		unsigned char iscompare = 0;
 		Expr *tmp;
 
 		/* GT and LE need operand swap: a>b becomes b<a, a<=b becomes b>=a */
@@ -2663,8 +2747,8 @@ spilled:	;
 			 * so reducing the value cannot clobber the pointer.
 			 */
 			Expr *n;
-			int isbc = e->left->left->u.var.reg == R_BC;
-			int inc = e->left->op == POSTINC;
+			unsigned char isbc = e->left->left->u.var.reg == R_BC;
+			unsigned char inc = e->left->op == POSTINC;
 
 			if (e->right->op == NUMBER) {
 				long val = e->right->u.val & 0xff;
@@ -3313,7 +3397,7 @@ void
 condgo(Expr *e, char *lbl, int wf)
 {
 	Expr *l, *r;
-	int op;
+	unsigned char op;
 	char sc[12];
 
 	op = e->op;

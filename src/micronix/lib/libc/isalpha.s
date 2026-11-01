@@ -2,10 +2,7 @@
 
 	psect	text
 _isalpha:
-	ld	a,h		;check for a char - the argument is in hl
-	or	a
-	jr	nz,nix
-	ld	a,l
+	.abi	_isalpha,3	;arg8/ret8: c in A, the answer in A
 	cp	'A'
 	jr	c,nix
 	cp	'z'+1
@@ -16,9 +13,9 @@ _isalpha:
 	cp	'a'
 	jr	c,nix
 yes:
-	ld	hl,1		;yes
+	ld	a,1		;yes
 	ret
-nix:	ld	hl,0
+nix:	xor	a		;no
 	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

@@ -31,6 +31,8 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <mtab.h>
+#include <unistd.h>
+
 
 #define MAXMOUNT 16		/* what this program can hold; the kernel's count is read */
 #define SUPERBLK 1		/* the superblock */

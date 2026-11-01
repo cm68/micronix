@@ -60,6 +60,7 @@ static char buf[64];
 static int labelcnt;		/* per-function label counter */
 static int fnindex;		/* function index for unique labels */
 static int funchasasm;		/* an ASM statement here: no dead-A,F assertion */
+static unsigned char funct;	/* this function's declared return type */
 
 /* Current function state */
 /*
@@ -166,9 +167,9 @@ static short bcoff, ixoff;	/* IY-relative offsets for saved regs */
 static struct swctx {
 	int id;			/* label number for this switch */
 	int ncase;
-	int hasdef;
-	int wide;		/* a case value outside 0..255: dispatch on HL */
-	int isbyte;		/* the control reduced to A */
+	unsigned char hasdef;
+	unsigned char wide;	/* a case value outside 0..255: dispatch on HL */
+	unsigned char isbyte;	/* the control reduced to A */
 	unsigned char *val;	/* this nesting level's slice of swvals */
 } swstk[MAXSWNEST];
 /*
@@ -448,6 +449,13 @@ emitprolog(void)
 		out(":\n");
 	else
 		out("::\n");
+	/*
+	 * Declare the function's two calling-convention bits to the
+	 * assembler, which puts them in the object symbol.  ld checks
+	 * every marked call against them.
+	 */
+	outf("\t.abi\t%s,%d\n", funcname,
+	    (ISBYTE(arg1w) ? 1 : 0) | (ISBYTE(funct) ? 2 : 0));
 
 	bcoff = ixoff = 0;
 
@@ -502,7 +510,13 @@ emitprolog(void)
 		 * was.  A function with no parameters has nothing to
 		 * place and keeps the plain helpers.
 		 */
-		sfx = nparams == 0 ? "" : (ISLONG(arg1w) ? "q" : "w");
+		/*
+		 * A byte first parameter arrives in A, so it wants the
+		 * b entry stubs; the slot they fill is still two bytes,
+		 * which is why the epilogue keeps the w exit.
+		 */
+		sfx = nparams == 0 ? "" :
+		      (ISLONG(arg1w) ? "q" : (ISBYTE(arg1w) ? "b" : "w"));
 
 		/*
 		 * Frame pointer, then the scalar area, then the callee
@@ -750,7 +764,8 @@ parseStmt(void)
 			parseStmt();
 		return;
 	case IF: {
-		int lbl, hasel;
+		int lbl;
+		unsigned char hasel;
 		n = read1();		/* nlabels for short-circuit */
 		/*
 		 * Two, not one.  An if with an else emits "no<lbl>" for the
@@ -819,35 +834,46 @@ parseStmt(void)
 				char w = e->width;
 
 				/*
-				 * Wrap in ASSIGN to HL for return value.
+				 * A function whose prototype says it
+				 * returns an 8-bit value hands it back in
+				 * A; the caller's comparison can read it
+				 * there with no marshalling out of HL.
+				 * Everything else still comes back in HL.
 				 *
-				 * A byte comes back in HL like everything
-				 * else, so it has to be widened first, and
-				 * a signed one has to carry its sign: the
-				 * assignment used to be byte-wide, took the
-				 * store rule that zeroes H, and a function
-				 * returning -1 as a char handed back 0x00ff.
-				 * Callers read the sign out of H and saw a
-				 * positive number.
+				 * A byte widened to a word has to carry
+				 * its sign: the assignment used to be
+				 * byte-wide, took the store rule that
+				 * zeroes H, and a function returning -1 as
+				 * a char handed back 0x00ff.  Callers read
+				 * the sign out of H and saw a positive
+				 * number.
 				 */
-				if (ISBYTE(w)) {
-					/*
-					 * A constant is already whatever
-					 * width it is asked to be, and there
-					 * is no rule for converting one -
-					 * "return 0" would have become a
-					 * widening of a literal and emitted
-					 * nothing.
-					 */
-					if (e->op == NUMBER)
-						e->width = 's';
-					else
-						e = mkunary(ISSIGNED(w) ?
-						    SEXT : WIDEN, 's', e);
-					w = 's';
+				if (ISBYTE(funct)) {
+					w = ISBYTE(w) ? w : funct;
+					hl = mkcode(w, R_A);
+					hl->op = INA;
+				} else {
+					if (ISBYTE(w)) {
+						/*
+						 * A constant is already
+						 * whatever width it is asked
+						 * to be, and there is no rule
+						 * for converting one -
+						 * "return 0" would have
+						 * become a widening of a
+						 * literal and emitted
+						 * nothing.
+						 */
+						if (e->op == NUMBER)
+							e->width = 's';
+						else
+							e = mkunary(ISSIGNED(w) ?
+							    SEXT : WIDEN, 's', e);
+						w = 's';
+					}
+					hl = mkcode(w, R_HL);
+					hl->op = INHL;
 				}
-				hl = mkcode(w, R_HL);
-				hl->op = INHL;
 				assign = mkbinary(ASSIGN, w, hl, e);
 				setdest(assign, DEST_VALUE);
 				assign = rewrite(assign);
@@ -882,7 +908,10 @@ parseStmt(void)
 		}
 		out("\tjp\tX");
 		out(funcname + 1);
-		deadnote(0);
+		if (ISBYTE(funct))
+			outc('\n');	/* the answer is in A; A is not dead here */
+		else
+			deadnote(0);
 		return;
 	case LABEL:
 		readS(buf, sizeof(buf));
@@ -919,7 +948,8 @@ parseStmt(void)
 		return;
 	case SWITCH: {
 		struct swctx *sw;
-		int isbyte;
+		unsigned char isbyte;
+		Expr *w;
 
 		read1();
 		n = read1();
@@ -946,6 +976,32 @@ parseStmt(void)
 		isbyte = 0;
 		e = readexpr();
 		if (e) {
+			/*
+			 * An unsigned byte control arrives widened to int,
+			 * because pass1 promotes the control to meet the
+			 * int-sized case labels - emitOperand wraps it in
+			 * a WIDEN.  The word is only wanted when a case
+			 * value outside a byte turns the dispatch wide
+			 * (swwiden below): until then the byte IS the
+			 * value, and rewriting the WIDEN too leaves it in
+			 * HL and costs the high-byte test at _D for
+			 * nothing.  Take the WIDEN off and let the byte
+			 * reduce to A; if a wide case does arrive, _D
+			 * puts the high half back with the "ld h,0" it
+			 * already emits for a byte control.
+			 *
+			 * A SEXT is left alone: a signed byte can be
+			 * negative, and a byte dispatch would confuse -1
+			 * with 255.  The word path's high-byte test is
+			 * what keeps them apart.
+			 */
+			if (e->op == WIDEN && e->left &&
+			    ISBYTE(e->left->width)) {
+				w = e;
+				e = w->left;
+				w->left = 0;
+				freeexpr(w);
+			}
 			setdest(e, DEST_VALUE);
 			e = rewrite(e);
 #ifdef DEBUG
@@ -974,9 +1030,9 @@ parseStmt(void)
 		 * instructions in the same order either way, because the
 		 * only thing between here and _D is a jump over the bodies
 		 * and nothing executes in between: the value computed here
-		 * is still in HL when the dispatch reads it.  Emitting it
-		 * down there instead means the choice is made when the
-		 * cases are known.
+		 * is still in HL (or A, for a byte control) when the
+		 * dispatch reads it.  Emitting it down there instead means
+		 * the choice is made when the cases are known.
 		 */
 		sw->isbyte = isbyte;
 		out("\tjp ");
@@ -1231,6 +1287,7 @@ parse(void)
 			t = read1();
 			funcstatic = (t & 0x80) != 0;	/* pass1 marks it there */
 			t &= 0x7f;
+			funct = t;
 			readS(funcname, sizeof(funcname));
 			nidxp(funcname, sizeof(funcname));	/* the label wants the spelling */
 			labelcnt = 0;

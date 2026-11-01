@@ -16,6 +16,15 @@ C
 .in +5
 .br
 .bd
+FILE *fopen(char *filename, char *type);
+.br
+.bd
+FILE *freopen(char *filename, char *type, FILE *stream);
+.br
+.bd
+FILE *fdopen(int fildes, char *type);
+.sp 2
+.bd
 #include <stdio.h>
 .sp
 .bd 2

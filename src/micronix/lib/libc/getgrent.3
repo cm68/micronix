@@ -16,6 +16,21 @@ C
 .in +5
 .br
 .bd
+struct group *getgrent(void);
+.br
+.bd
+struct group *getgrgid(int gid);
+.br
+.bd
+struct group *getgrnam(char *name);
+.br
+.bd
+int setgrent(void);
+.br
+.bd
+int endgrent(void);
+.sp 2
+.bd
 #include <grp.h>
 .sp
 .bd

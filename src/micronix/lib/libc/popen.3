@@ -15,6 +15,12 @@ popen, pclose
 .bd
 C       
 .in +5
+.bd
+FILE *popen(char *cmd, char *mode);
+.br
+.bd
+int pclose(FILE *stream);
+.sp 2
 .sp
 .bd
 # include <stdio.h>
@@ -44,20 +50,20 @@ and 2) an I/O mode, either "r" for reading or "w" for writing.
 A pipe is created 
 between the calling process and the command to be executed.
 The value returned is a stream
-pointeò thaô may bå useä tï writå tï thå 
-standarä inpuô oæ thå commanä oò to reaä froí itó standarä output.
+pointeï¿½ thaï¿½ may bï¿½ useï¿½ tï¿½ writï¿½ tï¿½ thï¿½ 
+standarï¿½ inpuï¿½ oï¿½ thï¿½ commanï¿½ oï¿½ to reaï¿½ froï¿½ itï¿½ standarï¿½ output.
 
-Streaís openeä bù 
+Streaï¿½s openeï¿½ bï¿½ 
 .bd
-popeî 
-are closeä bù 
+popeï¿½ 
+are closeï¿½ bï¿½ 
 .bd
-pcloså.  Pclose 
-waitó foò thå associateä procesó tï terminatå, then returnó thå exiô 
-statuó oæ thå command.
+pclosï¿½.  Pclose 
+waitï¿½ foï¿½ thï¿½ associateï¿½ procesï¿½ tï¿½ terminatï¿½, then returnï¿½ thï¿½ exiï¿½ 
+statuï¿½ oï¿½ thï¿½ command.
 
-Since opeî fileó arå shared¬ the typå "r¢ commanä can bå useä aó 
-aî inpuô filter,
+Since opeï¿½ fileï¿½ arï¿½ sharedï¿½ the typï¿½ "rï¿½ commanï¿½ can bï¿½ useï¿½ aï¿½ 
+aï¿½ inpuï¿½ filter,
 the type "w" as an output filter.
 
 
@@ -68,8 +74,8 @@ ERRORS
 .br
 .bd
 Popen
-returnó á ° (NULÌ pointer© iæ thå shelì cannoô bå accessed¬ oò iæ 
-fileó oò processeó cannoô bå created. 
+returnï¿½ ï¿½ ï¿½ (NULï¿½ pointerï¿½ iï¿½ thï¿½ shelï¿½ cannoï¿½ bï¿½ accessedï¿½ oï¿½ iï¿½ 
+fileï¿½ oï¿½ processeï¿½ cannoï¿½ bï¿½ created. 
 
 .bd
 Pclose 
@@ -87,13 +93,13 @@ NOTES
 .in +5
 .br
 Filter input may be badly positioned if user attempts
-buffereä readinç beforå openinç aî inpuô filter® 
+buffereï¿½ readinï¿½ beforï¿½ openinï¿½ aï¿½ inpuï¿½ filterï¿½ 
 
-Similaò problemó 
-witè aî outpuô filteò maù bå prevented bù flushing the buffeò, i.e., using
+Similaï¿½ problemï¿½ 
+witï¿½ aï¿½ outpuï¿½ filteï¿½ maï¿½ bï¿½ prevented bï¿½ flushing the buffeï¿½, i.e., using
 .bd
 fflush. 
-[Seå 
+[Seï¿½ 
 .bd
 fclose
 (3).]

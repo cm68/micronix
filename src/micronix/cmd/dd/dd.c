@@ -32,6 +32,8 @@
 
 #include <stdio.h>
 #include <sys/signal.h>
+#include <unistd.h>
+
 
 #define	BIG	2147483647L
 #define	MAXBS	32000L
@@ -52,7 +54,6 @@ char	*ofile;
 unsigned char	*ibuf;
 unsigned char	*obuf;
 char	*sbrk();
-long	lseek();
 long	number();
 int	ibs	= 512;
 int	obs	= 512;

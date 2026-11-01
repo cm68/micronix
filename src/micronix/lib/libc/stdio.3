@@ -17,6 +17,24 @@ C
 .br
 .bd
 #include <stdio.h>
+.bd
+FILE *fopen(char *filename, char *type);
+.br
+.bd
+int fclose(FILE *stream);
+.br
+.bd
+int printf(char *format, ...);
+.br
+.bd
+int scanf(char *format, ...);
+.br
+.bd
+int getc(FILE *stream);
+.br
+.bd
+int putc(int c, FILE *stream);
+.sp 2
 .sp
 .bd
 FILE *stdin;
@@ -85,8 +103,8 @@ stderr
 .in -4	
 A constant "pointer" (NULL 0) designates no stream.
 .sp
-Aî integeò constanô (end of file, or EOÆ -1© ió returneä upoî erroò bù anù 
-integeò functionó that deal with streams or upon end of file.
+Aï¿½ integeï¿½ constanï¿½ (end of file, or EOï¿½ -1ï¿½ iï¿½ returneï¿½ upoï¿½ erroï¿½ bï¿½ anï¿½ 
+integeï¿½ functionï¿½ that deal with streams or upon end of file.
 
 Routines that use the I/O package must have the header file 
 with the pertinent macro definitions (<stdio.h>).  The 
@@ -118,8 +136,8 @@ FILE
 pointer has not been initialized with 
 .bd
 fopen.
-Thió meanó thaô inpuô oò outpuô haó beeî attempteä oî aî outpuô 
-oò inpuô stream, or that a 
+Thiï¿½ meanï¿½ thaï¿½ inpuï¿½ oï¿½ outpuï¿½ haï¿½ beeï¿½ attempteï¿½ oï¿½ aï¿½ outpuï¿½ 
+oï¿½ inpuï¿½ stream, or that a 
 .bd
 FILE
 pointer designates corrupt
@@ -131,9 +149,9 @@ This use of the standard library has been changed to line buffer output
 to a terminal by default.  It attempts to flush the output whenever a
 .bd
 read
-(seå Sectioî 2© froí thå standarä inpuô ió necessary®  Iî mosô 
-cases¬ thió makeó thå utilitù morå efficient.  Thå actionó 
-themselveó shoulä bå transparenô unlesó it
+(seï¿½ Sectioï¿½ 2ï¿½ froï¿½ thï¿½ standarï¿½ inpuï¿½ iï¿½ necessaryï¿½  Iï¿½ mosï¿½ 
+casesï¿½ thiï¿½ makeï¿½ thï¿½ utilitï¿½ morï¿½ efficient.  Thï¿½ actionï¿½ 
+themselveï¿½ shoulï¿½ bï¿½ transparenï¿½ unlesï¿½ it
 is used with programs which use standard I/O routines 
 .ul
 and

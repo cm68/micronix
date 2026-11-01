@@ -24,6 +24,8 @@
 #include <sys/stat.h>
 #include <sys/signal.h>
 #include <errno.h>
+#include <unistd.h>
+
 
 #define	BUFSIZ	8192
 /*
@@ -40,7 +42,6 @@ char in[BUFSIZ];
 char out[BUFSIZ];
 
 extern int errno;
-long	lseek();
 
 main(argc,argv)
 char **argv;

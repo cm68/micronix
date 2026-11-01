@@ -16,6 +16,18 @@ C
 .in +5
 .br
 .bd
+int feof(FILE *stream);
+.br
+.bd
+int ferror(FILE *stream);
+.br
+.bd
+void clearerr(FILE *stream);
+.br
+.bd
+int fileno(FILE *stream);
+.sp 2
+.bd
 #include <stdio.h>
 .sp
 .bd 2

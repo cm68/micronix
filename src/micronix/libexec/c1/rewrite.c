@@ -80,14 +80,14 @@ int pnode(unsigned char pat, unsigned char w, Expr *e);
 Expr *rewrite1(Expr *e);
 Expr *valtohl(Expr *e);
 unsigned char baseop(unsigned char op);
-int islocdesc(Expr *e);
-int isdestreg(Expr *e);
+unsigned char islocdesc(Expr *e);
+unsigned char isdestreg(Expr *e);
 
 /*
  * Check if expression matches any preserve pattern.
  * Returns 1 if should be preserved (not reduced).
  */
-int
+unsigned char
 shouldpres(Expr *e)
 {
 	unsigned char *pp;
@@ -359,7 +359,7 @@ label(Expr *e)
 /*
  * The comparisons, which read their operands as values.
  */
-static int
+static unsigned char
 iscmpop(unsigned char op)
 {
 	switch (op) {
@@ -567,7 +567,7 @@ assign(Expr *e, unsigned char tgt)
  * wants the bit number subtracts the one (the RF_POW2 transform and the
  * SET/RES emitters in lower.c).
  */
-int
+unsigned char
 ispow2(unsigned long n)
 {
 	int i;
@@ -1026,6 +1026,24 @@ donehl(Expr *e, unsigned char op)
 }
 
 /*
+ * The byte counterpart: a call whose prototype says it returns an
+ * 8-bit value comes back in A, and the caller's comparison can read it
+ * there without marshalling HL into A first.  Same three statements as
+ * donehl; a shared function with a register argument was two bytes
+ * dearer than the stores it saves.
+ */
+Expr *
+donea(Expr *e, unsigned char op)
+{
+	Expr *n = mkcode(e->width, R_A);
+
+	n->op = op;
+	n->dest = e->dest;
+	freeexpr(e);
+	return n;
+}
+
+/*
  * The register each RF_REG value demands, indexed by the field shifted
  * down.  Slot 1 is RF_IXIY, which accepts either index register and is
  * tested by hand; slot 0 is no requirement at all and never reached.
@@ -1065,7 +1083,7 @@ tryrule(struct rule *rp, Expr *e)
 	Expr *n, *src, *num, *lc, *rc;
 	char reg;
 	int off;
-	int shift, changed;
+	unsigned char shift, changed;
 	unsigned char newop, oldop;
 
 	/* Match pattern */
@@ -1290,7 +1308,7 @@ tryrule(struct rule *rp, Expr *e)
 	if (newop == SYMREF) {
 		char *name;
 		short soff;
-		int kind;
+		unsigned char kind;
 		if (e->op == SYM) {
 			/* bare SYM -> SYMREF+0 */
 			name = e->u.name;
@@ -1381,7 +1399,7 @@ tryrule(struct rule *rp, Expr *e)
 /*
  * Check if op is commutative
  */
-int
+unsigned char
 iscommut(unsigned char op)
 {
 	switch (op) {
@@ -1572,7 +1590,7 @@ flipflag(unsigned char f)
 	return f;
 }
 
-int
+unsigned char
 isflag(unsigned char r)
 {
 	return r >= F_Z && r <= F_P;

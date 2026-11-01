@@ -16,6 +16,7 @@
 extern long seconds;
 
 extern char zpage[];            /* exec.c: a 512-byte zero page */
+extern int iomove(unsigned char, char *, int);	/* the flag is a byte */
 
 /*
  * Read a file from its inode. The transfer parameters

@@ -12,6 +12,8 @@
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <unistd.h>
+
 #endif
 
 /*
@@ -202,14 +204,16 @@ main(argc, argv)
     windexit(0);
 }
 
+unsigned char
 isspace(c)
-char c;
+unsigned char c;
 {
     return ((c == ' ') || (c == '\t'));
 }
 
+unsigned char
 isdigit(c)
-char c;
+unsigned char c;
 {
     return ((c >= '0') && (c <= '9'));
 }

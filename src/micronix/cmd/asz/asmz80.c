@@ -196,14 +196,15 @@ struct instruct isr_table[] = {
 #define T_R     (T_BIAS + 41)
 
 /* External functions from asm.c */
-extern void need();
+extern void need(unsigned char);
 extern unsigned char operand();
-extern void emitbyte();
+extern void emitbyte(unsigned char);
 extern void emit_exp();
 extern void emit_imm();
-extern unsigned char tok2reg();
+extern unsigned char tok2reg(unsigned char);
 extern char match();
 extern void gripe();
+extern void gripe2();
 extern unsigned short cur_address;
 extern char pass;
 extern char no_relax;
@@ -804,7 +805,8 @@ static char
 do_call(isr)
 struct instruct *isr;
 {
-	unsigned char arg;
+	unsigned char arg, op;
+	int callbits;
 	struct expval value;
 
 	arg = operand(&value);
@@ -812,11 +814,45 @@ struct instruct *isr;
 	if (arg == T_C) arg = T_CR;  /* 'c' means carry, not register C */
 	if (arg == 1) arg = T_CR;
 	if (arg >= T_NZ && arg <= T_M) {
-		emitbyte(isr->opcode + ((arg - T_NZ) << 3));
+		op = isr->opcode + ((arg - T_NZ) << 3);
 		need(',');
 		operand(&value);  /* get the address */
+		/*
+		 * A local target is resolved in this object: the assembler
+		 * knows the callee's .abi bits, so the convention check
+		 * the marker exists for can be made here, and a match
+		 * emitted as an ordinary call.  The linker cannot make it
+		 * for a local - the relocation is a segment one and the
+		 * object carries no symbol for the callee - so a marker
+		 * left here would become CALL PO/PE/P at run time.
+		 *
+		 * po, pe and p are reserved for this; the other
+		 * conditional calls are real conditions and stay as they
+		 * are, but a local callee still has to agree with the
+		 * ordinary convention.
+		 */
+		if (pass && value.sym && value.sym->index == 0xffff) {
+			if (op == 0xE4)
+				callbits = 3;
+			else if (op == 0xEC)
+				callbits = 1;
+			else if (op == 0xF4)
+				callbits = 2;
+			else
+				callbits = 0;
+			if (callbits != (value.sym->abi & 3))
+				gripe2("call ABI mismatch: ",
+				    value.sym->name);
+			if (callbits > 0)
+				op = isr->arg;	/* ordinary call */
+		}
+		emitbyte(op);
 		emit_exp(2, &value);
 	} else if (arg == T_PLAIN) {
+		/* a local callee still has to be the ordinary convention */
+		if (pass && value.sym && value.sym->index == 0xffff &&
+		    (value.sym->abi & 3) != 0)
+			gripe2("call ABI mismatch: ", value.sym->name);
 		emitbyte(isr->arg);
 		emit_exp(2, &value);
 	} else

@@ -95,35 +95,39 @@ strsave(s)
     return (strcpy(p, s));
 }
 
-int
+/*
+ * The character tests.  A test takes and returns a byte: the argument
+ * arrives in A and the 0/1 answer goes back the same way, which is the
+ * whole of the 8-bit convention.  They are s's own, not libc's, so the
+ * editor does not depend on whether ctype.h's macros are in view.
+ */
+unsigned char
 isalnum(c)
-char c;
+unsigned char c;
 {
-	return  (((c >= 'a') && (c <= 'z')) || 
-			 ((c >= 'A') && (c <= 'Z')) || 
+	return  (((c >= 'a') && (c <= 'z')) ||
+			 ((c >= 'A') && (c <= 'Z')) ||
 			 ((c >= '0') && (c <= '9')));
 }
 
-#ifdef notdef
-int
+unsigned char
 isspace(c)
-char c;
+unsigned char c;
 {
-	return ((c == ' ') || (c == '\t') || (c == '\f') || 
+	return ((c == ' ') || (c == '\t') || (c == '\f') ||
 			(c == '\r') || (c == '\n') || (c == '\v'));
 }
 
-int
+unsigned char
 isdigit(c)
-char c;
+unsigned char c;
 {
 	return ((c >= '0') && (c <= '9'));
 }
-#endif
 
-int
+unsigned char
 isprint(c)
-char c;
+unsigned char c;
 {
 	return ((c >= ' ') && (c < 0x7f));
 }

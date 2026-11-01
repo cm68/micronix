@@ -31,7 +31,7 @@ UINT8 jctl[NPROC];
  * stop the process that is stopping things.
  */
 jobctl(op)
-    UINT8 op;
+    int op;
 {
     register struct proc *p;
     register UINT8 *b;

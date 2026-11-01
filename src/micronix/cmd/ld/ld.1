@@ -89,6 +89,73 @@ object.
 .sp 2
 .in -5
 .bd
+CALLING CONVENTIONS
+.in +5
+.br
+A function passes its first argument in A when its prototype says
+that parameter is an 8-bit scalar, and returns an 8-bit result in A.
+Every other argument and result travels in HL - a long's high half in
+HL'.  Each object symbol carries the callee's two bits, written by
+asz from a
+.bd
+.abi name,bits
+directive: bit 1, first parameter in A; bit 2, result in A.
+
+The compiler marks every direct call with the convention it used by
+choosing one of the reserved conditional-call opcodes:
+.bd
+call po
+(0xE4, arg8/ret8),
+.bd
+call pe
+(0xEC, arg8/ret16), or
+.bd
+call p
+(0xF4, arg16/ret8).  An ordinary
+.bd
+call
+(0xCD) is arg16/ret16.  Ld compares the marker with the callee's two
+bits.  When they agree it rewrites the instruction to a plain
+.bd
+call;
+when they do not, the link fails with
+.bd
+call ABI mismatch,
+naming the function and both conventions.  An ordinary call is
+checked the same way, so an unprototyped call to a function whose
+first parameter is a byte is caught rather than silently given the
+word convention.  Only
+.bd
+po, pe
+and
+.bd
+p
+are reserved; the
+.bd
+nz, z, nc, c
+and
+.bd
+m
+conditions are available to hand-written code as before.
+
+With -r the check is not run and a symbol marker is left in the
+output, because its callee may not be in this group.  The callee's two
+bits are carried through to the output symbol table, so the final link
+can still check the call.
+
+A call to a local function is a segment relocation, not a symbol one:
+the assembler resolved the address and the object carries no symbol
+entry for the callee, so there is nothing to compare.  Ld swizzles
+that marker - the opcode alone - to a plain
+.bd
+call
+in every link, -r included.  It has to, and in -r especially: 0xEC is
+CALL PE, so a marker left in a folded kernel page would run the call
+only when the parity flag happened to say so, and the final link,
+finding the page in a data segment, would never look at the opcode.
+.sp 2
+.in -5
+.bd
 SEE ALSO
 .in +5
 .br

@@ -89,6 +89,13 @@
 #include <stdio.h>
 #include <sys/signal.h>
 #include "dc.h"
+
+/* The character parameters are byte-wide and ride in A; without these
+ * the calls before each definition would use the word convention. */
+int unreadc(char);
+int binop(char);
+int cond(char);
+
 main(argc,argv)
 int argc;
 char *argv[];

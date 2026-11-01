@@ -132,6 +132,7 @@ int num_globals;
 struct abssym {
     struct abssym *next;
     unsigned short value;
+    unsigned char abi;      /* SF_ARG8|SF_RET8 from the image */
     char name[1];           /* variable length tail */
 };
 
@@ -2018,6 +2019,12 @@ char *name;
         a = (struct abssym *)permalloc(sizeof(struct abssym) + symlen);
         strcpy(a->name, symname);
         a->value = val;
+        /*
+         * Keep the calling-convention bits.  A driver module calls
+         * into the resident image through an -A answer, and without
+         * them its marked call has nothing to check against.
+         */
+        a->abi = type & (SF_ARG8 | SF_RET8);
         a->next = abssyms;
         abssyms = a;
     }
@@ -2212,6 +2219,7 @@ pass1_layout()
             if (a) {
                 s->value = a->value;
                 s->seg = SEG_ABS;
+                s->type |= a->abi;
                 continue;
             }
             /* -r emits a relocatable object for a later link, so an
@@ -2588,12 +2596,13 @@ unsigned char v;
 }
 
 void
-apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, reloc_base)
+apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, in_text, reloc_base)
 struct object *obj;
 long reloc_off;
 unsigned seg_size;
 unsigned short seg_base;
 int is_text;
+int in_text;                    /* this is the object's text section */
 unsigned short reloc_base;      /* offset to add to pos for -r relocations */
 {
     unsigned pos = 0;
@@ -2773,6 +2782,91 @@ unsigned short reloc_base;      /* offset to add to pos for -r relocations */
 
             /* apply relocation at current position */
             if (pos < seg_size) {
+                /*
+                 * A direct call is marked with its convention: call nn
+                 * is 16-bit argument and return, and the reserved
+                 * conditional calls po/pe/p are the other three.  The
+                 * callee's definition carries the same two bits in the
+                 * high half of its object symbol's flag byte.  If they
+                 * agree the marker becomes an ordinary call; if they do
+                 * not, the link fails rather than run the wrong one.
+                 * The conditions the peephole and the hand-written
+                 * assembly really use - nz, z, nc, c, m - are left
+                 * alone.
+                 */
+                if (in_text && hilo == 0 && pos > 0) {
+                    static char *abinm[] = {
+                        "arg16/ret16", "arg8/ret16",
+                        "arg16/ret8", "arg8/ret8"
+                    };
+                    unsigned char op = bget(pos - 1);
+                    int callbits, defbits;
+
+                    if (op == 0xE4)
+                        callbits = 3;	/* marker: A arg and return */
+                    else if (op == 0xEC)
+                        callbits = 1;	/* marker: A argument */
+                    else if (op == 0xF4)
+                        callbits = 2;	/* marker: A return */
+                    else if (op == 0xCD || op == 0xC4 || op == 0xCC ||
+                             op == 0xD4 || op == 0xDC || op == 0xFC)
+                        /*
+                         * An ordinary call, or a real conditional call
+                         * (the peephole's nz/z and the hand-written
+                         * asm's nc/c/m).  Its operand is the ordinary
+                         * convention; check it, but leave the opcode.
+                         */
+                        callbits = 0;
+                    else
+                        callbits = -1;
+
+                    if (!s) {
+                        /*
+                         * A LOCAL target is a segment relocation, not a
+                         * symbol one: the assembler resolved the address
+                         * and the object carries no symbol entry for the
+                         * callee, so there is nothing to compare the
+                         * marker against.  Swizzle it to a plain call
+                         * anyway.  Leaving the marker in place is not
+                         * harmless - 0xE4/0xEC/0xF4 are CALL PO/PE/P,
+                         * so the call would run only when the parity or
+                         * sign flag happened to say so.
+                         *
+                         * This is the only place a -r link may touch a
+                         * marker, and it must: a local call inside a
+                         * folded module (the kernel's -r -Sdata pages)
+                         * is a local relocation too, and the final link
+                         * would find it in a data segment and never look
+                         * at the opcode.
+                         */
+                        if (callbits > 0)
+                            bput(pos - 1, 0xCD);
+                    } else if (callbits >= 0 && (!rflag || seg_fold)) {
+                        /*
+                         * A fold - -Sdata or -Stext - puts this code
+                         * in a segment the final link will not read as
+                         * text, so its markers would never be seen
+                         * again.  Swizzle them here.  A plain -r link
+                         * leaves a symbol marker alone: its callee may
+                         * be in another module and the final link can
+                         * still check it.
+                         */
+                        if (!rflag) {
+                            defbits = ((s->type & SF_ARG8) ? 1 : 0) |
+                                      ((s->type & SF_RET8) ? 2 : 0);
+                            if (callbits != defbits) {
+                                fprintf(stderr,
+                                    "ld: call ABI mismatch: %s: call site %s, definition %s (in %s @%04x, op %02x)\n",
+                                    s->name, abinm[callbits], abinm[defbits],
+                                    obj->name, pos, op);
+                                exit(1);
+                            }
+                        }
+                        if (callbits > 0)
+                            bput(pos - 1, 0xCD);
+                    }
+                }
+
                 if (hilo == 0) {
                     /* word relocation */
                     if (pos + 1 < seg_size) {
@@ -2936,13 +3030,14 @@ unsigned seg_size;
  * copy segment data with relocations applied
  */
 void
-copy_segment(obj, seg_start, seg_size, reloc_off, seg_base, is_text, dest, reloc_base)
+copy_segment(obj, seg_start, seg_size, reloc_off, seg_base, is_text, in_text, dest, reloc_base)
 struct object *obj;
 unsigned seg_start;
 unsigned seg_size;
 long reloc_off;
 unsigned short seg_base;
 int is_text;
+int in_text;                    /* the section being copied is text */
 FILE *dest;
 unsigned short reloc_base;      /* offset to add to pos for -r relocations */
 {
@@ -2994,7 +3089,7 @@ unsigned short reloc_base;      /* offset to add to pos for -r relocations */
         /* it fits: one read, patch it, one write */
         if (fread(segbuf, 1, seg_size, obj->fp) != seg_size)
             error("read error");
-        apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, reloc_base);
+        apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, in_text, reloc_base);
         if (!is_text)
             patch_lnksyms(obj, seg_size);
         if (fwrite(segbuf, 1, seg_size, dest) != seg_size)
@@ -3027,7 +3122,7 @@ unsigned short reloc_base;      /* offset to add to pos for -r relocations */
     winbase = -1;
     windirty = 0;
 
-    apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, reloc_base);
+    apply_relocs(obj, reloc_off, seg_size, seg_base, is_text, in_text, reloc_base);
     if (!is_text)
         patch_lnksyms(obj, seg_size);
 
@@ -3199,7 +3294,7 @@ pass2_output()
                         error("objects out of address order (data)");
                     write_zeros(datafp, obj->text_off - cur_data);
                     copy_segment(obj, 16, obj->text_size, obj->textRelocOff,
-                                 data_base + obj->text_off, 0, datafp,
+                                 data_base + obj->text_off, 0, 1, datafp,
                                  obj->text_off);
                     cur_data = obj->text_off + obj->text_size;
                 }
@@ -3209,7 +3304,7 @@ pass2_output()
                     write_zeros(datafp, obj->data_off - cur_data);
                     copy_segment(obj, 16 + obj->text_size, obj->data_size,
                                  obj->dataRelocOff, data_base + obj->data_off,
-                                 0, datafp, obj->data_off);
+                                 0, 0, datafp, obj->data_off);
                     cur_data = obj->data_off + obj->data_size;
                 }
                 /* bss rides as zeros in the gaps the trailing pass fills */
@@ -3220,7 +3315,7 @@ pass2_output()
                         error("objects out of address order (text)");
                     write_zeros(outfp, obj->text_off - cur_text);
                     copy_segment(obj, 16, obj->text_size, obj->textRelocOff,
-                                 text_base + obj->text_off, 1, outfp,
+                                 text_base + obj->text_off, 1, 1, outfp,
                                  obj->text_off);
                     cur_text = obj->text_off + obj->text_size;
                 }
@@ -3230,7 +3325,7 @@ pass2_output()
                     write_zeros(outfp, obj->data_off - cur_text);
                     copy_segment(obj, 16 + obj->text_size, obj->data_size,
                                  obj->dataRelocOff, text_base + obj->data_off,
-                                 1, outfp, obj->data_off);
+                                 1, 0, outfp, obj->data_off);
                     cur_text = obj->data_off + obj->data_size;
                 }
                 /* bss rides as zeros in the gaps the trailing pass fills */
@@ -3240,7 +3335,7 @@ pass2_output()
                         error("objects out of address order (text)");
                     write_zeros(outfp, obj->text_off - cur_text);
                     copy_segment(obj, 16, obj->text_size, obj->textRelocOff,
-                                 text_base + obj->text_off, 1, outfp,
+                                 text_base + obj->text_off, 1, 1, outfp,
                                  obj->text_off);
                     cur_text = obj->text_off + obj->text_size;
                 }
@@ -3250,7 +3345,7 @@ pass2_output()
                     write_zeros(datafp, obj->data_off - cur_data);
                     copy_segment(obj, 16 + obj->text_size, obj->data_size,
                                  obj->dataRelocOff, data_base + obj->data_off,
-                                 0, datafp, obj->data_off);
+                                 0, 0, datafp, obj->data_off);
                     cur_data = obj->data_off + obj->data_size;
                 }
             }
@@ -3317,6 +3412,14 @@ pass2_output()
             case SEG_BSS:  type = 0x07 | 0x08; break;
             default:       type = 0x08; break;
             }
+            /*
+             * Carry the calling-convention bits through a -r link.
+             * The segment alone rebuilt this byte, so an object folded
+             * by "-ld -r" (the kernel's low.o and the rest) lost the
+             * callee's two bits and the final link then refused every
+             * marked call to a function defined in that module.
+             */
+            type |= s->type & (SF_ARG8 | SF_RET8);
             write_byte(type);
             /*
              * The field in the object file is fixed width and the

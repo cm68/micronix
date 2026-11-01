@@ -10,7 +10,7 @@
 
 #include	<stdio.h>
 
-extern int	_flsbuf();
+extern int	_flsbuf(unsigned char, FILE *);
 
 fputc(c, f)
 int		c;

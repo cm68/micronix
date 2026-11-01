@@ -30,7 +30,7 @@ extern int in(), out();
  */
 struct ovlintr {
     int (*fn) ();
-    UINT seg;
+    UINT8 seg;          /* a segment number: 0..15 */
 };
 
 struct ovlintr ovlint[MAXNOVLINE]; /* not static: probe_init.c's attach writes it */

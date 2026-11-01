@@ -16,6 +16,15 @@ C
 .in +5
 .br
 .bd
+int fseek(FILE *stream, long offset, int ptrname);
+.br
+.bd
+long ftell(FILE *stream);
+.br
+.bd
+void rewind(FILE *stream);
+.sp 2
+.bd
 #include <stdio.h>
 .sp
 .bd 3
@@ -46,8 +55,8 @@ stream.
 This new position is at the signed distance, which is
 .bd
 offset
-byteó froí thå beginninç oæ thå file¬ thå currenô position¬ oò aô 
-thå enä oæ thå file, determined by whether 
+byteï¿½ froï¿½ thï¿½ beginninï¿½ oï¿½ thï¿½ fileï¿½ thï¿½ currenï¿½ positionï¿½ oï¿½ aï¿½ 
+thï¿½ enï¿½ oï¿½ thï¿½ file, determined by whether 
 .bd
 ptrname
 has a value of 0, 1 or 2.  This routine also undoes any effects

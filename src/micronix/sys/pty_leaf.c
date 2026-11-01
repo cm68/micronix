@@ -26,7 +26,7 @@
 #include <sys/sgtty.h>
 #include <errno.h>
 
-extern int ttyout(), ttyin(), ttymode();
+extern int ttyout(struct tty *), ttyin(UINT8, struct tty *), ttymode();
 
 /*
  * Pair and side of a device number; -1 for a minor that is not one of

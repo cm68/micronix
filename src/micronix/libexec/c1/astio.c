@@ -316,7 +316,7 @@ outd(int n)
 {
 	char buf[12];
 	register char *p = buf + 11;
-	int neg;
+	unsigned char neg;
 
 	/*
 	 * Both builds must SPELL a word the same way, or the self-built

@@ -111,13 +111,16 @@ VOID		exname();
 VOID		printnam();
 VOID		printflg();
 VOID		prs();
+VOID		chkpr(char);		/* main.c: the character is byte-wide */
+INT		nextc(CHAR);		/* word.c: one character, byte-wide */
+INT		any(CHAR, STRING);	/* string.c: c in s */
 INT		histread();		/* history.c: read and expand one line */
 INT		histedit();		/* edit.c: edit one terminal line */
 INT		histcount();		/* history.c: the ring, for the editor */
 INT		histfirst();
 STRING		histevent();
 extern STRING	histsrc;		/* the line readc is to serve */
-VOID		prc();
+VOID		prc(CHAR);
 VOID		getenv();
 STRING		*setenv();
 #ifdef	MICRONIX1

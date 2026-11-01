@@ -56,6 +56,9 @@
 #include "s.h"
 #include <stdio.h>
 
+int loc_char(char, int);	/* below; ch is byte-wide and rides in A */
+int loc_string(char);
+
 /*
  * define "identifier character" and "special character" 
  */

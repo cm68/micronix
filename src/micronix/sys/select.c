@@ -59,7 +59,6 @@
 #include <sys/net.h>
 #include <errno.h>
 
-extern struct file *ofile();
 extern int sleep(), wakeup();
 extern int in(), inton();
 extern struct tty mttys[];
@@ -139,7 +138,7 @@ devready(dev)
 select()
 {
     register UINT mask, bit, r;
-    register int fd;
+    register UINT8 fd;
     register struct file *fp;
     UINT netwanted;
     int dev, m;

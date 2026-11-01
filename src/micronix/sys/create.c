@@ -12,6 +12,8 @@
 #include <sys/proc.h>
 #include <errno.h>
 
+extern char iopen();          /* open.c: a descriptor or ERROR */
+
 /*
  * Creat system call.
  */
@@ -20,7 +22,6 @@ creat(name, mode)
     int mode;
 {
     register struct inode *ip;
-    register int fd;
 
     /*
      * File does not exist. Mask the mode to
@@ -45,9 +46,8 @@ creat(name, mode)
         }
         itrunc(ip);             /* itrunc ignores special files */
     }
-    fd = iopen(ip, IWRITE);
+    u.hl = iopen(ip, IWRITE);
     irelse(ip);
-    u.hl = fd;
 }
 
 /*

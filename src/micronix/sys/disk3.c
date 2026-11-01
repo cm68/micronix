@@ -36,7 +36,7 @@
  */
 static int d3error();
 static void d3link();
-static int d3specify();
+static int d3specify(UINT8);    /* drive is curdrv: dev & 3 */
 static UINT32 d3addr();
 
 #define NDRIVES 4               /* Number of drives */
@@ -424,7 +424,7 @@ d3error()
  */
 static int
 d3specify(drive)
-    UINT drive;
+    UINT8 drive;        /* newdrv: curdrv = dev & 3 */
 {
     UINT32 a;
 

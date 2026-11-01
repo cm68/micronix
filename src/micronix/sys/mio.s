@@ -395,14 +395,10 @@ _ss1_rxint:
 	.defw	ss1_rx
 
 ss1_rx:
-	in	a,(07ch)	; the received character
-	ld	c,a
-	ld	b,0
+	in	a,(07ch)	; the received character, arg0 in A
 	ld	hl,_mttys		; the SS1 tty, minor 1, slot 0
 	push	hl
-	ld	l,c
-	ld	h,b		; the character, arg0
-	call	_ttyin
+	call	pe,_ttyin		; arg8/ret16: ld makes it call nn
 	pop	af		; drop the tty argument
 	ld	a,0x67		; OCW2 specific EOI, level 7 (RxRDY)
 	out	(072h),a	; the slave 8259 command port
@@ -565,9 +561,8 @@ main:
 	ret
 L100:
 	push	de		; push tty (arg1)
-	ld	l,c
-	ld	h,b		; hl = char (arg0)
-	call	_ttyin
+	ld	a,c		; the character, arg0 in A
+	call	pe,_ttyin	; arg8/ret16: ld makes it call nn
 	pop	af		; drop tty
 	ret
 

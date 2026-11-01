@@ -264,6 +264,22 @@ pfxCall(struct expr *e)
         e1->type = inttype;
 
     /*
+     * The first argument is passed in A when the callee's prototype
+     * affirmatively says it is an 8-bit scalar: char or unsigned char,
+     * not a pointer, array, function or aggregate that merely happens
+     * to be a byte wide.  No prototype means the parameter types are
+     * unknown, so the call keeps the word convention and loses if the
+     * callee reads A - which the warning below says out loud.
+     */
+    if ((ft->flags & TF_FUNC) && ft->sub) {
+        struct type *a1 = fnArgType(ft, 0);
+
+        if (a1 && a1 != voidtype && a1->size == 1 &&
+            !(a1->flags & (TF_POINTER | TF_ARRAY | TF_FUNC | TF_AGGREGATE)))
+            e1->flags |= E_AARG;
+    }
+
+    /*
      * Parse the argument list, converting each argument to
      * the type the prototype declares for it.  A function
      * with no prototype, and the variadic tail past the
@@ -297,6 +313,14 @@ pfxCall(struct expr *e)
     }
 
     expect(RPAR, ER_E_SP);
+
+    /*
+     * An argument list and no prototype: the parameter types are
+     * unknown, so the first argument stays in HL.  A warning, not an
+     * error - the code is allowed - but say it.
+     */
+    if (e1->right && !((ft->flags & TF_FUNC) && fnArgType(ft, 0)))
+        warn("call without parameter types");
 
     // Result type will be determined later from function signature
     return e1;

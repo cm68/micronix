@@ -61,7 +61,7 @@ extern int selectchan;          /* select(2): a reader may be watching */
 ttyinit1(t, dev, mode, ms)
     register struct tty *t;
     int dev;
-    UINT mode;
+    UINT8 mode;         /* RAW or COOKED */
     UINT8 ms;
 {
     t->ispeed = t->ospeed = 13;		/* 9600 */

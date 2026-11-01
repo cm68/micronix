@@ -41,6 +41,8 @@
 #include <sys/fs.h>
 #include <sys/dir.h>
 #include <mtab.h>
+#include <unistd.h>
+
 
 #define NMOUNT 10		/* the kernel's NMOUNT (sys/sys.h) */
 #define SUPERBLK 1

@@ -3,17 +3,15 @@
 	psect	text
 _isdigit:
 _isdig:
-	ld	a,h		;check for a char - the argument is in hl
-	or	a
-	jr	nz,nix
-	ld	a,l
+	.abi	_isdigit,3	;arg8/ret8: c in A, the answer in A
+	.abi	_isdig,3
 	cp	'0'
 	jr	c,nix
 	cp	'9'+1
 	jr	nc,nix
-	ld	hl,1		;yes
+	ld	a,1		;yes
 	ret
-nix:	ld	hl,0
+nix:	xor	a		;no
 	ret
 
 ; vim: tabstop=4 shiftwidth=4 noexpandtab:

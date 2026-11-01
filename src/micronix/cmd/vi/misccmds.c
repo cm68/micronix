@@ -44,8 +44,9 @@ openbeforecmd()
     appchar('\n');
 }
 
+unsigned char
 issepchar(c)
-    char c;
+    unsigned char c;
 {
     if (strchr(WORDSEP, c) != NULL)
         return (1);

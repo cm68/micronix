@@ -5,6 +5,8 @@
  */
 
 #include "less.h"
+#include <unistd.h>
+
 
 public char file = -1;	/* File descriptor of the input file */
 

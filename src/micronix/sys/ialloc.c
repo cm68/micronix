@@ -14,7 +14,7 @@
 #include <sys/buf.h>
 #include <errno.h>
 
-extern char *swin();            /* uio.c: the scratch window */
+extern char *swin(UINT8);       /* uio.c: the scratch window */
 extern void srel();
 extern struct inode ilist[];
 

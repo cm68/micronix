@@ -352,8 +352,10 @@ static int scsireset(), scsiselect();
  */
 struct scsiif
 {
-    int (*rd)();                /* rd(reg) -> byte */
-    int (*wr)();                /* wr(reg, byte) */
+    /* prototyped: the byte first parameters ride in A and the indirect
+     * caller learns that from the pointer's type, not the callee */
+    int (*rd)(UINT8);           /* rd(reg) -> byte */
+    int (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
     int (*reset)();             /* reset() */
     int (*intr)();              /* intr(on): connect or cut the chip's IRQ */
 

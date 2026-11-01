@@ -45,6 +45,18 @@ gripe(error_t errcode)
 }
 
 /*
+ * A warning is a diagnostic that does not fail the compile.  The code
+ * is allowed; the source should hear about it anyway.  It shares the
+ * error buffer and the filename:line prefix.
+ */
+void
+warn(char *msg)
+{
+    char *p = fmtstr(errbuf, "%s:%d: warning: %s\n", filename, lineno, msg);
+    write(2, errbuf, p - errbuf);
+}
+
+/*
  * some errors are too nasty to fix
  */
 void

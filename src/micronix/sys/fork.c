@@ -14,6 +14,8 @@
 #include <sys/con.h>
 #include <errno.h>
 
+extern int close(UINT8);    /* open.c */
+
 extern struct proc *initproc, *swapproc;
 
 /*
@@ -158,7 +160,7 @@ newpid(a)
  */
 exit()
 {
-    register int fd;
+    register UINT8 fd;
     register struct proc *p;
 
     u.p->status |= (u.hl << 8);

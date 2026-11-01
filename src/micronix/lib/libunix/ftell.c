@@ -2,8 +2,8 @@
  * ftell - return current file position
  */
 #include <stdio.h>
+#include <unistd.h>
 
-extern long lseek();
 
 long
 ftell(f)

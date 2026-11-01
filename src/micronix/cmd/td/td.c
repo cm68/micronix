@@ -74,6 +74,8 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
+#include <unistd.h>
+
 
 #define	DTAB		"/etc/dtab"
 #define	BIGFILE		1000	/* blocks: the size that wants -a */

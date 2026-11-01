@@ -58,5 +58,10 @@ char *malloc(), *strchr(), *strcpy();
 char *nextline(), *prevline(), *coladvance(), *ssearch();
 char *fwdsearch(), *bcksearch();
 
+/* the character tests: a byte in A in, the answer as a byte in A out */
+unsigned char isspace(unsigned char);
+unsigned char isdigit(unsigned char);
+unsigned char issepchar(unsigned char);
+
 #define CONTROL(c) ((c) - 0x40)
 

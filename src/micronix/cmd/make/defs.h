@@ -102,7 +102,7 @@ extern int write(int, char *, int);
 extern int close(int);
 extern int unlink(char *);
 extern int time(long *);
-extern char access(char *, int);
+extern int access(char *, int);
 
 extern int sigivalue;
 extern int sigqvalue;

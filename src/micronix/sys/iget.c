@@ -16,6 +16,8 @@
 
 struct inode ilist[];
 
+extern int iio(unsigned char, struct inode *);	/* below; flag is a byte */
+
 /*
  * Return a pointer to a locked inode.
  * Errors: bad inumber, ilist is full.

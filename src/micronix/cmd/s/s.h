@@ -4,6 +4,22 @@
 
 #define	NULL	0
 
+/*
+ * Functions the files share whose first parameter is a character, or
+ * whose result is one.  The declaration makes the byte convention
+ * visible across translation units; without it the caller would pass
+ * the word convention and ld would refuse the link.
+ */
+int	operator(char, int, int);
+unsigned char	isalnum(unsigned char);		/* lib.c */
+unsigned char	isspace(unsigned char);
+unsigned char	isdigit(unsigned char);
+unsigned char	isprint(unsigned char);
+unsigned char	isalpha(unsigned char);		/* libc */
+unsigned char	islower(unsigned char);
+unsigned char	isupper(unsigned char);
+char	k_lastcmd();
+
 #define CR		'\r'    /* sent by <return> key */
 #define ctrl(x)		(x & 037)       /* control character 'x' */
 #define ESCAPE		27      /* end-of-insertion character */

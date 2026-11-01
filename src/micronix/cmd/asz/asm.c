@@ -52,8 +52,8 @@ extern char m_flag;
 
 void asm_reset();
 void assemble();
-void outbyte();
-void outtmp();
+void outbyte(char);
+void outtmp(char);
 unsigned char operand();
 
 /*
@@ -1231,6 +1231,7 @@ int visible;
 			symhash[h] = sym;
 		}
 		sym->seg = SEG_UNDEF;
+		sym->abi = 0;
 		sym->index = 0xffff;
 		{
 			register char *d = sym->name;
@@ -2555,6 +2556,35 @@ assemble()
 					continue;
 				}
 
+				/*
+				 * .abi <name>,<bits>
+				 *
+				 * The calling-convention bits for a function the
+				 * compiler defined: 1 = first parameter is 8-bit
+				 * (passed in A), 2 = return is 8-bit (in A).  They
+				 * ride in the free high bits of the object symbol's
+				 * flag byte, where ld reads them to check every call
+				 * site the compiler marked.
+				 */
+				if (match(token_buf, "abi")) {
+					struct symbol *as;
+
+					get_token();
+					if (cur_token != T_NAME)
+						gripe("expected symbol");
+					as = sym_fetch(token_buf);
+					if (!as)
+						as = sym_update(token_buf, SEG_UNDEF, 0, 1);
+					need(',');
+					get_token();
+					if (cur_token != T_NUM)
+						gripe("expected number");
+					if (as)
+						as->abi = token_val & 3;
+					consume();
+					continue;
+				}
+
 				if (match(token_buf, "extern")) {
 					while (1) {
 						get_token();
@@ -2929,6 +2959,7 @@ assemble()
 		default:
 			break;
 		}
+		type |= (sym->abi & 3) << 4;
 
 #ifdef DEBUG
 		if (verbose > 3) {

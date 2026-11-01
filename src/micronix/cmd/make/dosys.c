@@ -1,4 +1,6 @@
 #include "defs.h"
+#include <unistd.h>
+
 
 dosys(comstring,nohalt)
 register char *comstring;

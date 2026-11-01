@@ -104,7 +104,7 @@ long		ftell();
 int		fseek(FILE *, long, int);
 char *		fgets();
 char *		_bufallo();
-int _flsbuf();
+int _flsbuf(unsigned char, FILE *);
 /*
  * int, not char: both return the character read or written, or EOF,
  * which is -1 - a value a char cannot hold apart from a data byte of

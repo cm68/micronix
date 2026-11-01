@@ -88,6 +88,7 @@ indir:	jp	(hl)
 
 	global	fenter, fexit
 	global	fenterw, fenterq
+	global	fenterb
 
 ;	The w entries guarantee more than the spill: **hl reaches the
 ;	function body intact and equal to (iy+4)**.  That is what lets
@@ -100,6 +101,8 @@ indir:	jp	(hl)
 ;	promise: a long's high word is in hl' and the reload is not
 ;	worth the juggling for as rare as long first parameters are.
 
+fenterb:
+	ld	l,a
 fenterw:
 	pop	de		;the function body
 	pop	af		;the caller's return address
@@ -377,6 +380,7 @@ fexbq:
 
 	global	fentbx, fentx, fentb, fentn
 	global	fentbxw, fentxw, fentbw, fentnw
+	global	fentbb, fentxb, fentbxb, fentnb
 	global	fentbxq, fentxq, fentbq, fentnq
 
 ;	The w and q entries: the first argument is in HL (HL':HL for a
@@ -395,6 +399,8 @@ fexbq:
 ;	hl comes back from the slot, so the promise above holds however
 ;	big the frame is.
 
+fentbxb:
+	ld	l,a
 fentbxw:			;frame, scalar area, save IX and BC
 	pop	de		;-> the word after the call
 	pop	af		;the caller's return address
@@ -425,6 +431,8 @@ fentbxw:			;frame, scalar area, save IX and BC
 	exx
 	ret			;and into it
 
+fentxb:
+	ld	l,a
 fentxw:				;the same, saving IX alone
 	pop	de
 	pop	af
@@ -454,6 +462,8 @@ fentxw:				;the same, saving IX alone
 	exx
 	ret
 
+fentbb:
+	ld	l,a
 fentbw:				;saving BC alone
 	pop	de
 	pop	af
@@ -483,6 +493,8 @@ fentbw:				;saving BC alone
 	exx
 	ret
 
+fentnb:
+	ld	l,a
 fentnw:				;no saves, but a scalar area to allocate
 	pop	de
 	pop	af

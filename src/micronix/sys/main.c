@@ -58,7 +58,7 @@ UINT8 map0[];
 char lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
 extern UINT8 nbufs;             /* uhdr.s's _nbufs: the published count */
 
-extern int segalloc();          /* malloc.c */
+extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
 extern int nodev();             /* con.c */
 
 /*
@@ -129,7 +129,7 @@ signon()
 expand_bufs()
 {
     struct buf *b;
-    int seg;
+    unsigned char seg;
     UINT8 j;
 
     b = blist + 8;

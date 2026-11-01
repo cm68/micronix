@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 logmsg(s)
 char *s;
 {

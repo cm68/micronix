@@ -14,6 +14,8 @@
 #include <sys/signal.h>
 #include <errno.h>
 
+extern int rdwri(UINT8, UINT8, int, int);	/* below; rw and fd are bytes */
+
 /*
  * The pipe size at which the writing process is suspended.
  */
@@ -44,8 +46,8 @@ write(buf, count)
  * desired access.
  */
 rdwri(rw, fd, buf, count)
-    UINT8 rw;
-    int fd, buf, count;
+    UINT8 rw, fd;               /* both are bytes: u.hl's low byte is the fd */
+    int buf, count;
 {
     register struct inode *ip;
     register struct file *fp;

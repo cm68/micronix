@@ -16,6 +16,8 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <unistd.h>
+
 
 #define	MAXBSIZE	512
 
@@ -33,7 +35,6 @@ char cflag INIT;
 char sflag INIT;
 char *rindex();
 char *malloc();
-long lseek();
 
 /*
  * The cptree destination, remembered before the walk.  Copying / into /b

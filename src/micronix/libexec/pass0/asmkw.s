@@ -7,19 +7,21 @@
 ; register state did not survive the split.
 ;
 ; Calling convention (ccc): the string arrives in HL, the table is read
-; at [sp+2], and the token is returned in HL.  BC and IX are the
-; caller's register variables, so BC is saved.
+; at [sp+2], and the token is returned in A - the 8-bit return the C
+; prototype in cpp.h declares.  BC and IX are the caller's register
+; variables, so BC is saved.
 ;
 ; Registers through the body:
 ;	hl - the table pointer, walking
 ;	bc - the original string, for the resets
 ;	de - the string pointer, walking
-;	a  - scratch
+;	a  - scratch, then the answer
 ;
 	psect	text
 	global	_kwlook
 
 _kwlook:
+	.abi	_kwlook,2		; arg16/ret8: the token comes back in A
 	ex	de,hl			; de = string (first arg)
 	ld	hl,2
 	add	hl,sp			; past the return address
@@ -142,8 +144,6 @@ scandone:
 notfound:
 	ld	a,0xff
 done:
-	ld	l,a
-	ld	h,0
 	pop	bc
 	ret
 

@@ -13,6 +13,8 @@
 LOCAL CHAR	quote;	/* used locally */
 LOCAL CHAR	quoted;	/* used locally */
 
+LOCAL INT	getch(CHAR);	/* defined below; copyto calls it first */
+
 
 
 LOCAL STRING	copyto(endch)

@@ -19,6 +19,8 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include "sh.h"
+#include <unistd.h>
+
 
 char login;                 /* argv[0] began with '-'   (0x9004) */
 char verbose;               /* -v: echo lines as they are run */

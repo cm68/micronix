@@ -18,6 +18,8 @@
 #include "diff.h"
 #include <sys/dir.h>
 #include <dirent.h>
+#include <unistd.h>
+
 
 struct	direct *readdir();
 DIR	*opendir();

@@ -37,12 +37,12 @@ static int memio(), busready(), busplease(), busthanks();
  * allocator, the raw user-memory copies, the raw window mapping, and the
  * disk label decoder.
  */
-extern int segalloc();
+extern unsigned char segalloc();
 extern UINT8 map0[], bufseg;
 extern int copyin(), copyout();
-extern bwin();
+extern int bwin(UINT8);
 extern int dllabel();
-extern char *swin();
+extern char *swin(UINT8);
 extern void srel();
 
 /*

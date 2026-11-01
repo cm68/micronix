@@ -15,6 +15,18 @@ ctime, localtime, gmtime, asctime, timezone
 C        
 .in +5
 .br
+.bd
+char *ctime(time_t *clock);
+.br
+.bd
+struct tm *localtime(time_t *clock);
+.br
+.bd
+struct tm *gmtime(time_t *clock);
+.br
+.bd
+char *asctime(struct tm *t);
+.sp 2
 .bd 2
 char *ctime(clock)
 .br

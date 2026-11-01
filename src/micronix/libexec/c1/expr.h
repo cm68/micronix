@@ -15,6 +15,7 @@
 #define NR_NORED	1	/* don't reduce: preserve for parent rule */
 #define NR_ADDR		2	/* parent wants the address, not the place */
 #define NR_BYTEWANT	4	/* value demanded as a byte by its consumer */
+#define NR_AARG		0x40	/* CALL: the first argument rides in A */
 
 /*
  * A SYM/SYMREF name's kind rides the free high bits of nored (bits 3-5;

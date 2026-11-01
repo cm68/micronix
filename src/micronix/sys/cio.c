@@ -62,7 +62,8 @@ cwrite(dev)
  */
 static
 cioswap(fd, fp, dev)
-    int fd, dev;
+    UINT8 fd;
+    int dev;
     register struct file *fp;
 {
     register struct file *nf;
@@ -90,7 +91,8 @@ cioswap(fd, fp, dev)
  * device - a clone's accept - and cioswap()s this process's file to it.
  */
 cioctl(fd, cmd, arg)
-    int fd, cmd;
+    UINT8 fd;
+    int cmd;
     char *arg;
 {
     struct file *fp;

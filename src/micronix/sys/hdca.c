@@ -650,7 +650,7 @@ hdopen(dev, mode)
 	UINT dev, mode;
 {
 	struct hd *hp;
-	UINT drive;
+	UINT8 drive;       /* drive = dev & 3 */
 
 	drive = dev & 3;
 	if (drive >= NHD) {
@@ -722,7 +722,7 @@ hdfmt(hp, c, b, drive)
 	struct hd *hp;
 	struct hdca_cmd *c;
 	struct buf *b;
-	UINT drive;
+	UINT8 drive;       /* drive = dev & 3 */
 {
 	int spt = c->sector;		/* the sector field carries the count */
 	int head = c->head;
@@ -807,7 +807,7 @@ hdcioctl(dev, cmd, r, b)
 {
 	struct hdca_cmd *c;
 	struct hd *hp;
-	UINT drive;
+	UINT8 drive;       /* drive = dev & 3 */
 
 	if (cmd != CDBCMD) {
 		u.error = ENXIO;

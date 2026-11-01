@@ -65,6 +65,9 @@ src/tools/readall: $(TOOLSRCS)
 src/hwsim/d1/d1: $(SIMSRCS)
 	cd src ; make
 	cd src/hwsim/d1 ; make
+	# d1p links the NODEBUG library, which "cd src ; make" does not
+	# build - lib simulates one suffix per make, and that is the other.
+	cd src/lib ; make NODEBUG=1
 	cd src/hwsim/d1 ; make NODEBUG=1
 
 #

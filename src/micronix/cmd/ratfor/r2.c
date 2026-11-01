@@ -9,6 +9,7 @@
 #include "r.h"
 
 extern int hollerith;
+int ptc(char);			/* below; the character rides in A */
 
 char	outbuf[80];
 int	outp	= 0;

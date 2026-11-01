@@ -5,6 +5,8 @@
 #include "less.h"
 #include "position.h"
 #include <setjmp.h>
+#include <unistd.h>
+
 
 public char	ispipe;
 public jmp_buf	main_loop;

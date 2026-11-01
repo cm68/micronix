@@ -194,17 +194,24 @@ ustart(tty)
  * OVLBASE-relative addresses in the module, valid while its page is
  * mapped, which the wrappers below arrange.
  */
-static UINT ttyseg;
-static int (*ttyin_m) ();
-static int (*ttyout_m) ();
-static int (*mumint_m) ();
+static UINT8 ttyseg;            /* a segment number: 0..15 */
+/*
+ * Prototyped: these point at the driver page's entries, and ttyin's
+ * first parameter is a byte.  An unprototyped pointer would pass the
+ * character in HL while the callee - compiled with UINT8 c - reads A.
+ * ttyout and mumint take a struct tty *, so their parameters are words
+ * either way.
+ */
+static int (*ttyin_m) (UINT8, struct tty *);
+static int (*ttyout_m) (struct tty *);
+static int (*mumint_m) (struct tty *);
 static UINT ttyready;           /* the console tty is initialized and open */
 
 ttypub(seg, in, out, mum)
     UINT seg;
-    int (*in) ();
-    int (*out) ();
-    int (*mum) ();
+    int (*in) (UINT8, struct tty *);
+    int (*out) (struct tty *);
+    int (*mum) (struct tty *);
 {
     ttyseg = seg;
     ttyin_m = in;

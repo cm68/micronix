@@ -279,11 +279,18 @@ static int idereset();
  */
 struct ideif
 {
-    int (*rd)();                /* rd(reg) -> byte */
-    int (*wr)();                /* wr(reg, byte) */
+    /*
+     * Prototyped where the first parameter is a byte.  These are called
+     * indirectly through this struct, and an unprototyped pointer would
+     * land the argument in HL while the callee - compiled with a byte
+     * first parameter - read it from A.  The pointer type is what tells
+     * the call site which convention to use.
+     */
+    int (*rd)(UINT8);           /* rd(reg) -> byte */
+    int (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
     int (*xfer)();              /* xfer(p, nbytes, read) */
     int (*reset)();             /* reset() */
-    int (*sel)();               /* sel(unit) */
+    int (*sel)(UINT8);          /* sel(unit) */
     int (*intr)();              /* intr(on): connect or cut the drive's INTRQ */
 
     int busy;                   /* a command is out and not yet finished */

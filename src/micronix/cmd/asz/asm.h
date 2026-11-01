@@ -46,6 +46,7 @@ extern unsigned char *lineptr;
  */
 struct symbol {
     unsigned char seg;              /* SEG_* */
+    unsigned char abi;              /* SF_ARG8|SF_RET8, from .abi */
     unsigned short index;           /* object file ordinal */
     unsigned short value;           /* segment relative */
     struct symbol *next;            /* bucket chain, then list: see asm.c */
@@ -108,8 +109,8 @@ void asm_reset();
 void assemble();
 char peek();
 char get_next();
-void outbyte();
-void outtmp();
+void outbyte(char);
+void outtmp(char);
 
 #endif
 

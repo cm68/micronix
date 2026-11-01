@@ -1,6 +1,7 @@
 #include <types.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <unistd.h>	/* seek, lseek: the fd is a byte, passed in A */
 
 DIR *
 opendir(dirname)
@@ -61,8 +62,6 @@ long
 telldir(dirp)
 DIR *dirp;
 {
-	long lseek();
-
 	return lseek(dirp->fd, 0L, 1);
 }
 
@@ -70,7 +69,5 @@ seekdir(dirp, pos)
 DIR *dirp;
 long pos;
 {
-	long lseek();
-
 	lseek(dirp->fd, pos, 0);
 }

@@ -18,9 +18,16 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 
+/*
+ * The same definition as sys/probe.c's, and it has to stay the same to
+ * the byte: the array is one object built here and read there, so a
+ * wider seg here strides ovlint[] by four where the resident dispatcher
+ * reads it by three, and the first interrupt calls whatever the
+ * misaligned slot happens to hold.
+ */
 struct ovlintr {
     int (*fn) ();
-    UINT seg;
+    UINT8 seg;
 };
 
 extern struct ovlintr ovlint[MAXNOVLINE];  /* sys/probe.c */

@@ -16,6 +16,15 @@ C
 .in +5
 .br
 .bd
+int scanf(char *format, ...);
+.br
+.bd
+int fscanf(FILE *stream, char *format, ...);
+.br
+.bd
+int sscanf(char *s, char *format, ...);
+.sp 2
+.bd
 #include <stdio.h>
 .sp
 .bd 2
@@ -119,8 +128,8 @@ Octal integer expected.  Corresponding argument should be integer pointer.
 .bd
 x
 .br
-Hexadecimaì integeò expected® Correspondinç argumenô shoulä bå 
-integeò pointer.
+Hexadecimaï¿½ integeï¿½ expectedï¿½ Correspondinï¿½ argumenï¿½ shoulï¿½ bï¿½ 
+integeï¿½ pointer.
 .sp
 .ti -1
 .bd
@@ -170,8 +179,8 @@ as the first character after the left bracket defines the input field
 as all characters in the set of characters following the 
 .bd
 ^ 
-sign®  Absencå oæ thió sign meanó thå inpuô fielä ió alì thå 
-characteró withiî the brackets.  Corresponding argument must point to
+signï¿½  Absencï¿½ oï¿½ thiï¿½ sign meanï¿½ thï¿½ inpuï¿½ fielï¿½ iï¿½ alï¿½ thï¿½ 
+characterï¿½ withiï¿½ the brackets.  Corresponding argument must point to
 a character array.
 .sp 2
 .in -4
@@ -221,14 +230,15 @@ Scanf
 returns the number of input items successfully matched and assigned.
 This may also be used to decide how many items were actually found.
 The constant end of file is returned upon end of input.  This is different
-froí 0¬ whicè maù bå interpreteä tï meaî nï conversioî waó done®  
-Iæ conversion was intended, it was frustrated by an inappropriate 
+froï¿½ 0ï¿½ whicï¿½ maï¿½ bï¿½ interpreteï¿½ tï¿½ meaï¿½ nï¿½ conversioï¿½ waï¿½ doneï¿½  
+Iï¿½ conversion was intended, it was frustrated by an inappropriate 
 character in the input.  As an example:
 .sp
 .in +8
 .bd 2
 int i; float x; char name[50];
 .br
+.bd
 scanf("%d%f%s", &i, &x, name);
 .sp
 .in -8

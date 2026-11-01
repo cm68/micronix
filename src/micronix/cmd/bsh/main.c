@@ -22,7 +22,7 @@ FILEBLK		stdfile;
 FILE		standin = &stdfile;
 
 
-PROC VOID	exfile();
+PROC VOID	exfile(BOOL);
 
 
 

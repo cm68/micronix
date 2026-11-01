@@ -89,6 +89,8 @@ struct ws_symbol {
 #define         SF_BSS          0x03
 #define SF_DEF          0x04
 #define SF_GLOBAL       0x08
+#define SF_ARG8         0x10	/* first parameter is 8-bit (in A) */
+#define SF_RET8         0x20	/* return is 8-bit (in A) */
 	char name[15];
 };
 

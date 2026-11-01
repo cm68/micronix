@@ -32,8 +32,11 @@ extern int arg[];               /* in-line arguments from system() */
  * would be read out of HL alone and everything above 64K - the whole
  * reason r_seek hands back two words - would arrive as its low half.
  */
-extern UINT32 seek(int fd, UINT disp, unsigned from);
-extern int ftruncate(int fd, UINT32 length);
+extern UINT32 seek(UINT8 fd, UINT disp, unsigned from);
+extern int ftruncate(UINT8 fd, UINT32 length);
+extern int close(UINT8);
+extern int cioctl(UINT8, int, char *);
+extern int bioctl(UINT8, UINT, char *);
 
 /*
  * First, pass registers across the system interface

@@ -190,7 +190,7 @@ extern char *ovldata();         /* ovldata(major): the driver's data, or 0;
                                  * block first, then char */
 extern int ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
 extern int ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
-extern int ovlattach();         /* ovlattach(seg): place a module, run its init */
+extern int ovlattach(UINT);     /* ovlattach(seg): place a module, run its init */
 extern int ovlstart();          /* place the driver stamped into the slot */
 extern int ovlntr();            /* ovlntr(line): call the handler on a line */
 extern int intrset();           /* intrset(probe, fn, seg): claim for the attach loop */

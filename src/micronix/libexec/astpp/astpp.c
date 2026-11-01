@@ -226,7 +226,7 @@ static void parseExpr(void) {
 
     /* Call */
     if (opChar == CALL) {
-        int i, retType = read1();
+        int i, retType = read1() & 0x7f;	/* high bit: first arg in A */
         int argc = read1();
         char buf[32];
         sprintf(buf, "(CALL:%c/%d ", retType, argc);

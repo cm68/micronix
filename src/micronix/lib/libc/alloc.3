@@ -15,6 +15,18 @@ alloc, free, realloc, calloc
 C
 .in +5
 .br
+.bd
+char *alloc(unsigned size);
+.br
+.bd
+void free(char *ptr);
+.br
+.bd
+char *realloc(char *ptr, unsigned size);
+.br
+.bd
+char *calloc(unsigned nelem, unsigned elsize);
+.sp 2
 .bd 2
 char *alloc(size)
 .br
@@ -88,8 +100,8 @@ to
 .bd
 size
 bytes.  It may also return a pointer to a block, if the block
-ió removed®  Thå valuås oæ thå ne÷ anä olä blocë 
-sizes determine the changes in block contentó; the contents remain
+iï¿½ removedï¿½  Thï¿½ valuï¿½s oï¿½ thï¿½ neï¿½ anï¿½ olï¿½ blocï¿½ 
+sizes determine the changes in block contentï¿½; the contents remain
 unchanged up to the lesser value of the old and new sizes.
  
 .bd

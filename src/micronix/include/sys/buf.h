@@ -56,7 +56,7 @@ extern struct buf blist[];      /* boot headers; textpad.s links blist last */
  */
 extern char *bhold();           /* map a buffer's data, return its address */
 extern void brel();             /* put back the segment the hold saved */
-extern int bwin();              /* the raw mapping, without the stack */
+extern int bwin(UINT8);         /* the raw mapping, without the stack; seg is a byte */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

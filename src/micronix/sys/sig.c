@@ -18,7 +18,7 @@
  * Signal system call
  */
 signal(sig, func)
-    UINT8 sig;
+    int sig;
     register int (*func) ();
 {
     register int old;
@@ -40,7 +40,7 @@ signal(sig, func)
  * Kill system call.
  */
 kill(sig)
-    UINT8 sig;
+    int sig;
 {
     register struct proc *p;
     int pid;

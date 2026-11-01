@@ -40,6 +40,8 @@
 #include <sys/ioctl.h>
 #include <sys/mw.h>
 #include <sys/dlabel.h>
+#include <unistd.h>
+
 
 /*
  * The command block is the board's own, sixteen bytes (include/sys/mw.h):

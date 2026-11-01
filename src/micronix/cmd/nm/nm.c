@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <obj.h>
 #else
 #include <stdio.h>
 #endif
@@ -58,6 +59,20 @@ char *stype;
     case 6: strcpy(seg, "data"); strcpy(stype, "def"); break;
     case 7: strcpy(seg, "bss"); strcpy(stype, "def"); break;
     default: strcpy(seg, "-"); strcpy(stype, "undef"); break;  /* extern/undef */
+    }
+
+    /*
+     * The compiler's calling-convention bits: bit 4 is an 8-bit first
+     * parameter (passed in A), bit 5 an 8-bit return (in A).  Show them
+     * with the type so a definition's convention is visible here.
+     */
+    if (type & SF_ARG8) {
+        if (type & SF_RET8)
+            strcat(stype, ":8/8");
+        else
+            strcat(stype, ":8/16");
+    } else if (type & SF_RET8) {
+        strcat(stype, ":16/8");
     }
 }
 

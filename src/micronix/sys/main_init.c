@@ -42,7 +42,7 @@ extern UINT8 nmtab;             /* uhdr.s's _nmtab: the published count */
 extern UINT8 segmap[];          /* malloc.c */
 extern UINT nsegs;
 extern UINT lastseg;            /* uhdr.s's _lastseg: the allocator hint */
-extern int segalloc();          /* malloc.c */
+extern unsigned char segalloc();    /* malloc.c: a segment is a byte */
 extern int swapinit();          /* malloc.c */
 extern int nodev();             /* con.c */
 extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
@@ -66,7 +66,7 @@ extern UINT kino;               /* uhdr.s's _kino: the inode we booted from */
  */
 static void
 drvprobe(major, name, ndrv)
-    UINT major;
+    UINT8 major;        /* < NBDEV (10) and < NCDEV (13) */
     char *name;
     UINT8 ndrv;
 {
@@ -200,7 +200,8 @@ main()
 static
 putblk(bp, seg, off)
     struct buf *bp;
-    UINT seg, off;
+    UINT8 seg;
+    UINT off;
 {
     UINT8 save;
 
@@ -260,7 +261,8 @@ ovlplaceall()
     struct obj hdr;
     struct inode *ip;
     long modbase;
-    UINT nmod, n, i, seg, bmaj, cmaj, ra, bn;
+    UINT nmod, n, i, ra, bn;
+    UINT8 seg, bmaj, cmaj;      /* segment and majors are bytes */
     int bad;
     struct buf *bp;
     char *s;
@@ -460,7 +462,7 @@ meminit()
 binit()
 {
     struct buf *b;
-    int seg;
+    unsigned char seg;
 
     /*
      * Seed the 8 boot buffers from one 4K segment.  Buffer data now lives

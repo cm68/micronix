@@ -15,6 +15,14 @@
 #include <errno.h>
 
 /*
+ * A descriptor is one byte, and ERROR is -1 - the same byte as 0xff.
+ * char is signed in this compiler, so a char holds either a descriptor
+ * (0..15) or ERROR, and a failed allocation is tested as -1.
+ */
+extern char oalloc();           /* a descriptor, or ERROR */
+char iopen();                   /* the same */
+
+/*
  * Open system call.
  *
  * The second argument is the open flags, not just the access mode:
@@ -28,7 +36,6 @@ open(name, flags)
     unsigned int flags;
 {
     register struct inode *ip;
-    register int fd;
     register UINT8 mode;
 
     if ((ip = iname(name)) == 0)
@@ -40,9 +47,8 @@ open(name, flags)
     }
     if (flags & O_APPEND)
         mode |= IAPPEND;
-    fd = iopen(ip, mode);
+    u.hl = iopen(ip, mode);
     irelse(ip);
-    u.hl = fd;
 }
 
 /*
@@ -53,7 +59,7 @@ pipe(vec)
 {
     register struct inode *ip;
     register struct file *rf, *wf;
-    int rd, wd;
+    char rd, wd;                /* the descriptors, or ERROR */
 
     vec[0] = vec[1] = -1;
     if ((rf = falloc()) == 0 || (rd = oalloc()) == ERROR)
@@ -83,12 +89,14 @@ pipe(vec)
  * Open a file from its inode.
  * Called from open and create.
  */
+char
 iopen(ip, mode)
     struct inode *ip;
     int mode;
 {
     register struct file *fp;
-    register int dev, fd;
+    register int dev;
+    char fd;                    /* a descriptor, or ERROR */
     static char writ;
 
     writ = mode & IWRITE;
@@ -136,7 +144,7 @@ iopen(ip, mode)
  * Close system call
  */
 close(fd)
-    int fd;
+    UINT8 fd;
 {
     register struct file *fp;
 
@@ -222,6 +230,7 @@ falloc()
 /*
  * Allocate an open file slot
  */
+char
 oalloc()
 {
     register struct file **op, **otop;
@@ -239,7 +248,7 @@ oalloc()
  */
 struct file *
 ofile(fd)
-    unsigned int fd;
+    UINT8 fd;
 {
     register struct file *fp;
 

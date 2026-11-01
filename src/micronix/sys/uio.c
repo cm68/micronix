@@ -391,7 +391,8 @@ bclose(dev, mode)
  */
 int
 bioctl(fd, cmd, arg)
-    UINT fd, cmd;
+    UINT8 fd;
+    UINT cmd;
     char *arg;
 {
     struct cdb r;

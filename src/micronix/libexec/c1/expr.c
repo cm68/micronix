@@ -401,7 +401,7 @@ freeexpr(Expr *e)
 }
 
 /* check if op is binary */
-int
+unsigned char
 isbinary(int op)
 {
 	/*
@@ -416,7 +416,7 @@ isbinary(int op)
 Expr *
 readexpr(void)
 {
-	unsigned char op, t, n, i, wc;
+	unsigned char op, t, n, i, wc, aarg;
 	unsigned long v;
 	Expr *e, *args, *arg;
 
@@ -476,6 +476,8 @@ readexpr(void)
 
 	case CALL:
 		t = read1();
+		aarg = (t & 0x80) != 0;	/* first argument in A */
+		t &= 0x7f;
 		n = read1();
 #ifdef DEBUG
 		if (VERBOSE(V_EXPR))
@@ -489,7 +491,10 @@ readexpr(void)
 			arg->right = args;  /* prepend to chain */
 			args = arg;
 		}
-		return mkcall(t, n, e, args);
+		e = mkcall(t, n, e, args);
+		if (aarg)
+			e->nored |= NR_AARG;
+		return e;
 
 	case PREINC:
 	case POSTINC:

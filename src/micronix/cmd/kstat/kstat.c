@@ -35,6 +35,7 @@
 #include <sys/file.h>
 #include <sys/inode.h>
 #include <obj.h>
+#include <unistd.h>
 
 #define KERNEL  "/micronix"
 #define MEMORY  "/dev/mem"
@@ -54,7 +55,6 @@ static int memfd;
  * it the compiler assumes an int return and keeps only the low word of
  * a file position.
  */
-extern long lseek(unsigned char fd, long offset, int whence);
 
 /*
  * a bit-name table for printbits().
