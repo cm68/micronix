@@ -485,6 +485,7 @@ expand(struct tdent *e, struct token *t, struct tokarray *sink)
 	post = &posts[xdepth];
 	xdepth++;
 
+emit:
 	sinkn(sink, e->spec, e->nspec);
 	for (;;) {
 		if (!have)
@@ -550,13 +551,14 @@ expand(struct tdent *e, struct token *t, struct tokarray *sink)
 			 * level, not a nested use: "UINT8 a, UINT16 b"
 			 * is one declaration, and a typedef name is only
 			 * syntax that expands away here.  Switch the
-			 * active entry and keep looping instead of
-			 * recursing, so a prototype's parameter list can
-			 * name as many typedef'd types as it has room for.
+			 * active entry and go back for its spec instead
+			 * of recursing, so a prototype's parameter list
+			 * can name as many typedef'd types as it has
+			 * room for - and so the second spec is one jump,
+			 * not a second copy of the expansion.
 			 */
 			e = e2;
-			sinkn(sink, e->spec, e->nspec);
-			continue;
+			goto emit;
 		}
 		/* a type keyword or anything else: not our list */
 		sink1(sink, t);
