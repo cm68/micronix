@@ -576,7 +576,12 @@ run_controller() {
 
 # ---- main ----------------------------------------------------------
 
-for f in "$bootdisk" "$mnix" "$devlist" "$rootfiles" "$kernel"; do
+#
+# The sources the matrix reads.  The built products it runs - mnix, the
+# kernel and the filesystem root - do not exist in a clobbered tree;
+# host_rebuild makes them, so they are checked below it.
+#
+for f in "$bootdisk" "$devlist" "$rootfiles"; do
 	if [ ! -e "$f" ]; then
 		echo "$0: $f not found - not in the tree this script is in" >&2
 		exit 1
@@ -584,8 +589,8 @@ for f in "$bootdisk" "$mnix" "$devlist" "$rootfiles" "$kernel"; do
 done
 
 host_rebuild || exit 1
-if [ ! -f "$filesystem/bin/sh" ] || [ ! -f "$kernel" ]; then
-	echo "$0: $filesystem/bin/sh or $kernel missing - build the tree" >&2
+if [ ! -f "$filesystem/bin/sh" ] || [ ! -f "$kernel" ] || [ ! -x "$mnix" ]; then
+	echo "$0: $filesystem/bin/sh, $kernel or $mnix missing - build the tree" >&2
 	exit 1
 fi
 if [ -z "`dist_media`" ]; then
