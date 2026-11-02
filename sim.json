@@ -13,7 +13,7 @@
         "xterm": ["uart0", "ttyB", "ttyC"],
         "clock": "normal"
       },
-      "wiring": "wbmio",
+      "wiring": "wbmio,vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -35,7 +35,7 @@
         "console": "wb",
         "clock": "normal"
       },
-      "wiring": "ss1",
+      "wiring": "ss1ctl,vi0=djdma,vi1=hddma,vi2=ncr,vi3=nic,vi4=ide,vi5=hdca,vi6=disk3,vi7=disk2",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -55,7 +55,7 @@
         "nomon": true,
         "clock": "normal"
       },
-      "wiring": "wbmio",
+      "wiring": "wbmio,vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -80,7 +80,7 @@
         "nomon": true,
         "clock": "normal"
       },
-      "wiring": "wbmio",
+      "wiring": "wbmio,vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
