@@ -282,8 +282,9 @@ io_init()
  * A machine is a wiring table: which card asserts each VI line, and what
  * each IR pin is wired to (a VI line, or an on-board source).  Cards only
  * ever name their source; the line numbers live here and are looked up
- * with wiring_vi_line().  The -W option picks a standard profile and then
- * applies name=value overrides, so a bare -W (or none) is today's machine.
+ * with wiring_vi_line().  The -w option names the machine by its boards
+ * (`ss1`, `wb`, `mio`, `wb,mio`, `mio,mio`) and then assigns the cards
+ * with viN=card; a bare -w is the default Wunderbus+MultIO machine.
  */
 
 #define NVI     8
@@ -317,180 +318,134 @@ struct wiring {
 struct wiring wiring;
 
 /*
- * The standard profiles.  Cards do not share an interrupt line: the
- * kernel's intr_attach() panics when a probe finds a second card on a
- * line that is already wired.  profile_ss1 therefore gives every card
- * its own VI line and leaves the two CompuPro boards that are
- * alternatives to the HD-DMA unwired (line -1), to be moved onto a
- * free line with -w ss1,viN=<card> for a run that uses one.  The older
- * profiles still name alternatives as second entries on the same vi
- * number, which only works while at most one card of each group is
- * present.
- */
-static struct wiring profile_d1 = {
-    { { "hddma", 0 }, { "hdca", 0 }, { "djdma", 1 }, { "disk1", 1 },
-      { "ncr", 2 }, { "ide", 2 } },
-    6,
-    {
-        [0] = { IRQ_VI, 0 },
-        [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_VI, 2 },
-        [3] = { IRQ_ONBOARD, 0, "uart0" },
-        [4] = { IRQ_ONBOARD, 0, "uart1" },
-        [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [7] = { IRQ_ONBOARD, 0, "clock" },
-    },
-    "multio",
-    0, 0, 1,
-};
-
-static struct wiring profile_multio = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 0 }, { "disk1", 1 },
-      { "ncr", 3 }, { "ide", 4 }, { "nic", 5 }, { "disk3", 0 },
-      { "disk2", 0 } },
-    9,
-    {
-        [0] = { IRQ_VI, 0 },
-        [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_ONBOARD, 0, "slave" },
-        [3] = { IRQ_ONBOARD, 0, "uart0" },
-        [4] = { IRQ_ONBOARD, 0, "uart1" },
-        [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [7] = { IRQ_ONBOARD, 0, "clock" },
-        [8]  = { IRQ_VI, 3 },
-        [9]  = { IRQ_VI, 4 },
-        [10] = { IRQ_VI, 5 },
-    },
-    "multio",
-    1, 0, 1,
-};
-
-static struct wiring profile_ss1 = {
-    { { "hddma", 0 }, { "djdma", 1 }, { "hdca", 2 }, { "ncr", 3 },
-      { "ide", 4 }, { "nic", 5 }, { "nd", 6 }, { "disk1", 7 },
-      { "disk3", -1 }, { "disk2", -1 } },
-    10,
-    {
-        [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
-        [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },
-        [6] = { IRQ_VI, 6 },
-        [7] = { IRQ_ONBOARD, 0, "slave" },
-        [8] = { IRQ_VI, 7 },
-        [9]  = { IRQ_ONBOARD, 0, "timer0" },
-        [10] = { IRQ_ONBOARD, 0, "timer1" },
-        [11] = { IRQ_ONBOARD, 0, "timer2" },
-        [12] = { IRQ_ONBOARD, 0, "fpu0" },
-        [13] = { IRQ_ONBOARD, 0, "fpu1" },
-        [14] = { IRQ_ONBOARD, 0, "uart_tx" },
-        [15] = { IRQ_ONBOARD, 0, "uart_rx" },
-    },
-    "ss1",
-    0, 0, 0,
-};
-
-/*
- * The four PIC topologies the kernel detects, one profile each.  They
- * place the controllers in the order djdma, hddma (hdcdma), ncr, nic
- * (net), ide, hdca, disk3, disk2 on the connected VI lines, one card per
- * line.  A profile is clean rather than an override of an older one
- * because set_card_line() does not remove a card's previous alias.
+ * The wiring vocabulary is the boards, not a profile name.  A machine is
+ * named by the boards it carries between the interrupt controllers and
+ * the bus, followed by the cards' vector assignments:
  *
- * wb:     the Wunderbus I/O alone - three lines, no slave.
- * wbmio:  a Wunderbus I/O master (no cascade hardware) with a polled
- *         MultIO slave; VI2 is the slave's INT, so only VI0,1,3,4,5.
- * mio2:   two MultIOs cascaded - the master at the Wunderbus address has
- *         cascade hardware and the slave CAS-vectors.
- * ss1ctl: the CompuPro SS1, all eight VI lines.
+ *      ss1
+ *      wb
+ *      mio
+ *      wb,mio
+ *      mio,mio
+ *
+ * A single board is the master.  "wb,mio" is a Wunderbus I/O master with
+ * one MultIO attached - the Wunderbus has no cascade hardware, so that
+ * slave is polled.  "mio,mio" is two MultIOs cascaded, master at the
+ * Wunderbus address with cascade hardware.  A lone "mio" is a MultIO
+ * used alone.  Cards are placed only by viN=card, so the spec states the
+ * whole wiring and nothing is implied by a profile.
  */
-static struct wiring profile_wb = {
-    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 2 } },
-    3,
-    {
-        [0] = { IRQ_VI, 0 },
-        [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_VI, 2 },
-        [3] = { IRQ_ONBOARD, 0, "uart0" },
-        [4] = { IRQ_ONBOARD, 0, "uart1" },
-        [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [7] = { IRQ_ONBOARD, 0, "clock" },
-    },
-    "multio",
-    0, 0, 1,
-};
 
-static struct wiring profile_wbmio = {
-    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 3 }, { "nic", 4 },
-      { "ide", 5 } },
-    5,
-    {
-        [0] = { IRQ_VI, 0 },
-        [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_ONBOARD, 0, "slave" },
-        [3] = { IRQ_ONBOARD, 0, "uart0" },
-        [4] = { IRQ_ONBOARD, 0, "uart1" },
-        [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [7] = { IRQ_ONBOARD, 0, "clock" },
-        [8]  = { IRQ_VI, 3 },
-        [9]  = { IRQ_VI, 4 },
-        [10] = { IRQ_VI, 5 },
-    },
-    "multio",
-    1, 0, 1,
-};
+static int build_machine(struct wiring *w, char **board, int nboard);
+static int set_card_line(struct wiring *w, char *name, int line);
 
-static struct wiring profile_mio2 = {
-    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 3 }, { "nic", 4 },
-      { "ide", 5 } },
-    5,
-    {
-        [0] = { IRQ_VI, 0 },
-        [1] = { IRQ_VI, 1 },
-        [2] = { IRQ_ONBOARD, 0, "slave" },
-        [3] = { IRQ_ONBOARD, 0, "uart0" },
-        [4] = { IRQ_ONBOARD, 0, "uart1" },
-        [5] = { IRQ_ONBOARD, 0, "uart2" },
-        [7] = { IRQ_ONBOARD, 0, "clock" },
-        [8]  = { IRQ_VI, 3 },
-        [9]  = { IRQ_VI, 4 },
-        [10] = { IRQ_VI, 5 },
-    },
-    "multio",
-    1, 1, 0,
-};
+static void
+set_irq(struct wiring *w, int pin, int kind, int vi, char *name)
+{
+    w->irq[pin].kind = kind;
+    w->irq[pin].vi = vi;
+    w->irq[pin].name = name;
+}
 
-static struct wiring profile_ss1ctl = {
-    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 2 }, { "nic", 3 },
-      { "ide", 4 }, { "hdca", 5 }, { "disk3", 6 }, { "disk2", 7 } },
-    8,
-    {
-        [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
-        [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },
-        [6] = { IRQ_VI, 6 },
-        [7] = { IRQ_ONBOARD, 0, "slave" },
-        [8] = { IRQ_VI, 7 },
-        [9]  = { IRQ_ONBOARD, 0, "timer0" },
-        [10] = { IRQ_ONBOARD, 0, "timer1" },
-        [11] = { IRQ_ONBOARD, 0, "timer2" },
-        [12] = { IRQ_ONBOARD, 0, "fpu0" },
-        [13] = { IRQ_ONBOARD, 0, "fpu1" },
-        [14] = { IRQ_ONBOARD, 0, "uart_tx" },
-        [15] = { IRQ_ONBOARD, 0, "uart_rx" },
-    },
-    "ss1",
-    0, 0, 0,
-};
+/* The MultIO-family pin map: with a slave, VI2 is its cascade and
+ * VI3..VI5 feed its IR0..IR2. */
+static void
+multio_pins(struct wiring *w, int slave)
+{
+    set_irq(w, 0, IRQ_VI, 0, 0);
+    set_irq(w, 1, IRQ_VI, 1, 0);
+    if (slave)
+        set_irq(w, 2, IRQ_ONBOARD, 0, "slave");
+    else
+        set_irq(w, 2, IRQ_VI, 2, 0);
+    set_irq(w, 3, IRQ_ONBOARD, 0, "uart0");
+    set_irq(w, 4, IRQ_ONBOARD, 0, "uart1");
+    set_irq(w, 5, IRQ_ONBOARD, 0, "uart2");
+    set_irq(w, 7, IRQ_ONBOARD, 0, "clock");
+    if (slave) {
+        set_irq(w, 8, IRQ_VI, 3, 0);
+        set_irq(w, 9, IRQ_VI, 4, 0);
+        set_irq(w, 10, IRQ_VI, 5, 0);
+    }
+}
+
+/* The CompuPro SS1's two CAS 8259s. */
+static void
+ss1_pins(struct wiring *w)
+{
+    int i;
+
+    for (i = 0; i < 7; i++)
+        set_irq(w, i, IRQ_VI, i, 0);
+    set_irq(w, 7, IRQ_ONBOARD, 0, "slave");
+    set_irq(w, 8, IRQ_VI, 7, 0);
+    set_irq(w, 9, IRQ_ONBOARD, 0, "timer0");
+    set_irq(w, 10, IRQ_ONBOARD, 0, "timer1");
+    set_irq(w, 11, IRQ_ONBOARD, 0, "timer2");
+    set_irq(w, 12, IRQ_ONBOARD, 0, "fpu0");
+    set_irq(w, 13, IRQ_ONBOARD, 0, "fpu1");
+    set_irq(w, 14, IRQ_ONBOARD, 0, "uart_tx");
+    set_irq(w, 15, IRQ_ONBOARD, 0, "uart_rx");
+}
 
 /*
- * The default machine is what the cards' hardcoded lines describe today:
- * the two-PIC Wunderbus + MultIO.  -w re-selects a profile and applies
- * overrides; this runs before main so the resolved table is ready when
- * the cards and the -w parser look at it.
+ * Build the machine from its board names.  The caller has already split
+ * the leading board tokens out of the spec.  Returns 0, or -1 for a
+ * board set that is not a machine (two masters, an SS1 with a slave, ...).
+ */
+static int
+build_machine(struct wiring *w, char **board, int nboard)
+{
+    int i;
+
+    w->ncard = 0;
+    for (i = 0; i < NIRQ; i++)
+        set_irq(w, i, IRQ_NONE, 0, 0);
+    w->int_driver = 0;
+    w->slave = 0;
+    w->cascade = 0;
+    w->wb_master = 0;
+
+    if (nboard == 1 && strcmp(board[0], "ss1") == 0) {
+        w->int_driver = "ss1";
+        ss1_pins(w);
+        return 0;
+    }
+    if (nboard == 1 && (strcmp(board[0], "wb") == 0 ||
+                        strcmp(board[0], "mio") == 0)) {
+        w->int_driver = "multio";
+        w->wb_master = strcmp(board[0], "wb") == 0;
+        multio_pins(w, 0);
+        return 0;
+    }
+    if (nboard == 2 && strcmp(board[1], "mio") == 0 &&
+        (strcmp(board[0], "wb") == 0 || strcmp(board[0], "mio") == 0)) {
+        w->int_driver = "multio";
+        w->wb_master = strcmp(board[0], "wb") == 0;
+        w->slave = 1;
+        w->cascade = !w->wb_master;
+        multio_pins(w, 1);
+        return 0;
+    }
+    return -1;
+}
+
+/*
+ * The default machine, for a run with no -w: a Wunderbus + MultIO with
+ * the five standard controllers.  -w replaces it entirely.
  */
 __attribute__((constructor))
 static void
 wiring_init(void)
 {
-    wiring = profile_multio;
+    static char *board[2] = { "wb", "mio" };
+
+    build_machine(&wiring, board, 2);
+    set_card_line(&wiring, "djdma", 0);
+    set_card_line(&wiring, "hddma", 1);
+    set_card_line(&wiring, "ncr", 3);
+    set_card_line(&wiring, "nic", 4);
+    set_card_line(&wiring, "ide", 5);
 }
 
 /*
@@ -627,53 +582,40 @@ apply_override(struct wiring *w, char *key, char *val)
     return -1;
 }
 
-static int
-select_profile(struct wiring *w, char *name)
-{
-    if (strcmp(name, "d1") == 0)
-        *w = profile_d1;
-    else if (strcmp(name, "multio") == 0)
-        *w = profile_multio;
-    else if (strcmp(name, "ss1") == 0)
-        *w = profile_ss1;
-    else if (strcmp(name, "wb") == 0)
-        *w = profile_wb;
-    else if (strcmp(name, "wbmio") == 0)
-        *w = profile_wbmio;
-    else if (strcmp(name, "mio2") == 0)
-        *w = profile_mio2;
-    else if (strcmp(name, "ss1ctl") == 0)
-        *w = profile_ss1ctl;
-    else
-        return 0;
-    return 1;
-}
-
 /*
- * Parse a -W specification: "profile[,key=value]...".  The first token
- * names a profile, the rest override single entries.  Returns 0 on a
- * clean parse, -1 on a bad profile or override.  The spec string is
- * split in place (it is the argv copy), so names point into it.
+ * Parse a -w specification: "boards[,viN=card][,irqN=viM|source][,int=board]".
+ * The leading comma-separated words name the boards (ss1, wb, mio,
+ * wb,mio, mio,mio); the rest are assignments.  Returns 0 on a clean
+ * parse, -1 on a bad board set or assignment.  The spec string is split
+ * in place (it is the argv copy), so names point into it.
  */
 int
 parse_wiring(char *spec)
 {
     struct wiring *w = &wiring;
     char *p, *comma, *eq;
+    char *board[2];
+    int nboard = 0;
 
-    comma = strchr(spec, ',');
-    if (comma)
-        *comma = '\0';
-    if (!select_profile(w, spec))
-        return -1;
-    if (!comma)
-        return 0;
-
-    p = comma + 1;
+    p = spec;
     for (;;) {
         comma = strchr(p, ',');
         if (comma)
             *comma = '\0';
+        if (strchr(p, '=') != 0)
+            break;                      /* the assignments start here */
+        if (nboard >= 2)
+            return -1;
+        board[nboard++] = p;
+        if (!comma)
+            return (nboard && build_machine(w, board, nboard) == 0) ? 0 : -1;
+        p = comma + 1;
+    }
+
+    if (nboard == 0 || build_machine(w, board, nboard) < 0)
+        return -1;
+
+    for (;;) {
         eq = strchr(p, '=');
         if (!eq)
             return -1;
@@ -681,10 +623,12 @@ parse_wiring(char *spec)
         if (apply_override(w, p, eq + 1) < 0)
             return -1;
         if (!comma)
-            break;
+            return 0;
         p = comma + 1;
+        comma = strchr(p, ',');
+        if (comma)
+            *comma = '\0';
     }
-    return 0;
 }
 
 /*

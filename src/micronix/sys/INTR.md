@@ -164,5 +164,6 @@ face (`sys/net.c`) — claims it from the module's init, which
 One image, no `N8259` flag and no poled/vectored build split.  The
 generic `pic_init()` probes the master board (0x49 DIP switch), the
 slave at 0x40, and the SS1 pair, and programs polled or CAS from what it
-finds.  The simulator's matching profiles are `wb`, `wbmio`, `mio2` and
-`ss1ctl` (src/hwsim/s100.c), one `sim.json` preset each.
+finds.  The simulator names a machine the same way: the wiring is the boards -
+`ss1`, `wb`, `mio`, `wb,mio` or `mio,mio` - followed by the cards'
+`viN=card` assignments, one `sim.json` preset per topology.

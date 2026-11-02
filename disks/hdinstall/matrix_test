@@ -85,14 +85,11 @@
 # first labeled disk it finds, so no menu input is needed; the install
 # boot is the exception, and names the DJ-DMA with -B djdma.
 #
-# The wiring override matters.  The default multio profile names the
-# alternative disk cards on the same VI lines (hddma/hdca/disk2/disk3 on
-# VI0, djdma/disk1 on VI1).  The simulator instantiates every card, and
-# with more than one card on a line the HD-DMA family's level-triggered
-# request is left high by the attach, so later completions raise no edge
-# and reads time out.  Each controller leg therefore moves every disk
-# card except the one under test and the DJ-DMA off to VI6/VI7, which the
-# MultIO does not connect to the 8259 at all.
+# The wiring is spelled out per leg.  A two-PIC machine carries one
+# controller per VI line, so each leg names the five it has - djdma, the
+# controller under test, ncr, nic and ide - with the HD-DMA family member
+# (hddma or hdca) taking VI1 and the DJ-DMA staying on VI0 for the
+# install diskette.  No two cards share a line.
 #
 # Exit status is 0 only when every requested controller passed every
 # stage.  A summary is printed and left in <dir>/summary.
@@ -182,7 +179,7 @@ set_controller() {
 		labroot="label -w 512/8/17 /dev/hd0c"
 		labusr="label -w 512/8/17 /dev/hd1c"
 		bootimg=bootimg
-		wire="vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
 		;;
 	hdca)
 		medium=m26; major=1; drive=hdca
@@ -193,7 +190,7 @@ set_controller() {
 		labroot="label -w 202/8/32 /dev/hdac"
 		labusr="label -w 202/8/32 /dev/hdbc"
 		bootimg=hdcabootimg
-		wire="vi6=hddma,vi6=disk2,vi6=disk3,vi7=disk1"
+		wire="vi0=djdma,vi1=hdca,vi3=ncr,vi4=nic,vi5=ide"
 		;;
 	ide)
 		medium=cf1g; major=4; drive=ide
@@ -204,7 +201,7 @@ set_controller() {
 		labroot="label -w 392/16/63 /dev/ide0c"
 		labusr="label -w 392/16/63 /dev/ide1c"
 		bootimg=idebootimg
-		wire="vi6=hddma,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
 		;;
 	ncr)
 		medium=mps1g; major=5; drive=scsi
@@ -215,7 +212,7 @@ set_controller() {
 		labroot="label -w 392/16/63 /dev/scsi0c"
 		labusr="label -w 392/16/63 /dev/scsi1c"
 		bootimg=ncrbootimg
-		wire="vi6=hddma,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1"
+		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
 		;;
 	*)
 		echo "$0: $1: no such controller" >&2
@@ -356,7 +353,7 @@ boot_stage() {
 	# simply finds nothing.
 	#
 	mkdir -p "$w/drives" || return 1
-	cmd="./d1 -F -d $w/drives -w multio,$wire $bootflags -L $log $*"
+	cmd="./d1 -F -d $w/drives -w wb,mio,$wire $bootflags -L $log $*"
 	( cd "$d1dir" && exec setsid script -qec "$cmd" /dev/null ) \
 		</dev/null >/dev/null 2>&1 &
 	pid=$!

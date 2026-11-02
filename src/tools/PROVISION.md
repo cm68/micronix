@@ -38,7 +38,7 @@ boot wiring), not a role.  Root and swap are attributes of the *kernel*
         "xterm": ["uart0", "ttyB", "ttyC"],
         "clock": "normal"
       },
-      "wiring": "multio",
+      "wiring": "wb,mio,vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -74,8 +74,12 @@ the file is relative to the top of the tree unless it is absolute.
 - **config** — the `-c` configuration switch, broken into named fields
   (below).  The tool composes one packed `-c` number from them.
 - **wiring** — the `-w` interrupt routing, passed to the simulator
-  verbatim, exactly as the option is typed: a profile name, then
-  optional `key=value` overrides (`"ss1,irq14=uart_rx"`).
+  verbatim, exactly as the option is typed: the machine's boards, then the
+  cards' assignments.  Boards are `ss1`, `wb` (a Wunderbus I/O), `mio` (a
+  MultIO), and the pairs `wb,mio` (a Wunderbus with one MultIO attached,
+  polled) or `mio,mio` (two MultIOs cascaded).  The rest is
+  `viN=card`, e.g. `"wb,mio,vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"`;
+  `irqN=` and `int=` remain available as overrides.
 - **root / swap** — the kernel's setdev arguments, named as device
   tokens, not raw major/minor.  `show` resolves and prints them; `boot`
   does not pass them to anything, and no kernel is patched.

@@ -58,11 +58,10 @@ are what a board registry replaces.
 
 The interrupt wiring is already a table with profiles.  s100.c keeps a
 `struct wiring` - card name to VI line, IR pin to source, and the name of
-the board driving INT - with profiles `d1`, `multio` and `ss1` for the
-older machines and `wb`, `wbmio`, `mio2` and `ss1ctl` for the four PIC
-topologies the kernel discovers (s100.c:277-560).  A constructor resolves
-the default (s100.c:342), and
-`-w profile[,key=value]...` re-selects and overrides it (s100.c:467,
+the board driving INT - with the board lists `ss1`, `wb`, `mio`,
+`wb,mio` and `mio,mio` naming the topology (s100.c:277-560).  A
+constructor resolves the default (s100.c:342), and
+`-w boards[,viN=card]...` re-selects it and assigns the cards (s100.c:467,
 hwsim.c:1886).  Boards look their line up by name at init
 (`wiring_vi_line("hdca")` at hdca.c:498) instead of carrying a number.
 This is the right shape already; it is not yet tied to instances.
@@ -149,7 +148,7 @@ have to edit three places that are really one fact.
 
 Two small corrections to the framing, before the sketch proper.  First,
 there is no s100.h; the bus lives in s100.c plus hwsim.h.  Second, the
-option that re-selects the wiring profile is lowercase `-w` (hwsim.c:1886);
+option that re-selects the wiring is lowercase `-w` (hwsim.c:1886);
 the comments in s100.c:240 and hwsim.h:73 still call it `-W`, which is the
 write-watchpoint option (hwsim.c:1985).  The comments are what have
 drifted.
@@ -266,9 +265,9 @@ d1/TODO's first note - "the HDCA clearing it won't necessarily clear the
 interrupt, since the HDDMA might also have the level up" - describes
 behaviour `set_vi()` already provides: each line keeps an eight-bit mask,
 one bit per card, and the line is up while any card's bit is set
-(s100.c:76).  The hddma and hdca share vi_0 in the `d1` profile with
-distinct card ids, 1 and 0, and the case works (s100.c:277, hddma.c:260,
-hdca.c:163).  So the shared line is not unhandled in the model; what is
+(s100.c:76).  A historical machine put the hddma and hdca both on vi_0
+with distinct card ids, 1 and 0, and the case works (s100.c:277,
+hddma.c:260, hdca.c:163).  So the shared line is not unhandled in the model; what is
 unhandled is that the model's bookkeeping is hand-assigned.
 
 Every driver hard-codes its card id.  The set, read from the call sites:
@@ -303,8 +302,7 @@ The sharing check in main is evidence the model is not trusted.  hwsim.c
 refuses a machine that attaches drives to two disk controllers whose names
 map to one VI line, with "two disk controllers share a VI line"
 (hwsim.c:2097-2117).  A real Morrow box could hold the HD-DMA and the HDCA
-both on vi_0 - the `d1` profile exists to describe it - and the driver
-code is exactly what has to survive that.  The check should come out once
+both on vi_0, and the driver code is exactly what has to survive that.  The check should come out once
 the bus owns card assignment, because it is currently standing in for the
 invariant the bus will enforce.
 
@@ -500,7 +498,7 @@ Second, card ids become bus-assigned, and the sharing check comes out.
 This is the step that makes two boards on one line a supported fact instead
 of a refused one, and it must come before any driver is made multi-instance
 or the new instances would collide with the hand-picked ids.  The proof is
-the `d1` profile with both the hdca and the hddma attached: today refused
+a machine with both the hdca and the hddma attached: today refused
 (hwsim.c:2117), afterwards booting, which is the real Morrow case the TODO
 names.
 

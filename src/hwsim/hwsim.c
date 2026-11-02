@@ -723,7 +723,7 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t\tneeds - stock machine only:\n");
     fprintf(stderr, "\t\t-b mon447.bin -B djdma -j bc\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
-    fprintf(stderr, "\t-w\t<wiring> profile[,key=value]...: d1, multio, ss1, wb, wbmio, mio2, ss1ctl\n");
+    fprintf(stderr, "\t-w\t<wiring> boards[,viN=card]...: ss1 | wb | mio | wb,mio | mio,mio\n");
     fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-e\t<media set manifest file> (the /dev/mediachg sets)\n");
