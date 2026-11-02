@@ -19,7 +19,7 @@ DEPTH	= ../..
 DIR	= bsh
 CLASS	= cmd
 
-CSRCS	= args.c blok.c builtin.c cmd.c ctype.c edit.c error.c expand.c \
+CSRCS	= argscan.c args.c blok.c builtin.c cmd.c ctype.c edit.c error.c expand.c \
 	  fault.c globals.c history.c io.c macro.c main.c msg.c name.c \
 	  print.c service.c setbrk.c shim.c stak.c string.c word.c xec.c
 
