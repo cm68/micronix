@@ -107,7 +107,7 @@ room. Text stays the primary motive.
 
 1. Confirm scratch (read-after-write within the call, nothing survives).
 2. Drop `static` (and any redundant copy like `ip = i`).
-3. `mxccc -m micronix -O -DOVLSEG=12 -DN8259=2 -i../include -s` and read the
+3. `mxccc -m micronix -O -DOVLSEG=12 -i../include -s` and read the
    `.s`: confirm `bit n,(ix+off)` / `ld r,(ix+off)` and the symbol gone from
    `.bss`.
 4. `mxsize` before/after: text and bss must both shrink; if text grows the

@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * NCR 5380 SCSI host adapter

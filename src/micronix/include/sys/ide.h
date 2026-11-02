@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * IDE controller

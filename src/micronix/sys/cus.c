@@ -7,7 +7,6 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/tty.h>
-#include <sys/ints.h>
 #include <sys/pic8259.h>
 
 /*

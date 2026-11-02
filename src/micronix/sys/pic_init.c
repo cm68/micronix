@@ -10,8 +10,10 @@
  *
  * The board is discovered, not assumed: the master is brought up, the
  * slave is programmed and then probed to see whether it answered, and the
- * line table is filled from what is there.  (The SS1 probe joins ahead of
- * this.)
+ * line table is filled from what is there.  The master's board type is
+ * read from the Wunderbus DIP switch (a MultIO does not implement it),
+ * which decides whether the slave can CAS-vector or must be polled.
+ * (The SS1 probe joins ahead of this.)
  */
 #include <types.h>
 #include <sys/pic.h>
@@ -30,8 +32,12 @@ extern INT16 di(), ei();
  */
 extern INT16 int0(), int1(), int2(), int3(), int4(), int5(), int6(), int7();
 extern INT16 sint0(), sint1(), sint2();
+extern INT16 ovlint2(), ovlint3(), ovlint4();
 extern INT16 ovlint5(), ovlint6(), ovlint7();
 extern INT16 spurious(), ss1_clkint(), ss1_txint(), ss1_rxint();
+
+/* the slave 8259's vector table (slavevec.s) */
+extern UINT8 slave_vectors[];
 
 /*
  * Write one vector entry: jp <fn>, padded to the 8259's four bytes.
@@ -170,17 +176,20 @@ picprobe(p)
 
 /*
  * Bring the board up and fill the resident table.  The master is level
- * triggered, 4-byte vectors, single (no ICW3 - the slave is polled), and
- * its vector table is moved to a boundary and named in the ICWs.  The
- * slave, if it answered, takes ICW3 for its id and, polled, a zero vector
- * base.  The clock (IR7) and, with a slave, the cascade (IR2) are left
- * unmasked; the attach loop opens the VI lines.
+ * triggered, 4-byte vectors, and its vector table is moved to a boundary
+ * and named in the ICWs.  A Wunderbus I/O master answers its DIP switch
+ * at group 0's second register; a MultIO reads open bus there.  Only a
+ * MultIO master has the cascade hardware, so only there is the slave
+ * programmed CAS-vectored; a slave under a Wunderbus master is polled.
+ * The clock (IR7) and, with a slave, the cascade (IR2) are left unmasked;
+ * the attach loop opens the VI lines.
  */
 UINT8
 pic_init()
 {
     register INT16 base;
     UINT8 i;
+    INT16 cascade_ok;
 
     /*
      * The SS1 first: two CAS-cascaded 8259s on the CPU board.  Program
@@ -201,14 +210,12 @@ pic_init()
     pics[1].polled = 0;
 
     /* the slave first, so it is not signalling when the master arms */
-    ss1_svec();
     base = 0x220;
     out(SS1SPIC0, 0x1d | (base & 0xe0));   /* ICW1: cascade, level, ICW4 */
     out(SS1SPIC1, (base >> 8) & 0xff);     /* ICW2: vector base high byte */
     out(SS1SPIC1, 7);                      /* ICW3: slave id = master IR7 */
     out(SS1SPIC1, 0x08);                   /* ICW4: buffered slave */
     out(SS1SPIC1, 0xff);                   /* OCW1: mask everything */
-    ss1_mvec();
     base = 0x200;
     out(SS1MPIC0, 0x1d | (base & 0xe0));   /* ICW1: cascade, level, ICW4 */
     out(SS1MPIC1, (base >> 8) & 0xff);     /* ICW2: vector base high byte */
@@ -231,6 +238,8 @@ pic_init()
         rtcwrite = ss1_rtcwrite;
         console_minit = ss1_uart_init;
         console_minor = TTY_SS1;        /* /dev/console is the 2651 */
+        ss1_svec();                     /* the vectors, only if it answered */
+        ss1_mvec();
         out(SS1MPIC1, 0x7f);            /* mask IR0-6, open IR7 (the cascade) */
         out(SS1SPIC1, 0x7d);            /* open the timer (IR1) and RxRDY
                                          * (IR7); VI7 is the attach loop's.
@@ -242,7 +251,18 @@ pic_init()
         return (0);
     }
 
-    /* no SS1: the Wunderbus master, then the (optional) slave */
+    /*
+     * The master's board type.  A Wunderbus I/O board answers a DIP
+     * switch at group 0's second register (0x49); a MultIO does not
+     * implement it and reads open bus.  That decides whether the master
+     * has cascade hardware: a MultIO master lets its slave CAS-vector
+     * on INTA, while a Wunderbus master cannot and the slave must be
+     * polled.
+     */
+    out(MSELECT, 0);                    /* group 0: the control group */
+    cascade_ok = (in(MBASE + 1) != 0xff);
+
+    /* no SS1: the Wunderbus/MultIO master, then the (optional) slave */
     pics[0].icw0 = PIC0;
     pics[0].icw1 = PIC1;
     pics[0].sel = MSELECT;
@@ -260,16 +280,43 @@ pic_init()
     master_vectors();
     base = 0x200;
     out(MSELECT, PENABLE);
-    out(PIC0, 0x1f | (base & 0xe0));    /* ICW1: level, 4-byte, single, ICW4 */
-    out(PIC1, (base >> 8) & 0xff);      /* ICW2: vector base high byte */
-    out(PIC1, 0x0c);                    /* ICW4 */
+    if (cascade_ok) {
+        out(PIC0, 0x1d | (base & 0xe0)); /* ICW1: level, 4-byte, cascade, ICW4 */
+        out(PIC1, (base >> 8) & 0xff);   /* ICW2: vector base high byte */
+        out(PIC1, 1 << CASCADE_IR);      /* ICW3: the slave id is IR2 */
+        out(PIC1, 0x0c);                 /* ICW4 */
+    } else {
+        out(PIC0, 0x1f | (base & 0xe0)); /* ICW1: level, 4-byte, single, ICW4 */
+        out(PIC1, (base >> 8) & 0xff);   /* ICW2: vector base high byte */
+        out(PIC1, 0x0c);                 /* ICW4 */
+    }
     out(PIC1, 0xff);                    /* OCW1: mask everything */
 
-    /* the slave, programmed then probed - a card that is not there takes
-     * the writes harmlessly and never reads them back */
-    out(SSELECT, SPICONLY);
-    out(SPIC0, 0x1d);                   /* ICW1: level, cascade, ICW4 */
-    out(SPIC1, 0x00);                   /* ICW2: no vector, polled */
+    /*
+     * Program the slave, then probe it - a card that is not there takes
+     * the writes harmlessly and never reads them back.  A cascaded slave
+     * gets its own vector table: the u-page table is copied to its
+     * 32-byte boundary and named in ICW2, so a CAS acknowledge fetches
+     * its stub.  A polled slave gets no vector; the master's IR2 stub
+     * polls it instead.
+     */
+    if (cascade_ok) {
+        INT16 saddr = (INT16) slave_vectors;
+        INT16 sbase = saddr & ~0x1f;
+        UINT8 *bp = (UINT8 *) sbase;
+        UINT8 *src = slave_vectors;
+        INT16 k;
+
+        for (k = 0; k < 12; k++)
+            bp[k] = src[k];
+        out(SSELECT, SPICONLY);
+        out(SPIC0, 0x1d | (sbase & 0xe0)); /* ICW1: cascade, VECL */
+        out(SPIC1, (sbase >> 8) & 0xff);   /* ICW2: the table's base */
+    } else {
+        out(SSELECT, SPICONLY);
+        out(SPIC0, 0x1d);                   /* ICW1: cascade, no vector */
+        out(SPIC1, 0x00);                   /* ICW2: no vector, polled */
+    }
     out(SPIC1, CASCADE_IR);             /* ICW3: slave id = the master's IR2 */
     out(SPIC1, 0x00);                   /* ICW4 */
     out(SPIC1, 0xff);                   /* OCW1: mask everything */
@@ -286,16 +333,18 @@ pic_init()
             linepic[2 + i] = 1;
             lineir[2 + i] = i;
         }
+        pics[1].polled = cascade_ok ? 0 : 1;
         out(MSELECT, PENABLE);
         out(PIC1, 0x03);                /* mask IR0-1, open IR2 (cascade) + IR3-7 */
     } else {
-        /* the single Wunderbus: three lines */
+        /* no slave: three lines, and IR2 is an ordinary line */
         npics = 1;
         nlines = 3;
         for (i = 0; i < 3; i++) {       /* VI0-2, the master's IR0-2 */
             linepic[i] = 0;
             lineir[i] = i;
         }
+        vecset(0x208, ovlint2);         /* not the cascade poll stub */
         out(MSELECT, PENABLE);
         out(PIC1, 0x07);                /* mask IR0-2, open IR3-7 */
     }

@@ -82,6 +82,9 @@ int parse_wiring(char *spec);
 int wiring_vi_line(char *name);      // a card name -> its VI line, -1 if none
 int wiring_irq(int pin, int *vi, char **name);  // an IR pin -> vi line or onboard source
 int wiring_active(char *name);       // is this board the int_line driver?
+int wiring_slave(void);              // is the 0x40 slave 8259 present?
+int wiring_cascade(void);            // does the master have cascade hardware?
+int wiring_wb_master(void);          // is the master a Wunderbus I/O board?
 
 extern void (*vi_change)(unsigned char new);
 extern unsigned char (*get_intack)();

@@ -316,14 +316,18 @@ multio_set_int_line()
      * own inputs to be vectored.  The slave's INT is wired to the
      * master's cascade line (SLAVE_CASCADE_IR): ask the slave first, then
      * fold its answer into the master's irr, so the master's priority
-     * resolver sees the cascade line when the slave fires.
+     * resolver sees the cascade line when the slave fires.  A Wunderbus
+     * I/O-only machine has no slave and IR2 is an ordinary master input,
+     * so there is nothing to fold.
      */
-    line = (pic_serviceable(&pics[1]) >= 0) ? 1 : 0;
+    if (wiring_slave()) {
+        line = (pic_serviceable(&pics[1]) >= 0) ? 1 : 0;
 
-    if (line)
-        pics[0].irr |= (1 << SLAVE_CASCADE_IR);
-    else
-        pics[0].irr &= ~(1 << SLAVE_CASCADE_IR);
+        if (line)
+            pics[0].irr |= (1 << SLAVE_CASCADE_IR);
+        else
+            pics[0].irr &= ~(1 << SLAVE_CASCADE_IR);
+    }
 
     /* the master's own resolver now covers both PICs */
     line = (pic_serviceable(&pics[0]) >= 0) ? 1 : 0;
@@ -375,13 +379,18 @@ multio_vi_change(unsigned char new)
      * Level, not edge: set each VI input's IRR bit from the line's
      * current level.  A change-only update loses a request that was
      * acknowledged while the card kept the line high (the NIC does
-     * exactly that with a frame still in its FIFO).  VI2 on the master
-     * is the slave's cascade, below, and is not a VI input.
+     * exactly that with a frame still in its FIFO).  With a slave, VI2
+     * on the master is the slave's cascade, below, and is not a VI
+     * input; without one, VI0..VI2 are the master's IR0..IR2.
      */
-    pics[0].irr = (pics[0].irr & ~MASTER_VI_MASK) |
-        (vi_lines & MASTER_VI_MASK);
-    pics[1].irr = (pics[1].irr & ~0x07) |
-        ((vi_lines & SLAVE_VI_MASK) >> 3);
+    if (wiring_slave()) {
+        pics[0].irr = (pics[0].irr & ~MASTER_VI_MASK) |
+            (vi_lines & MASTER_VI_MASK);
+        pics[1].irr = (pics[1].irr & ~0x07) |
+            ((vi_lines & SLAVE_VI_MASK) >> 3);
+    } else {
+        pics[0].irr = (pics[0].irr & ~0x07) | (vi_lines & 0x07);
+    }
 
     multio_set_int_line();
 }
@@ -401,7 +410,7 @@ multio_intack()
     struct pic *p;              /* the PIC the vector came from */
     unsigned char i;
 
-    /* only the master owns SINTA; the slave is polled, never vectored */
+    /* only the master owns SINTA; the slave is polled or CAS-vectored */
     p = &pics[0];
 
     trace(trace_intack, "multio_intack: ivecstate=%d %s\n",
@@ -420,23 +429,24 @@ multio_intack()
             pics[0].irr, pics[0].isr, pics[0].priority, level);
 
         /*
-         * The CAS cascade: when the master's cascade line (IR6) is the
-         * request and the slave has been given a vector base (its ICW2 is
-         * non-zero), the slave drives its own vector instead of the
-         * master's.  A polled slave's ICW2 is zero, so the master vectors
-         * IR6 as usual and ovlint6 polls the slave.  Neither in-service
+         * The CAS cascade: when the master has cascade hardware and the
+         * slave has been given a vector base (its ICW2 is non-zero), the
+         * slave drives its own vector instead of the master's.  A
+         * Wunderbus master has no cascade hardware, and a polled slave's
+         * ICW2 is zero; in either case the master vectors IR2 as usual
+         * and the resident IR2 stub polls the slave.  Neither in-service
          * bit is set here - the master's EOI is a no-op and the slave's
          * line is level-triggered, its irr cleared below and re-armed by
          * the next line edge - so the dismiss needs nothing beyond the
          * master EOI.
          */
-        if (level == SLAVE_CASCADE_IR) {
+        if (level == SLAVE_CASCADE_IR && wiring_cascade()) {
             if (pics[1].icw2 != 0) {            /* the slave has a vector base */
                 pics[0].irr &= ~(1 << SLAVE_CASCADE_IR); /* master's cascade */
                 iv_isrbit = 0;
                 p = &pics[1];
                 level = pic_serviceable(p);     /* the slave's line */
-            }                                   /* else polled: master IR6 */
+            }                                   /* else polled: master IR2 */
         }
 
         // we didn't find a cause for our interrupt
@@ -1195,6 +1205,15 @@ wr_daisy1(portaddr p, byte v)
 byte
 rd_switch(portaddr p)
 {
+    /*
+     * Group 0's second register.  The Wunderbus I/O board puts its DIP
+     * switch here; a MultIO does not implement it and reads open bus.
+     * sys/pic_init.c reads this port to tell the two master boards apart,
+     * which is what decides whether the slave can CAS-vector or must be
+     * polled.
+     */
+    if (wiring_wb_master())
+        return 0x00;            /* a strapped switch, not open bus */
     return 0xff;
 }
 
@@ -1541,16 +1560,16 @@ multio_init()
     terminal_fd_in = ace[0].infd;
     terminal_fd_out = ace[0].outfd;
 
-    register_output(SBASE+7, &slave_select);
+    if (wiring_slave())
+        register_output(SBASE+7, &slave_select);
 
     vi_change = &multio_vi_change;
     get_intack = &multio_intack;
 
     /*
-     * The two PICs.  Both fold into the same INT line (the slave's INT
-     * reaches the master as IR6 in multio_set_int_line), and both trace
-     * and name their bits the same way, so the only difference is which
-     * port range reaches them.
+     * The two PICs.  With a slave, both fold into the same INT line (the
+     * slave's INT reaches the master as IR2 in multio_set_int_line); a
+     * Wunderbus I/O-only machine has the master alone.
      */
     pic_init(&pics[0]);
     pic_init(&pics[1]);
@@ -1570,11 +1589,15 @@ multio_init()
      * serial ports are not modelled - so its two PIC registers are wired
      * up once and left, rather than through a group-select dance like the
      * master's.  picfor() sends them to pics[1] on the address alone.
+     * A machine with no slave leaves these ports unregistered, so the
+     * kernel's 0x40 probe reads open bus and takes the three-line path.
      */
-    register_input(SBASE + 4, &rd_pic_port_0);
-    register_input(SBASE + 5, &rd_pic_port_1);
-    register_output(SBASE + 4, &wr_pic_port_0);
-    register_output(SBASE + 5, &wr_pic_port_1);
+    if (wiring_slave()) {
+        register_input(SBASE + 4, &rd_pic_port_0);
+        register_input(SBASE + 5, &rd_pic_port_1);
+        register_output(SBASE + 4, &wr_pic_port_0);
+        register_output(SBASE + 5, &wr_pic_port_1);
+    }
 
     /*
      * Names for the master's eight inputs, for the state dump.  Two are
@@ -1584,7 +1607,7 @@ multio_init()
      */
     reg_intbit(0, "hd-dma");
     reg_intbit(1, "djdma");
-    reg_intbit(2, "cascade");
+    reg_intbit(2, wiring_slave() ? "cascade" : "vi2");
     reg_intbit(7, "clock");
 #ifndef NODEBUG
     register_mon_cmd('M', "\tdump multio state", multio_dump);

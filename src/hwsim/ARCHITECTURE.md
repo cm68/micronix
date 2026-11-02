@@ -58,8 +58,10 @@ are what a board registry replaces.
 
 The interrupt wiring is already a table with profiles.  s100.c keeps a
 `struct wiring` - card name to VI line, IR pin to source, and the name of
-the board driving INT - with three profiles, `d1`, `multio` and `ss1`
-(s100.c:277-334).  A constructor resolves the default (s100.c:342), and
+the board driving INT - with profiles `d1`, `multio` and `ss1` for the
+older machines and `wb`, `wbmio`, `mio2` and `ss1ctl` for the four PIC
+topologies the kernel discovers (s100.c:277-560).  A constructor resolves
+the default (s100.c:342), and
 `-w profile[,key=value]...` re-selects and overrides it (s100.c:467,
 hwsim.c:1886).  Boards look their line up by name at init
 (`wiring_vi_line("hdca")` at hdca.c:498) instead of carrying a number.

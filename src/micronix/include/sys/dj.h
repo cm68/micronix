@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * DJ/DMA disk controller

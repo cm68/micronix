@@ -13,6 +13,7 @@
         "xterm": ["uart0", "ttyB", "ttyC"],
         "clock": "normal"
       },
+      "wiring": "wbmio",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -54,7 +55,7 @@
         "nomon": true,
         "clock": "normal"
       },
-      "wiring": "multio,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1",
+      "wiring": "wbmio",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
@@ -79,12 +80,112 @@
         "nomon": true,
         "clock": "normal"
       },
-      "wiring": "multio,vi6=hdca,vi6=disk2,vi6=disk3,vi7=disk1",
+      "wiring": "wbmio",
       "root": "hdcdma:0a",
       "swap": "hdcdma:0b",
       "volumes": [
         { "controller": "hdcdma", "unit": 0, "geometry": "m40", "image": "/tmp/wsc/hdcdma/root.img" },
         { "controller": "hdcdma", "unit": 1, "geometry": "m40", "image": "/tmp/wsc/hdcdma/usr.img" }
+      ]
+    },
+
+    "wunderbus": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "console": "wb",
+        "clock": "normal"
+      },
+      "wiring": "wb",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40",
+          "image": "disks/wunderbus/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40",
+          "image": "disks/wunderbus/usr.img" }
+      ]
+    },
+
+    "wunderbus-mio": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "console": "wb",
+        "clock": "normal"
+      },
+      "wiring": "wbmio",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40",
+          "image": "disks/wunderbus-mio/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40",
+          "image": "disks/wunderbus-mio/usr.img" }
+      ]
+    },
+
+    "mio-cascade": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "console": "wb",
+        "clock": "normal"
+      },
+      "wiring": "mio2",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40",
+          "image": "disks/mio-cascade/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40",
+          "image": "disks/mio-cascade/usr.img" }
+      ]
+    },
+
+    "ss1": {
+      "emulator": "src/hwsim/d1",
+      "kernel": "src/micronix/sys/unix",
+      "boot": {
+        "monitor": "src/micronix/stand/roms/mon500.bin",
+        "level1": "src/micronix/stand/roms/l1boot.bin",
+        "device": "hdcdma",
+        "j2": "ab"
+      },
+      "config": {
+        "nomon": true,
+        "console": "ss1",
+        "clock": "normal"
+      },
+      "wiring": "ss1ctl",
+      "root": "hdcdma:0a",
+      "swap": "hdcdma:0b",
+      "volumes": [
+        { "controller": "hdcdma", "unit": 0, "geometry": "m40",
+          "image": "disks/ss1/root.img" },
+        { "controller": "hdcdma", "unit": 1, "geometry": "m40",
+          "image": "disks/ss1/usr.img" }
       ]
     }
   },

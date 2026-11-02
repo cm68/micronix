@@ -71,10 +71,9 @@ LD = ld
 #
 # -DOVLSEG names the segment the overlay frame is in; sys/ovl.h's
 # OVLBASE is OVLSEG * 0x1000 and the module links below are told the same
-# address by -Tdata, so the two have to agree.  -DN8259=2 is the interrupt
-# topology (include/sys/ints.h): the d1's two 8259s.  Polled vs vectored
-# is no longer a C flag - one kernel discovers the board at boot.
-CFLAGS = -m micronix -O -DOVLSEG=13 -DN8259=2 -i$(INC)/
+# address by -Tdata, so the two have to agree.  The interrupt topology is
+# discovered at boot - one kernel handles every board.
+CFLAGS = -m micronix -O -DOVLSEG=13 -i$(INC)/
 
 #
 # The overlay frame.  OVLBASE is the one segment a driver module is
@@ -466,7 +465,7 @@ access.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/mount.h $(SYS)/proc.h
 balloc.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/proc.h
 cio.o: $(SYS)/sys.h $(SYS)/con.h $(SYS)/file.h $(SYS)/inode.h $(SYS)/proc.h
 create.o: $(SYS)/sys.h $(SYS)/inode.h $(SYS)/proc.h
-cus.o: $(SYS)/sys.h $(SYS)/tty.h $(SYS)/ints.h
+cus.o: $(SYS)/sys.h $(SYS)/tty.h
 dj.o: $(SYS)/sys.h $(SYS)/buf.h $(SYS)/con.h $(SYS)/proc.h
 djhdr.o: $(SYS)/sys.h $(SYS)/ovl.h
 djinit.o: $(SYS)/sys.h $(SYS)/proc.h

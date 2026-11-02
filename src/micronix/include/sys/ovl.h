@@ -61,11 +61,8 @@
 #define OVLBASE     (OVLSEG * 0x1000)
 
 /*
- * The interrupt topology (N8259, N8259_POLLED) and the number of vectored
- * lines (NOVLINE) are in sys/ints.h.  A driver names no line: the wiring
- * is discovered at boot.
+ * A driver names no line: the interrupt wiring is discovered at boot.
  */
-#include <sys/ints.h>
 
 /*
  * A module's first byte.  Everything the kernel needs to run a driver is

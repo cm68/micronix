@@ -14,10 +14,13 @@ discovered at boot and done once, by the resident half.
   handler it supplies, and a probe that tickles its card.  It never names
   a line, and it never calls `inton`.
 - **Runtime probe.**  One resident 8259 driver discovers the board at
-  boot - two CAS 8259s on the SS1, a master plus a polled slave on the
-  MultIO, or a single Wunderbus PIC - and fills the resident line table
-  (sys/pic8259.h).  One kernel boots every board; there is no per-board
-  image.
+  boot and fills the resident line table (sys/pic8259.h).  It probes the
+  SS1's pair, then the master at 0x48; a Wunderbus I/O answers its DIP
+  switch at 0x49 while a MultIO reads 0xff, and the optional slave at
+  0x40 decides three or five lines.  The master's type chooses polling
+  or CAS for the slave: a Wunderbus master has no cascade hardware, so
+  its slave is polled; a MultIO master CAS-vectors it.  One kernel boots
+  every board; there is no per-board image or build flag.
 
 ## The model
 
@@ -76,11 +79,18 @@ line table from whichever answered:
 - **SS1** — two CAS-cascaded 8259s on the CPU board at 0x70/0x72, all
   eight VI lines vectored.  `pic_irr()` reads both PICs; `pic_eoi()`
   acknowledges both.
-- **MultIO** — the master at 0x48 with the second board's slave at 0x40,
-  five lines.  The slave is polled, never vectored: its pending lines are
+- **Wunderbus I/O** — the single PIC at 0x48, three lines (VI0–VI2).
+  Its DIP switch at group 0, register 2 (0x49) identifies the board;
+  it has no cascade hardware.
+- **Wunderbus I/O + MultIO** — the 0x48 master plus the add-on board's
+  slave at 0x40, five lines.  The slave is polled: its pending lines are
   read by selecting it, and its poll *is* its acknowledge.
-- **Wunderbus** — the single PIC, three lines.  The smallest
-  configuration; under no-sharing it carries at most three controllers.
+- **Two MultIOs** — the same addresses; the master at 0x48 has cascade
+  hardware and the slave at 0x40 CAS-vectors through its own table.
+
+The master's type is read once at boot (the DIP switch answers on a
+Wunderbus; a MultIO reads open bus), which is what decides whether the
+slave is programmed polled or CAS-vectored.
 
 ## The attach phase
 
@@ -146,15 +156,13 @@ face (`sys/net.c`) — claims it from the module's init, which
   line, and a second card that tickles a taken line is a panic.
 - The `inton(HDCAINT)` idiom in every driver's `open` — the resident
   attach unmasks once, at boot.
-- The single-PIC three-line build as a full-system config — six
-  controllers need six lines.
+- The single-PIC three-line build as a separate kernel — it is one of
+  the four runtime arrangements now.
 
-## The order of work
+## State
 
-1. The PIC objects first — move `inton`/`intoff` and the slave bring-up
-   out of `multio.c`/`slavepic.c` into `ss1pic.c`, `multiopic.c` and
-   `wbiopic.c`, the same behavior, linked by a `PIC` make variable.
-2. Then the ovlhdr change (`line` -> `probe`) and the attach phase in
-   `ovl.c`, reading `pic_irr()` and writing `ovlint`.
-3. Then delete the now-dead sharing (`OVLSHARE`, `INT_*`, the
-   `inton`-in-`open` idiom).
+One image, no `N8259` flag and no poled/vectored build split.  The
+generic `pic_init()` probes the master board (0x49 DIP switch), the
+slave at 0x40, and the SS1 pair, and programs polled or CAS from what it
+finds.  The simulator's matching profiles are `wb`, `wbmio`, `mio2` and
+`ss1ctl` (src/hwsim/s100.c), one `sim.json` preset each.

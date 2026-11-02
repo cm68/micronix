@@ -499,19 +499,6 @@ mumstatus(dev)
 #define MBASE (0x48)
 #define PIC1 (MBASE + 5)
 
-#if N8259 == 2
-/*
- * The slave PIC, on the second MultIO at 0x40, one group below the
- * master's.  Its registers sit at the same offsets as the master's;
- * selecting its PIC group is SPICONLY where the master's is PENABLE.
- */
-#define SBASE (0x40)
-#define SPIC0 (SBASE + 4)       /* the slave's ICW/OCW register */
-#define SPIC1 (SBASE + 5)       /* the slave's IMR/OCW1 register */
-#define SSELECT (SBASE + 7)     /* the slave's group select */
-#define SPICONLY 0x08           /* select the slave's PIC group */
-#endif
-
 /*
  * muenable -
  * set the multio interrupt lines according to mode

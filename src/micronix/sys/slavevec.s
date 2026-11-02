@@ -4,10 +4,12 @@
 ; slave's IR0..IR2, which are VI3..VI5 - each jumping through intrupt to a
 ; stub that dispatches line 2, 3 or 4.
 ;
-; The table is copied to a 32-byte boundary at boot by slave_pic_init
-; (sys/cus.c), exactly the way minit (sys/inits.s) relocates the master's
-; vectors, so it does not need to be aligned here: the 32 bytes of slack
-; above it are the copy's target.
+; The table is copied to a 32-byte boundary at boot by pic_init
+; (sys/pic_init.c), exactly the way minit (sys/inits.s) relocates the
+; master's vectors, so it does not need to be aligned here: the 32 bytes
+; of slack above it are the copy's target.  The copy and the slave's ICW2
+; are used only when the master has cascade hardware (probed at 0x49);
+; otherwise the master's IR2 stub polls the slave.
 ;
 	.data			; leaf code, parked in the u page (see user.c)
 	.globl	_slave_vectors

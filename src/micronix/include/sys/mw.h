@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * HD-DMA Controller command structure

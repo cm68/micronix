@@ -349,24 +349,28 @@ card.
 `pic_init()` (pic_init.c, init-only) probes for the controllers:
 
 - the SS1's two CAS-cascaded 8259s at 0x70-0x73,
-- the Wunderbus master at 0x48-0x4f, selected through a group latch,
-- the add-on MultIO's slave at 0x40-0x47, either polled or
-  CAS-vectored.
+- the master at 0x48-0x4f (Wunderbus I/O or MultIO), selected through
+  a group latch,
+- the add-on slave at 0x40-0x47, present or not.
 
 Presence is a round trip: the IMR (OCW1) is written with 0x00 and
 0xff and read back.  A missing 8259 reads open bus, the same value
-whatever was written, so both values have to come back.  The slave's
-INT is wired to the master's IR2; the polled variant is acknowledged by
-reading its poll word (the cascade stub in intrpt.s does this) and the
-vectored one has its own vector table.
+whatever was written, so both values have to come back.  The master's
+board type is read at group 0, second register (0x49): a Wunderbus I/O
+answers its DIP switch, a MultIO reads open bus.  That decides the
+slave: a Wunderbus master has no cascade hardware and its slave is
+polled (the cascade stub in intrpt.s reads its poll word), while a
+MultIO master is programmed cascaded and the slave CAS-vectors through
+the table copied to 0x220.  With no slave, the master's IR2 vector is
+`_ovlint2`, not the poll stub.
 
 What the probe leaves behind is a resident table (`picdata.c`): the
 PIC descriptors, `linepic[]` and `lineir[]` mapping a line number to a
 PIC and an IR, and `npics`/`nlines`.  The resident code (`pic.c`, leaf
 code in the u page) walks that table; it knows nothing about which
-board it is on.  Each 8259's 32-byte vector table is copied to its
-home before the ICWs name it (`picvec.c`): the master's at 0x200, a
-CAS slave's at 0x220.
+board it is on.  The master's 32-byte table is written in place at
+0x200 (`vecset`); a CAS slave's table (`slavevec.s`) is copied to its
+32-byte boundary at 0x220 before ICW2 names it.
 
 ### Attaching a driver
 
@@ -400,8 +404,8 @@ machine-wide.
 
 ### Dispatch
 
-A vector table entry jumps to a stub in intrpt.s (the Wunderbus uses
-`vectors`, the SS1 its two tables in ss1vec.s).  The stubs that serve
+A vector table entry jumps to a stub in intrpt.s (the master) or
+slavevec.s (a CAS slave; the SS1's pair is written by `pic_init`).  The stubs that serve
 discovered cards hand the line number to `ovlntr(line)` - `ovlint0`,
 `ovlint1`, `ovlint5` through `ovlint7`, and the SS1's slave stubs; the
 clock, console and spurious handlers are resident and do not.  On the

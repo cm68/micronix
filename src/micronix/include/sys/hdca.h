@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * The HDCA - the port-mapped, non-DMA hard drive controller of the

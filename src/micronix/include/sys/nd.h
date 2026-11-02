@@ -1,4 +1,3 @@
-#include <sys/ints.h>
 
 /*
  * The network disk (ND) — the HDCA's shape, minus the disk.

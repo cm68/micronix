@@ -309,6 +309,9 @@ struct wiring {
     int   ncard;
     struct irqwire irq[NIRQ];   /* pin -> source */
     char *int_driver;           /* the board asserting int_line */
+    int   slave;                /* the 0x40 slave 8259 is present */
+    int   cascade;              /* the master has cascade hardware */
+    int   wb_master;            /* the master is a Wunderbus I/O (DIP at 0x49) */
 };
 
 struct wiring wiring;
@@ -338,6 +341,7 @@ static struct wiring profile_d1 = {
         [7] = { IRQ_ONBOARD, 0, "clock" },
     },
     "multio",
+    0, 0, 1,
 };
 
 static struct wiring profile_multio = {
@@ -358,6 +362,7 @@ static struct wiring profile_multio = {
         [10] = { IRQ_VI, 5 },
     },
     "multio",
+    1, 0, 1,
 };
 
 static struct wiring profile_ss1 = {
@@ -380,6 +385,99 @@ static struct wiring profile_ss1 = {
         [15] = { IRQ_ONBOARD, 0, "uart_rx" },
     },
     "ss1",
+    0, 0, 0,
+};
+
+/*
+ * The four PIC topologies the kernel detects, one profile each.  They
+ * place the controllers in the order djdma, hddma (hdcdma), ncr, nic
+ * (net), ide, hdca, disk3, disk2 on the connected VI lines, one card per
+ * line.  A profile is clean rather than an override of an older one
+ * because set_card_line() does not remove a card's previous alias.
+ *
+ * wb:     the Wunderbus I/O alone - three lines, no slave.
+ * wbmio:  a Wunderbus I/O master (no cascade hardware) with a polled
+ *         MultIO slave; VI2 is the slave's INT, so only VI0,1,3,4,5.
+ * mio2:   two MultIOs cascaded - the master at the Wunderbus address has
+ *         cascade hardware and the slave CAS-vectors.
+ * ss1ctl: the CompuPro SS1, all eight VI lines.
+ */
+static struct wiring profile_wb = {
+    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 2 } },
+    3,
+    {
+        [0] = { IRQ_VI, 0 },
+        [1] = { IRQ_VI, 1 },
+        [2] = { IRQ_VI, 2 },
+        [3] = { IRQ_ONBOARD, 0, "uart0" },
+        [4] = { IRQ_ONBOARD, 0, "uart1" },
+        [5] = { IRQ_ONBOARD, 0, "uart2" },
+        [7] = { IRQ_ONBOARD, 0, "clock" },
+    },
+    "multio",
+    0, 0, 1,
+};
+
+static struct wiring profile_wbmio = {
+    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 3 }, { "nic", 4 },
+      { "ide", 5 } },
+    5,
+    {
+        [0] = { IRQ_VI, 0 },
+        [1] = { IRQ_VI, 1 },
+        [2] = { IRQ_ONBOARD, 0, "slave" },
+        [3] = { IRQ_ONBOARD, 0, "uart0" },
+        [4] = { IRQ_ONBOARD, 0, "uart1" },
+        [5] = { IRQ_ONBOARD, 0, "uart2" },
+        [7] = { IRQ_ONBOARD, 0, "clock" },
+        [8]  = { IRQ_VI, 3 },
+        [9]  = { IRQ_VI, 4 },
+        [10] = { IRQ_VI, 5 },
+    },
+    "multio",
+    1, 0, 1,
+};
+
+static struct wiring profile_mio2 = {
+    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 3 }, { "nic", 4 },
+      { "ide", 5 } },
+    5,
+    {
+        [0] = { IRQ_VI, 0 },
+        [1] = { IRQ_VI, 1 },
+        [2] = { IRQ_ONBOARD, 0, "slave" },
+        [3] = { IRQ_ONBOARD, 0, "uart0" },
+        [4] = { IRQ_ONBOARD, 0, "uart1" },
+        [5] = { IRQ_ONBOARD, 0, "uart2" },
+        [7] = { IRQ_ONBOARD, 0, "clock" },
+        [8]  = { IRQ_VI, 3 },
+        [9]  = { IRQ_VI, 4 },
+        [10] = { IRQ_VI, 5 },
+    },
+    "multio",
+    1, 1, 0,
+};
+
+static struct wiring profile_ss1ctl = {
+    { { "djdma", 0 }, { "hddma", 1 }, { "ncr", 2 }, { "nic", 3 },
+      { "ide", 4 }, { "hdca", 5 }, { "disk3", 6 }, { "disk2", 7 } },
+    8,
+    {
+        [0] = { IRQ_VI, 0 }, [1] = { IRQ_VI, 1 }, [2] = { IRQ_VI, 2 },
+        [3] = { IRQ_VI, 3 }, [4] = { IRQ_VI, 4 }, [5] = { IRQ_VI, 5 },
+        [6] = { IRQ_VI, 6 },
+        [7] = { IRQ_ONBOARD, 0, "slave" },
+        [8] = { IRQ_VI, 7 },
+        [9]  = { IRQ_ONBOARD, 0, "timer0" },
+        [10] = { IRQ_ONBOARD, 0, "timer1" },
+        [11] = { IRQ_ONBOARD, 0, "timer2" },
+        [12] = { IRQ_ONBOARD, 0, "fpu0" },
+        [13] = { IRQ_ONBOARD, 0, "fpu1" },
+        [14] = { IRQ_ONBOARD, 0, "uart_tx" },
+        [15] = { IRQ_ONBOARD, 0, "uart_rx" },
+    },
+    "ss1",
+    0, 0, 0,
 };
 
 /*
@@ -445,6 +543,30 @@ wiring_active(char *name)
     return wiring.int_driver && strcmp(wiring.int_driver, name) == 0;
 }
 
+/*
+ * The hardware facts the MultIO model needs: is the 0x40 slave present,
+ * does the master have cascade hardware, and is the master a Wunderbus
+ * I/O board (whose DIP switch at 0x49 the kernel probes to tell the
+ * master boards apart).
+ */
+int
+wiring_slave(void)
+{
+    return wiring.slave;
+}
+
+int
+wiring_cascade(void)
+{
+    return wiring.cascade;
+}
+
+int
+wiring_wb_master(void)
+{
+    return wiring.wb_master;
+}
+
 /* set one card's line, adding the card if it is not already wired */
 static int
 set_card_line(struct wiring *w, char *name, int line)
@@ -490,6 +612,18 @@ apply_override(struct wiring *w, char *key, char *val)
         w->int_driver = val;
         return 0;
     }
+    if (strcmp(key, "slave") == 0) {
+        w->slave = atoi(val) != 0;
+        return 0;
+    }
+    if (strcmp(key, "cas") == 0 || strcmp(key, "cascade") == 0) {
+        w->cascade = atoi(val) != 0;
+        return 0;
+    }
+    if (strcmp(key, "wb") == 0) {
+        w->wb_master = atoi(val) != 0;
+        return 0;
+    }
     return -1;
 }
 
@@ -502,6 +636,14 @@ select_profile(struct wiring *w, char *name)
         *w = profile_multio;
     else if (strcmp(name, "ss1") == 0)
         *w = profile_ss1;
+    else if (strcmp(name, "wb") == 0)
+        *w = profile_wb;
+    else if (strcmp(name, "wbmio") == 0)
+        *w = profile_wbmio;
+    else if (strcmp(name, "mio2") == 0)
+        *w = profile_mio2;
+    else if (strcmp(name, "ss1ctl") == 0)
+        *w = profile_ss1ctl;
     else
         return 0;
     return 1;

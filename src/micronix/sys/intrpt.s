@@ -120,6 +120,8 @@ cascade:
 	jp	z,casnone	; nothing to dispatch
 	ld	a,b
 	and	07h		; the slave's line, 0..2
+	cp	3		; the slave's IR3..7 are not wired to a line
+	jp	nc,casnone
 	add	a,2		; the line number, 2..4
 	ld	l,a
 	ld	h,0

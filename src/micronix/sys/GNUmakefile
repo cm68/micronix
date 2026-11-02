@@ -29,9 +29,8 @@ SRCDIR	= /usr/src/sys
 
 TARGET	= unix
 
-# One image for now: the Wunderbus/MultIO (miopic + upd1990).  The SS1
-# (ss1pic + ss1_clock) and single-Wunderbus (wbiopic) images join as the
-# per-board objects are wired.
+# One image: the PIC topology is discovered at boot (sys/pic_init.c), so
+# there are no per-board kernels.
 TARGETS	=
 
 # the kernel includes its own headers, not the C library's.  -i, as
@@ -186,11 +185,7 @@ $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
 $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
 
-# The slave PIC bring-up (sys/slavepic.c) is the one thing that differs
-# between a polled and a CAS-vectored two-PIC kernel, and it folds into
-# highmem.o twice: highmem.o is the vectored fold (unix), phighmem.o the
-# polled one (punix).  The driver modules and the whole rest of the kernel
-# build once and are shared by both images.
+# The PIC topology is discovered at boot, not compiled in.
 # dj, mw, ide and ncr are not here: they are driver modules, linked at
 # OVLBASE and stamped into the slot (the module rules below).  Their
 # header objects are named on the module links and no longer in the
@@ -283,14 +278,9 @@ OVLSLOT = ovlslot.o
 CCFLAGS += -DOVLSEG=$(OVLSEG)
 
 #
-# The interrupt topology (include/sys/ints.h).  The d1 has two 8259s - the
-# Wunderbus master and the add-on MultIO slave.  N8259 (the PIC count) is
-# still a build flag - a single-board kernel overrides it with -DN8259=1 -
-# but whether the slave is polled or CAS-vectored is no longer one: that
-# is the one difference in sys/slavepic.c, built both ways below and
-# chosen at the highmem link, so flipping it recompiles nothing else.
+# The interrupt topology is discovered at boot (sys/pic_init.c); there is
+# no N8259 build flag and no per-board kernel.
 #
-CCFLAGS += -DN8259=2
 
 #
 # Every object: the ones "all" links into unix and the ones folded into
@@ -386,11 +376,7 @@ upage.o: $(LEAF_AS) $(LEAF_C) pic.o user.o
 # reach it, so the page it occupies is the page it holds for the whole
 # boot.  Split out, the init is reclaimed instead, and the page holds
 # only what running the driver needs.
-# highmem.o is the vectored fold, phighmem.o the polled one - the two
-# differ only in which slave PIC object is folded in, so the rest of the
-# kernel (and the driver modules) builds once and both images link from
-# it.  The two slave PIC variants come from the one file; ccc's -c names
-# the object, so they live side by side.
+# highmem.o holds the init-only code, folded into the one image.
 highmem.o: main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
 		pic_init.o probe_init.o upd1990_init.o ss1clk_init.o
 	$(MXLD) -r -Sdata -o highmem.o main_init.o cus.o inits.o unbcd.o djinit.o ncrinit.o \
