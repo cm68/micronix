@@ -19,6 +19,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+#include <sys/signal.h>
+
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/dir.h>
@@ -40,6 +43,7 @@ int	bflag;
 int	vflag;
 int	yflag;
 int	iflag;
+int	aflag;			/* -a: every filesystem /etc/fstab names */
 
 char	*fsname;		/* the file system being checked */
 
@@ -248,6 +252,73 @@ static void rebuildfree(void);
 static void fixsuper(void);
 
 /*
+ * -a: the filesystems /etc/fstab names, read the way mount reads it.
+ * The root is skipped - it is mounted read-write already - and each
+ * check runs in a child so the five passes start from fresh globals.
+ * A failure signals init (SIGINT), which is how this system is asked
+ * for single user: rc has no way to branch on the status.
+ */
+static int
+checkfstab()
+{
+	FILE *f;
+	char line[128];
+	char dev[64], dir[64];
+	char *av[10];
+	char *p;
+	int n, pid, st, bad;
+
+	f = fopen("/etc/fstab", "r");
+	if (f == 0)
+		return (0);		/* nothing to check is not a failure */
+	bad = 0;
+	while (fgets(line, sizeof line, f) != 0) {
+		p = line;
+		while (*p == ' ' || *p == '\t')
+			p++;
+		if (*p == 0 || *p == '\n' || *p == '#')
+			continue;
+		dev[0] = 0;
+		dir[0] = 0;
+		if (sscanf(p, "%63s %63s", dev, dir) != 2)
+			continue;
+		if (strcmp(dir, "/") == 0)
+			continue;	/* root is mounted; leave it alone */
+		n = 0;
+		av[n++] = "/bin/fsck";
+		if (tflag) av[n++] = "-t";
+		if (nflag) av[n++] = "-n";
+		if (bflag) av[n++] = "-b";
+		if (vflag) av[n++] = "-v";
+		if (yflag) av[n++] = "-y";
+		av[n++] = dev;
+		av[n] = 0;
+		printf("Checking %s (%s):\n", dev, dir);
+		pid = fork();
+		if (pid == 0) {
+			execv(av[0], av);
+			perror(av[0]);
+			exit(1);
+		}
+		if (pid < 0) {
+			perror("fork");
+			bad = 1;
+			continue;
+		}
+		while (wait(&st) != pid)
+			;
+		if (((st >> 8) & 0377) != 0)
+			bad = 1;
+	}
+	fclose(f);
+	if (bad) {
+		printf("fsck: file system errors; asking init for single user\n");
+		kill(1, SIGINT);
+	}
+	return (bad);
+}
+
+/*
  * main - parse the options, then check each file system named on the
  * command line.  With no name, print the usage.
  */
@@ -265,15 +336,20 @@ main(int argc, char *argv[])
 		if (strcmp(arg, "-y") == 0) { yflag = 1; continue; }
 		if (strcmp(arg, "-b") == 0) { bflag = 1; continue; }
 		if (strcmp(arg, "-i") == 0) { iflag = 1; continue; }
+		if (strcmp(arg, "-a") == 0) { aflag = 1; continue; }
 		if (fsname) {
-			fprintf(stderr, "usage: fsck filesystem ... \n");
+			fprintf(stderr,
+			    "usage: fsck [-atnvyb] filesystem ...\n");
 			exit(1);
 		}
 		fsname = arg;
 	}
 
+	if (aflag)
+		exit(checkfstab());
+
 	if (!fsname) {
-		fprintf(stderr, "usage: fsck filesystem ... \n");
+		fprintf(stderr, "usage: fsck [-atnvyb] filesystem ...\n");
 		exit(1);
 	}
 

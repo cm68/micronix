@@ -1,6 +1,14 @@
 #
 # /etc/rc - multi-user start-up, run by init before it forks the logins.
 #
+# Check every filesystem /etc/fstab names before anything mounts it.
+# fsck -a reads the fstab itself and runs one check per entry, skipping
+# the mounted root; if any check fails it signals init, and init drops
+# back to the single-user shell instead of opening the logins.
+#
+fsck -a -y
+
+#
 # update forks and then syncs every thirty seconds, so it returns at once
 # and nothing here blocks.
 #
