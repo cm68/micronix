@@ -99,8 +99,15 @@ ss1_uart_open(dev, mode)
         ttinit(tty, dev);
         ttyopen(tty);
     }
+    /*
+     * Output stays closed at open, as the MultIO's open leaves it: the
+     * 2651's transmitter is always ready and its TxRDY stays asserted,
+     * so an open IR6 with nothing queued is an interrupt storm, not an
+     * idle line.  ss1_start opens it when there is output to drain and
+     * ss1_stop closes it again; the line discipline calls both.
+     */
     ss1_uart_init();
-    ss1_txline(1);              /* the tty is up: let TxRDY in */
+    ss1_txline(0);
 }
 
 /*
