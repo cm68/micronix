@@ -35,7 +35,7 @@ ETCDIR	 = $(ROOT)/etc
 # install whatever scratch file a later session leaves lying about,
 # and the list is what tells a reader what /etc is supposed to hold.
 #
-FILES	= banner fstab group motd passwd rc signon ttys
+FILES	= banner fstab group motd passwd rc rc.single signon ttys
 
 .PHONY: all update install install-man install-man-host clean clobber
 

@@ -134,10 +134,14 @@ static char *lgargv[4];			/* login on a terminal */
 static char *rcargv[3];			/* sh /etc/rc */
 
 /*
- * the two signal handlers, named before they are defined
+ * the signal handlers, named before they are defined
  */
 extern reload();
 extern shutdown();
+extern onidle();
+extern onsingle();
+extern idlecheck();		/* cmd/init/idle.c */
+extern killothers();		/* cmd/init/idle.c */
 
 /*
  * NOPEN is the kernel's per-process open file limit; it lives in a kernel
@@ -199,6 +203,18 @@ int nttys;
 struct ttyent ttys[NTTYS];
 
 /*
+ * The single user shell's idle alarm.  Set by the handler, read by the
+ * wait loop in console(), and turned into a decision by idlecheck()
+ * (cmd/init/idle.c, which owns the process table read).
+ */
+static int idlealarm;
+static int singlereq;		/* SIGINT: back to the single user shell */
+static int noidle;		/* a requested single user has no timer */
+static int sawwait;		/* the shell has reached tty input */
+static int useractive;		/* a command ran after that: never auto */
+static int ticks;		/* seconds of ttywait with nothing typed */
+
+/*
  * The first thing init does is disown everything it was started with.
  * closeall() is deliberately both halves at once - ignore the signal and
  * close the descriptor - so that nothing the bootstrap left behind can
@@ -218,6 +234,7 @@ main()
 	 * tty table and logout() takes a 0 pointer, so an empty ttys is fine.
 	 */
 	signal(SIGTERM, shutdown);
+	signal(SIGINT, onsingle);
 
 	rootfd = open("/dev/root", 0);
 	swapfd = open("/dev/swap", 0);
@@ -251,12 +268,56 @@ main()
 }
 
 /*
- * multi user.  runrc() waits for /etc/rc, reload() builds the tty table and
- * starts the logins, and mainloop() never returns.
+ * Back to single user.  SIGINT to init is the traditional request, and
+ * what fsck -a sends when a check fails.  Kill everything but init, let
+ * the ttys go, and run the console shell again.  A session asked for
+ * this way has no idle timer: the person wants it.  When it ends,
+ * rcandmaybe() runs /etc/rc and the logins come back.
+ */
+gotosingle()
+{
+	sync();
+	killothers();			/* every live process but init */
+	sync();
+	consmsg("init: single user");
+
+	signal(SIGINT, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+	signal(SIGTERM, shutdown);
+	noidle = 1;
+	console();
+	noidle = 0;
+	singlereq = 0;
+	signal(SIGINT, onsingle);
+	signal(SIGHUP, reload);
+	signal(SIGTERM, shutdown);
+}
+
+/*
+ * Run /etc/rc; if it, or the console before it, asked for single user,
+ * give the shell and try /etc/rc again when it exits.  This loops until
+ * a check passes, so a machine whose fsck keeps failing stays in the
+ * shell that can repair it.
+ */
+rcandmaybe()
+{
+	for (;;) {
+		runrc();
+		if (!singlereq)
+			return;
+		singlereq = 0;
+		gotosingle();
+	}
+}
+
+/*
+ * multi user.  rcandmaybe() runs /etc/rc and the single-user detours,
+ * reload() builds the tty table and starts the logins, and mainloop()
+ * never returns.
  */
 multi()
 {
-	runrc();
+	rcandmaybe();
 	reload();
 	mainloop();
 }
@@ -337,6 +398,61 @@ char *s;
 	exit(1);
 }
 
+
+/*
+ * /etc/rc.single: the work a single-user start does before the shell
+ * takes the console.  console()'s child runs it with the console on 0,
+ * 1 and 2, and then execs the login shell, so it runs every time the
+ * machine comes up single user - the first boot and every kill -INT 1
+ * return - and does not depend on the shell reading a script and then
+ * getting back to the tty.
+ */
+static void
+runsingle()
+{
+	static char *av[3];
+	int pid, status;
+
+	if (exists("/etc/rc.single") == 0)
+		return;
+	av[0] = "/bin/sh";
+	av[1] = "/etc/rc.single";
+	av[2] = 0;
+	pid = fork();
+	if (pid == -1)
+		return;
+	if (pid == 0) {
+		execv(av[0], av);
+		perror("/etc/rc.single");
+		exit(1);
+	}
+	while (wait(&status) != pid)
+		;
+}
+
+/*
+ * The idle alarm handler.  It only wakes wait(); the process table is
+ * read in idlecheck() below, in a child, because that is the one way a
+ * user process can see another's children and it keeps the table and its
+ * /dev/mem descriptor out of init.
+ */
+onidle()
+{
+	signal(SIGALRM, onidle);	/* V7 resets the handler on delivery */
+	idlealarm = 1;
+}
+
+/*
+ * SIGINT is the traditional "back to single user" request, and what
+ * fsck -a sends when a check fails.  The work is not done in the
+ * handler: mainloop()/multi() see the flag after wait() returns.
+ */
+onsingle()
+{
+	signal(SIGINT, onsingle);
+	singlereq = 1;
+}
+
 /*
  * the single user console session.  Returns 1 when the session has ended;
  * main() loops on it, so a return of 0 would mean "go round again", but the
@@ -362,8 +478,64 @@ console()
 	}
 
 	if (pid != 0) {
-		while (wait(&status) != pid)
-			;
+		int r, f;
+
+		/*
+		 * The login script runs first (its commands are children of
+		 * the shell), then the shell waits at the tty for somebody
+		 * to type.  Sample once a second:
+		 *
+		 *   - the first ttywait is where the script is done; start
+		 *     the clock there.  Commands before it are the script
+		 *     and do not count.
+		 *   - a child after that is a command somebody typed: the
+		 *     machine is in use, and it never goes multi-user on
+		 *     its own.
+		 *   - thirty seconds of ttywait with no such child: the
+		 *     shell started and nobody typed.  End it, and main()
+		 *     goes on to multi().
+		 */
+		sawwait = useractive = ticks = 0;
+		idlealarm = 0;
+		signal(SIGALRM, onidle);
+		for (;;) {
+			alarm(1);
+			r = wait(&status);
+			if (r == pid)
+				break;
+			if (r == -1 && errno == EINTR && idlealarm) {
+				idlealarm = 0;
+				f = idlecheck(pid);
+				if (f < 0)
+					break;		/* the shell exited */
+				if (f & 4)
+					continue;	/* cannot see it */
+				if (sawwait && !(f & 1))
+					useractive = 1;	/* left the prompt */
+				if ((f & 2) && sawwait)
+					useractive = 1;	/* a command */
+				if ((f & 1) && !sawwait) {
+					sawwait = 1;
+					ticks = 0;
+				}
+				if (useractive)
+					break;		/* wait normally */
+				if (sawwait && ++ticks >= 30) {
+					kill(pid, SIGKILL);
+					break;
+				}
+				continue;
+			}
+			if (r == -1 && errno == ECHILD)
+				break;
+		}
+		alarm(0);
+		signal(SIGALRM, SIG_DFL);
+		for (;;) {
+			r = wait(&status);
+			if (r == pid || (r == -1 && errno == ECHILD))
+				break;
+		}
 		return 1;
 	}
 
@@ -405,6 +577,8 @@ console()
 	 * is how the shell knows to read the profile and to be the one
 	 * you cannot exit out of into nothing.
 	 */
+	runsingle();
+
 	shargv[0] = "-sh";
 	shargv[1] = 0;
 	exec("/bin/sh", shargv);
@@ -780,6 +954,13 @@ mainloop()
 
 	for (;;) {
 		t = findpid(wait(&status));
+		if (singlereq) {
+			singlereq = 0;
+			gotosingle();
+			rcandmaybe();
+			reload();
+			continue;
+		}
 		if (t == 0)
 			continue;
 		logout(t);

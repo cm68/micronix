@@ -1,0 +1,8 @@
+#
+# /etc/rc.single - work the single-user shell does before it starts.
+#
+# init runs this each time the machine comes up single user: at boot,
+# and again after kill -INT 1.  stdin, stdout and stderr are the
+# console; when this returns, the login shell takes over.  Nothing
+# needs doing here by default.
+#

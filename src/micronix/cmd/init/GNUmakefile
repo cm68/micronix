@@ -27,7 +27,7 @@ BINDIR	= /etc
 #
 TARGETS	= init.dbg
 
-CSRCS	= init.c
+CSRCS	= init.c idle.c
 
 MANSRCS	= init.1
 

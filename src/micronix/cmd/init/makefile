@@ -23,7 +23,7 @@ ETC	= /etc
 MAN	= init.1
 MANDIR	= /usr/man/man1
 PROG	= init
-OBJS	= init.o
+OBJS	= init.o idle.o
 
 all: $(PROG)
 
