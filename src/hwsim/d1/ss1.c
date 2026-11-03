@@ -382,13 +382,13 @@ ss1_timer_arm(int i)
         count = 0x10000;        /* a load of zero counts down from 65536 */
 
     if (t->mode == 0) {
-        time_out("ss1_timer", count / 2, ss1_timer_fire, i);
+        wall_time_out("ss1_timer", count / 2, ss1_timer_fire, i);
     } else {
         int hz = 2000000L / count;
 
         if (hz <= 0)
             hz = 1;
-        recurring_time_out("ss1_timer", hz, ss1_timer_fire, i);
+        recurring_wall_time_out("ss1_timer", hz, ss1_timer_fire, i);
     }
 }
 

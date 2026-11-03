@@ -1145,7 +1145,9 @@ wr_clock(portaddr p, byte v)
          */
         if (rate != 0) {
             if (!((config_sw & CONF_SET) && (config_sw & NOCLOCK))) {
-                recurring_time_out("multio_clock", rate, clock_handler, 0);
+                cancel_time_out(clock_handler, 0);
+                recurring_wall_time_out("multio_clock", rate,
+                    clock_handler, 0);
             }
         }
     }

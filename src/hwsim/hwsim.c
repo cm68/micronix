@@ -860,11 +860,19 @@ mysignal(int signum, sighandler_t handler)
  * to the hardware: a controller that says it will interrupt in thirty
  * milliseconds means thirty milliseconds of processor time, not thirty
  * milliseconds of whatever else the host was doing.
+ *
+ * The programmable clocks are the exception, and they are wall-clock
+ * timers: the number a program puts in the register names a rate, and
+ * the machine may be far faster than the 4 MHz it was built as.  See
+ * wallnow_us() below.
  */
 struct timeout {
     char *name;
-    unsigned long long when;        // in cycles
+    unsigned long long when;        // in cycles, for a simulated timer
     unsigned long long interval;    // if recurring, else 0
+    unsigned long long when_us;     // host microseconds, for a wall timer
+    unsigned long long interval_us; // if recurring, else 0
+    int wall;                       // 1 = real time, not simulated time
     void (*handler)(int a);
     int arg;                        // argument to pass handler
 };
@@ -879,7 +887,7 @@ struct timeout {
  */
 #define CPU_HZ  4000000
 
-extern unsigned long long sim_cycles;   /* d1/mpz80.c: one per instruction */
+extern unsigned long long sim_cycles;   /* d1/mpz80.c: T-states, 4 per microsecond */
 
 /* wall-clock time the simulation started, for the exit report */
 static struct timeval sim_wall_start;
@@ -903,10 +911,34 @@ simnow64()
 }
 
 /*
- * Report the simulation speed at exit: how many simulated cycles the run
- * got through per wall-clock second, and what fraction that is of a real
- * Z80 clocked at 4 MHz (sim_cycles is one per instruction, so the ratio is
- * approximate - a real Z80 averages several clocks per instruction).
+ * Host microseconds since the run started, for the programmable clocks.
+ *
+ * Those are counters a program sets for a real interval - the kernel asks
+ * for an 8 Hz heartbeat, or writes a count into the SS1's 8253 - and the
+ * machine is allowed to be much faster than the 4 MHz it was built as.
+ * The number in the register names the interrupt rate, not a number of
+ * T-states: 8 Hz means eight interrupts in each real second, whether the
+ * cpu gets through a quarter of a million T-states in that second or a
+ * quarter of a billion.  Everything else - baud rates, controller
+ * turnaround - stays on simulated time, where it is reproducible.
+ */
+static unsigned long long
+wallnow_us()
+{
+    struct timeval now;
+    long long us;
+
+    if (gettimeofday(&now, NULL) != 0)
+        return (0);
+    us = (long long) (now.tv_sec - sim_wall_start.tv_sec) * MILLION
+        + (now.tv_usec - sim_wall_start.tv_usec);
+    return ((unsigned long long) us);
+}
+
+/*
+ * Report the simulation speed at exit: how many simulated cycles - T-states
+ * now, so this is real processor time - the run got through per wall-clock
+ * second, and what fraction that is of a real Z80 clocked at 4 MHz.
  */
 void
 sim_report(void)
@@ -961,6 +993,22 @@ check_time_outs()
     for (i = 0; i < MAXTIMEOUTS; i++) {
         tp = &timeouts[i];
 
+        if (tp->handler && tp->wall) {
+            while (tp->handler && wallnow_us() >= tp->when_us) {
+                void (*handler)(int a) = tp->handler;
+                int arg = tp->arg;
+
+                if (tp->interval_us) {
+                    tp->when_us += tp->interval_us;
+                } else {
+                    tp->handler = 0;
+                    tp->arg = 0;
+                }
+                (*handler)(arg);
+            }
+            continue;
+        }
+
         while (tp->handler && sim_cycles >= tp->when) {
             void (*handler)(int a) = tp->handler;
             int arg = tp->arg;
@@ -992,11 +1040,62 @@ recurring_time_out(char *name, int hertz, void (*function)(int a), int a)
         tp = &timeouts[i];
         if (tp->handler)
             continue;
+        tp->wall = 0;
         tp->interval = (unsigned long long) CPU_HZ / hertz;
         tp->handler = function;
         tp->name = name;
         tp->arg = a;
         tp->when = sim_cycles + tp->interval;
+        return;
+    }
+    printf("timeout overflow");
+    exit(3);
+}
+
+/*
+ * The same two calls on the host's clock.  See wallnow_us(): these are
+ * for the counters a program sets a rate on, not for hardware delays.
+ */
+void
+wall_time_out(char *name, int usec, void (*function)(int a), int a)
+{
+    int i;
+    struct timeout *tp;
+
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (tp->handler)
+            continue;
+        tp->wall = 1;
+        tp->interval_us = 0;
+        tp->handler = function;
+        tp->name = name;
+        tp->arg = a;
+        tp->when_us = wallnow_us() + usec;
+        return;
+    }
+    printf("timeout overflow");
+    exit(3);
+}
+
+void
+recurring_wall_time_out(char *name, int hertz, void (*function)(int a), int a)
+{
+    int i;
+    struct timeout *tp;
+
+    for (i = 0; i < MAXTIMEOUTS; i++) {
+        tp = &timeouts[i];
+        if (tp->handler)
+            continue;
+        tp->wall = 1;
+        tp->interval_us = MILLION / hertz;
+        if (tp->interval_us == 0)
+            tp->interval_us = 1;
+        tp->handler = function;
+        tp->name = name;
+        tp->arg = a;
+        tp->when_us = wallnow_us() + tp->interval_us;
         return;
     }
     printf("timeout overflow");
@@ -1058,7 +1157,8 @@ next_deadline()
     int i;
 
     for (i = 0; i < MAXTIMEOUTS; i++) {
-        if (timeouts[i].handler && timeouts[i].when < next) {
+        if (timeouts[i].handler && !timeouts[i].wall &&
+            timeouts[i].when < next) {
             next = timeouts[i].when;
         }
     }

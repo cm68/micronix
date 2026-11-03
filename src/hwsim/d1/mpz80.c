@@ -51,6 +51,14 @@ byte unhalt;
 uint64_t
 z80_tick(int num_ticks, uint64_t pins, void *user_data)
 {
+	/*
+	 * Simulated time is the processor's time, not a count of
+	 * instructions: every bus cycle says how many T-states it took,
+	 * and the timers (the uPD1990 and the SS1's 8253) are programmed
+	 * in hardware time.  A 32 Hz heartbeat is 32 per 4 MHz second,
+	 * which is what a device asks recurring_time_out() for.
+	 */
+	sim_cycles += num_ticks;
 	if (int_pin) {
 		pins |= Z80_INT;
 	}
@@ -105,7 +113,6 @@ z80_run()
 {
 	do {
 		z80_exec(&z80, 1);
-		sim_cycles++;
 	} while (!z80_opdone(&z80));
 #ifndef NODEBUG
 	if (nfloor)
@@ -858,10 +865,10 @@ take_pending_trap()
  *     input-service bound, so the console is polled often enough -
  *     whichever comes first.
  *
- * sim_cycles is counted here, one per instruction.  The debug build
- * counts it in z80_run() instead, and the two differ by a cycle on a
- * DD/FD-prefixed instruction (once here, twice there), which is below
- * the noise of a count that is already a rough proxy for time.
+ * sim_cycles is counted in z80_tick(), from the T-states the core
+ * reports for each bus cycle, and not once per instruction: the timers
+ * are in hardware time and need the processor's time, not instruction
+ * count.  Both builds count it there.
  */
 unsigned long long batch_stop;
 
@@ -869,7 +876,6 @@ static int
 batch_trap(uint16_t pc, int ticks, uint64_t pins, void *user_data)
 {
     (void)pc; (void)ticks; (void)pins; (void)user_data;
-    sim_cycles++;
     if (mem_pending_fault || int_pending_trap)
         return 1;                       /* a trap must be taken before the next instruction */
     return sim_cycles >= batch_stop;

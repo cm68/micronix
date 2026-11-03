@@ -115,6 +115,8 @@ extern void mpz80_map_dump(void);
 // generally useful timed callout facility
 void time_out(char *name, int usec, void (*func)(int a), int arg);
 void recurring_time_out(char *name, int hertz, void (*func)(int a), int arg);
+void wall_time_out(char *name, int usec, void (*func)(int a), int arg);
+void recurring_wall_time_out(char *name, int hertz, void (*func)(int a), int arg);
 void cancel_time_out(void (*func)(), int arg);
 
 // linux freaking signal madness
