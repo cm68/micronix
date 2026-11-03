@@ -8,6 +8,7 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/pic8259.h>
+#include <sys/ncr.h>
 
 /*
  * Initialize custom hardware. Called from main().
@@ -52,6 +53,14 @@ cus()
      */
     ovlstart();                 /* the stamped root driver, in sys/ovl.c */
     hdinit();                   /* clear the boot's stuck op-done/seek-done */
+    /*
+     * The SCSI host adapter's IRQ latch survives the boot.  Reading its
+     * RPI (register 7) is the acknowledge that clears the latch, exactly
+     * what the driver does in its own interrupt handler; do it here so a
+     * line the boot left standing cannot answer during the attach
+     * probe's tickle window and be mistaken for the probed card.
+     */
+    (void) in(SCSIBASE + 7);
     /*
      * Wire that driver's interrupt now, before main() goes on to open the
      * root device.  The rest of the modules cannot be placed until the

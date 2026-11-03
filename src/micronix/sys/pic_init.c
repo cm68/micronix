@@ -260,7 +260,7 @@ pic_init()
      * polled.
      */
     out(MSELECT, 0);                    /* group 0: the control group */
-    cascade_ok = (in(MBASE + 1) != 0xff);
+    cascade_ok = (in(MBASE + 1) == 0xff);
 
     /* no SS1: the Wunderbus/MultIO master, then the (optional) slave */
     pics[0].icw0 = PIC0;

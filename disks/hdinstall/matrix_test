@@ -86,10 +86,11 @@
 # boot is the exception, and names the DJ-DMA with -B djdma.
 #
 # The wiring is spelled out per leg.  A two-PIC machine carries one
-# controller per VI line, so each leg names the five it has - djdma, the
-# controller under test, ncr, nic and ide - with the HD-DMA family member
-# (hddma or hdca) taking VI1 and the DJ-DMA staying on VI0 for the
-# install diskette.  No two cards share a line.
+# controller per VI line: the DJ-DMA (the install diskette's root) stays
+# on VI1 and the HD-DMA family member under test takes VI0, with ncr,
+# ide and nic on VI3, VI4 and VI5.  The alternative disk cards are left
+# unwired rather than given a line.  No two cards share a vector, and
+# sys/probe_init.c gripes and panics if a probe ever finds one that does.
 #
 # Exit status is 0 only when every requested controller passed every
 # stage.  A summary is printed and left in <dir>/summary.
@@ -179,7 +180,7 @@ set_controller() {
 		labroot="label -w 512/8/17 /dev/hd0c"
 		labusr="label -w 512/8/17 /dev/hd1c"
 		bootimg=bootimg
-		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
+		wire="vi0=hddma,vi1=djdma,vi3=ncr,vi4=ide,vi5=nic"
 		;;
 	hdca)
 		medium=m26; major=1; drive=hdca
@@ -190,7 +191,7 @@ set_controller() {
 		labroot="label -w 202/8/32 /dev/hdac"
 		labusr="label -w 202/8/32 /dev/hdbc"
 		bootimg=hdcabootimg
-		wire="vi0=djdma,vi1=hdca,vi3=ncr,vi4=nic,vi5=ide"
+		wire="vi0=hdca,vi1=djdma,vi3=ncr,vi4=ide,vi5=nic"
 		;;
 	ide)
 		medium=cf1g; major=4; drive=ide
@@ -201,7 +202,7 @@ set_controller() {
 		labroot="label -w 392/16/63 /dev/ide0c"
 		labusr="label -w 392/16/63 /dev/ide1c"
 		bootimg=idebootimg
-		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
+		wire="vi1=djdma,vi3=ncr,vi4=ide,vi5=nic"
 		;;
 	ncr)
 		medium=mps1g; major=5; drive=scsi
@@ -212,7 +213,7 @@ set_controller() {
 		labroot="label -w 392/16/63 /dev/scsi0c"
 		labusr="label -w 392/16/63 /dev/scsi1c"
 		bootimg=ncrbootimg
-		wire="vi0=djdma,vi1=hddma,vi3=ncr,vi4=nic,vi5=ide"
+		wire="vi1=djdma,vi3=ncr,vi4=ide,vi5=nic"
 		;;
 	*)
 		echo "$0: $1: no such controller" >&2

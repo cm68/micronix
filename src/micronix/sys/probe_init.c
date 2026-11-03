@@ -18,6 +18,7 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 extern void panic();
+extern void pr();
 extern UINT8 intoff();
 extern UINT8 inton();
 extern UINT8 pic_eoi();
@@ -150,8 +151,17 @@ intr_attach()
             ovlcall1(intrprobe[i], intrseg[i], PROBE_CLEAR);
             continue;           /* no card there, nothing to wire */
         }
-        if (ovlint[line].fn)
+        /*
+         * A vector belongs to one device.  The gripe names the probe and
+         * the line it landed on so a miswired machine can be fixed from
+         * the console, and the panic stops before a second handler is
+         * put on a line the first one already owns.
+         */
+        if (ovlint[line].fn) {
+            pr("attach: probe %d landed on line %d, already held (seg %d)\n",
+                i, line, ovlint[line].seg);
             panic("two cards on one interrupt line");
+        }
         ovlint[line].fn = intrfn[i];
         ovlint[line].seg = intrseg[i];
         pic_eoi(line);          /* clear the tickled interrupt */
