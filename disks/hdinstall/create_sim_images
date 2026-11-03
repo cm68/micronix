@@ -1,0 +1,125 @@
+#!/bin/sh
+#
+# Build the hard disk images sim.json names.
+#
+#	./create_sim_images [-f] [<sim> ...]
+#
+# hwsim provisions and boots images but does not build them.  This does,
+# from the tree's own build: a bootable root volume through create_vol
+# (the install-built system, the kernel, and /usr/src), and a blank
+# mkfs'd filesystem for the other volumes.
+#
+# The presets in sim.json are hdcdma/m40 pairs, which is what create_vol
+# makes.  A volume on another controller or geometry, or an image outside
+# the tree, is reported and skipped.  With no <sim> the whole list runs.
+# -f rebuilds images that already exist.
+#
+# Run it through "make images", which builds the userland, host tools
+# and boot images first; a bare invocation assumes they are built.
+#
+set -u
+
+here=$(cd "$(dirname "$0")" && pwd) || exit 1
+root=$(cd "$here/../.." && pwd) || exit 1
+hwsim="$root/bin/hwsim"
+mnix="$root/src/tools/mnix"
+create="$here/create_vol"
+bootdir="$root/src/micronix/stand/boot"
+
+force=0
+if [ "${1:-}" = "-f" ]; then
+	force=1
+	shift
+fi
+
+[ -x "$hwsim" ] || { echo "$0: $hwsim not found - run make first" >&2; exit 1; }
+[ -x "$mnix" ] || { echo "$0: $mnix not found - run make first" >&2; exit 1; }
+[ -x "$create" ] || { echo "$0: $create not found" >&2; exit 1; }
+
+if [ $# -gt 0 ]; then
+	sims=$*
+else
+	sims=$("$hwsim" list) || exit 1
+fi
+
+failed=0
+skipped=0
+vols="$here/.simvols.$$"
+trap 'rm -f "$vols"' 0 1 2 15
+
+for sim in $sims; do
+	if ! "$hwsim" volumes "$sim" > "$vols"; then
+		echo "$0: $sim: cannot read its volumes" >&2
+		failed=1
+		continue
+	fi
+
+	while read -r ctl unit geom image; do
+		case "$image" in
+		/*)
+			echo "$sim: $image: outside the tree, skipped"
+			skipped=1
+			continue
+			;;
+		esac
+		img="$root/$image"
+		if [ -e "$img" ] && [ "$force" -eq 0 ]; then
+			echo "$sim: $image exists (make images FORCE=1 to rebuild)"
+			continue
+		fi
+		if [ "$ctl" != hdcdma ] || [ "$geom" != m40 ]; then
+			echo "$sim: $image: no builder for $ctl/$geom, skipped" >&2
+			skipped=1
+			continue
+		fi
+		mkdir -p "$(dirname "$img")" || { failed=1; continue; }
+		rm -f "$img.lock" "$img-delta"
+
+		if [ "$unit" = 0 ]; then
+			#
+			# The bootable root: create_vol builds an m40 hdcdma
+			# volume from filesystem/ and the built kernel, setdev'd
+			# to 3/0 with swap on 3/32.  It insists on a .vol name,
+			# so build beside the target and move it into place.
+			#
+			bld="$here/.simimage.$$.vol"
+			rm -f "$bld" "$bld.lock"
+			if "$create" "$bld" >/dev/null; then
+				if mv "$bld" "$img"; then
+					echo "$sim: built $image (bootable root)"
+				else
+					echo "$sim: $image: cannot move into place" >&2
+					failed=1
+				fi
+			else
+				echo "$sim: $image: create_vol failed" >&2
+				failed=1
+			fi
+			rm -f "$bld" "$bld.lock"
+		else
+			#
+			# The other volumes only have to exist with a filesystem
+			# on them; the root volume carries the system and its
+			# sources.  The slice table is create_vol's m40 one.
+			#
+			if "$mnix" initialize "$geom" "$img" &&
+			   "$mnix" label "$img" -s a 1 480 -s b 481 &&
+			   "$mnix" mkfs "$img" -i "$bootdir/bootimg" -f; then
+				echo "$sim: built $image (empty filesystem)"
+			else
+				echo "$sim: $image: mnix failed" >&2
+				failed=1
+			fi
+		fi
+		rm -f "$img.lock"
+	done < "$vols"
+done
+
+if [ "$failed" -ne 0 ]; then
+	echo "$0: one or more images could not be built" >&2
+	exit 1
+fi
+if [ "$skipped" -ne 0 ]; then
+	echo "$0: some volumes were skipped (see above)"
+fi
+exit 0

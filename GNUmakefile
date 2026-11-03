@@ -8,19 +8,21 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim d1 filesystem toolchain man
+all: sim d1 hwsim filesystem toolchain man
 	cd src ; make
 
 #
-# The simulators, installed as symlinks into bin/.  bin/ is also where
-# the cross tools (mxccc, mxar, mxnm) land; the simulators are their
-# peers there.  The link is relative so that moving the whole tree
-# keeps it pointing at its target, and -f replaces a plain file left
-# behind by the copy-style rule this used to be.
+# The simulators and the provisioning tool, installed as symlinks into
+# bin/.  bin/ is also where the cross tools (mxccc, mxar, mxnm) land;
+# these are their peers there.  The link is relative so that moving the
+# whole tree keeps it pointing at its target, and -f replaces a plain
+# file left behind by the copy-style rule this used to be.
 #
 sim: bin/sim
 
 d1: bin/d1
+
+hwsim: bin/hwsim
 
 #
 # The cross toolchain: the compiler and its passes, the host tools in
@@ -42,6 +44,10 @@ bin/d1: src/hwsim/d1/d1
 	mkdir -p bin
 	ln -sf ../src/hwsim/d1/d1 bin/d1
 
+bin/hwsim: src/tools/hwsim
+	mkdir -p bin
+	ln -sf ../src/tools/hwsim bin/hwsim
+
 #
 # The simulator and image tools have to be told what they are built
 # from, or a rule with no prerequisites is "up to date" forever: the
@@ -60,6 +66,9 @@ src/usersim/sim: $(USERSIMSRCS)
 	cd src ; make
 
 src/tools/readall: $(TOOLSRCS)
+	cd src ; make
+
+src/tools/hwsim: $(TOOLSRCS)
 	cd src ; make
 
 src/hwsim/d1/d1: $(SIMSRCS)
@@ -113,6 +122,20 @@ selfcompile: filesystem src/usersim/sim
 	rc=$$?; \
 	echo "=== selfcompile: $$(( $$(date +%s) - start ))s, exit $$rc"; \
 	exit $$rc
+
+#
+# The hard disk images sim.json names, so "hwsim boot <sim>" has
+# something to boot.  A root image is a full install-built system (the
+# userland, the kernel, /usr/src), so this is deliberately not part of
+# all: it runs a bootstrap and writes a few hundred megabytes.  FORCE=1
+# rebuilds images that already exist.
+#
+.PHONY: images
+images: bin/hwsim
+	$(MAKE) filesystem
+	$(MAKE) -C src/micronix bootstrap
+	$(MAKE) -C src/micronix/stand/boot bootimgs
+	sh disks/hdinstall/create_sim_images $(if $(FORCE),-f)
 
 DISKS = $(shell cat disks/dist/MICRONIX | grep -v ^# | cut -f 1)
 DISKS1 = $(shell cat disks/dist/NEWER | grep -v ^# | cut -f 1)

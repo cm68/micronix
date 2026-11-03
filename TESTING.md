@@ -305,9 +305,18 @@ src/tools/hwsim -g boot wunderbus     # d1 with -g and the kernel symbols
 
 The presets are `wunderbus`, `wunderbus-mio`, `mio-cascade` and `ss1`.
 `hwsim` composes `-b`/`-M`/`-j`/`-c`/`-w`/`-e` from the file and does
-not build disk images: each volume's image named in `sim.json` must
-already exist (the per-controller `create_vol` scripts under
-`disks/hdinstall`, one image set per sim).
+not build disk images itself.  Build the ones `sim.json` names with:
+
+```
+make images                 # userland + boot images + host tools, then the images
+make images FORCE=1         # rebuild images that already exist
+sh disks/hdinstall/create_sim_images ss1   # one sim, after a build
+```
+
+It makes hdcdma/m40 volumes (a bootable root built by `create_vol`, a
+blank filesystem for the other volumes) and reports volumes it cannot
+build — another controller or geometry, or an image outside the tree.
+`hwsim volumes <sim>` prints the list the builder walks.
 
 ## The gate before pushing
 

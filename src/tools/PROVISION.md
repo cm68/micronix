@@ -226,6 +226,7 @@ about the card is in `sim.json`.
     files <sim>        write each volume's file overrides into its image
     boot <sim>         launch the volumes; d1p headless by default, d1 with
                        -g/--debug, logging to /tmp/hwsim-<sim>.log
+    volumes <sim>      each volume: controller unit geometry image
     add <sim> <controller> <unit> <geometry> <image>
     del <sim> <controller>:<unit>
     list               the sims in the file
@@ -243,6 +244,14 @@ values the boot would use.
 every volume.  Until the tool chooses the image by controller, a volume
 on another controller needs an image built with that controller's
 level 2.
+
+`volumes` is the machine-readable form of the volume list, one line per
+volume, for host scripts.  `disks/hdinstall/create_sim_images` uses it
+to build the images the file names, and `make images` runs that after
+building the userland, boot images and host tools.  The builder makes
+hdcdma/m40 volumes, which is what the presets use; a volume on another
+controller or geometry, or an image outside the tree, is reported and
+skipped.
 
 `boot` first checks that every volume's image exists.  It then generates
 the device wiring from the volume list — every volume's

@@ -207,6 +207,18 @@ disks/hdinstall/hddma-0
 disks/bootdisks/*.img
 
 #
+# The hard disk images "make images" builds for sim.json, through
+# disks/hdinstall/create_sim_images.  Working volumes, regenerated from
+# the tree and locked by the drive model while a sim runs, never sources.
+#
+disks/q540-dual/
+disks/wunderbus/
+disks/wunderbus-mio/
+disks/mio-cascade/
+disks/ss1/
+disks/wren.img
+
+#
 # The distribution sets dist/create_dist generates, mx2.0-8-1.IMD and
 # its fellows.  Same kind of thing again: built out of the tree and
 # never a source.  Both suffixes are scoped to dist/ so that what is not

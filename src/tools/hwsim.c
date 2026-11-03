@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <json.h>
 
@@ -43,8 +44,39 @@ repo_root(const char *argv0)
 	char *s;
 	int i;
 
-	if (!realpath(argv0, bin))
-		strncpy(bin, argv0, sizeof bin - 1);
+	if (!realpath(argv0, bin)) {
+		/*
+		 * A bare name came from PATH, so there is no ./argv0 to
+		 * resolve: "hwsim" at a shell prompt found bin/hwsim, and
+		 * the tree is named by where that link points, not by the
+		 * word the shell passed.  Walk PATH and resolve the first
+		 * match; without one, fall back to the name as before.
+		 */
+		const char *path = strchr(argv0, '/') ? 0 : getenv("PATH");
+		char cand[PATH_MAX];
+		int found = 0;
+
+		while (path && *path) {
+			const char *end = strchr(path, ':');
+			int n = end ? (int)(end - path) : (int)strlen(path);
+
+			if (n == 0)
+				snprintf(cand, sizeof cand, "./%s", argv0);
+			else
+				snprintf(cand, sizeof cand, "%.*s/%s", n, path,
+				    argv0);
+			if (realpath(cand, bin)) {
+				found = 1;
+				break;
+			}
+			if (!end)
+				break;
+			path = end + 1;
+		}
+		if (!found)
+			strncpy(bin, argv0, sizeof bin - 1);
+	}
+	bin[sizeof bin - 1] = '\0';
 	for (i = 0; i < 3; i++) {
 		s = strrchr(bin, '/');
 		if (s)
@@ -537,6 +569,30 @@ v_format(const char *root, const char *name)
 	}
 }
 
+/*
+ * The volumes of a sim, one per line, for a host script that has no JSON
+ * reader: controller unit geometry image.  The image path is as it is
+ * written in sim.json, not resolved; the caller knows the tree root.
+ */
+static void
+v_volumes(const char *name)
+{
+	jv *sim = sim_get(name);
+	jv *vols = json_get(sim, "volumes");
+	int i;
+
+	for (i = 0; vols && i < vols->n; i++) {
+		jv *v = vols->v[i];
+		const char *ctl = json_str(v, "controller");
+		const char *geom = json_str(v, "geometry");
+		const char *img = json_str(v, "image");
+
+		printf("%s %ld %s %s\n",
+		    ctl ? ctl : "-", json_num(v, "unit"),
+		    geom ? geom : "-", img ? img : "-");
+	}
+}
+
 static void
 v_partition(const char *root, const char *name)
 {
@@ -677,6 +733,7 @@ v_boot(const char *root, const char *name, int debug)
 	char *simbin;
 	char *manifest;
 	char *logpath;
+	char *drvdir;
 	char *av[128];
 	int n = 0, i;
 
@@ -686,6 +743,20 @@ v_boot(const char *root, const char *name, int debug)
 	manifest = write_manifest(root);
 	logpath = malloc(strlen(name) + 32);
 	snprintf(logpath, strlen(name) + 32, "/tmp/hwsim-%s.log", name);
+	/*
+	 * Every card is instantiated, and a card with no drive on the
+	 * command line opens its default unit file where the simulator
+	 * was started.  Give each sim its own directory so two sims do
+	 * not fight over hdca-0 or scsi-0, and a boot does not leave
+	 * drive files and locks in the tree.
+	 */
+	drvdir = malloc(strlen(name) + 24);
+	snprintf(drvdir, strlen(name) + 24, "/tmp/hwsim-%s", name);
+	if (mkdir(drvdir, 0777) < 0 && errno != EEXIST) {
+		fprintf(stderr, "hwsim: %s: cannot make %s: %s\n",
+		    name, drvdir, strerror(errno));
+		exit(1);
+	}
 
 	if (!mon) {
 		fprintf(stderr, "hwsim: %s: no monitor rom (boot.monitor)\n", name);
@@ -718,6 +789,8 @@ v_boot(const char *root, const char *name, int debug)
 		av[n++] = "-S";
 		av[n++] = resolve_path(root, kernel);
 	}
+	av[n++] = "-d";
+	av[n++] = drvdir;
 	av[n++] = "-e";
 	av[n++] = manifest;
 	av[n++] = "-L";
@@ -835,6 +908,7 @@ usage(void)
 	    "  mkfs <sim>         mnix mkfs (filesystem + boot)\n"
 	    "  files <sim>        place each volume's file overrides\n"
 	    "  boot <sim>         launch d1/d1p from config + volumes\n"
+	    "  volumes <sim>      each volume: controller unit geometry image\n"
 	    "  add / del <sim>    a volume in or out\n"
 	    "  list / show <sim>  manage sim.json\n");
 	exit(1);
@@ -883,6 +957,12 @@ main(int argc, char **argv)
 		if (!name)
 			usage();
 		v_show(name);
+		return 0;
+	}
+	if (strcmp(verb, "volumes") == 0) {
+		if (!name)
+			usage();
+		v_volumes(name);
 		return 0;
 	}
 	if (strcmp(verb, "format") == 0) {
