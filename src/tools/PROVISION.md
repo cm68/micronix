@@ -146,6 +146,51 @@ monitor and level 2 use.
 + `nomon` (0x04).  The tool emits one packed `-c` — not `-B`, which
 covers only the boot bits and a later `-c` would override.
 
+## Network identity
+
+A sim that stands in for a board on the network needs an address of its
+own.  The card's sockets are host sockets, so a sim in the host's
+namespace would share the host's ports and be seen as 127.0.0.1.  With
+a top-level `net` and a per-sim `config.net`, `boot` puts the sim in its
+own network namespace on a bridge: the host sees the configured address,
+and the guest's own daemons can bind the same ports (23, 514) as the
+host's and as another sim's, each at its own address.
+
+```json
+{
+  "net": { "bridge": "mnx0", "host": "10.0.0.1", "prefix": 24 },
+  "sims": {
+    "q540-dual": { "config": { "net": "10.0.0.2" }, ... },
+    "wren":      { "config": { "net": "10.0.0.3" }, ... }
+  }
+}
+```
+
+`net.host` is the host's stand-in address — what the guest connects to,
+where it would use the host's LAN address on real hardware.  `config.net`
+is the sim's address, the peer the host's services see and log.  Use the
+DHCP reservations the real boards will get, so the host's
+`/etc/hosts.equiv` and `~/.rhosts` lines name sim and hardware alike.
+Numeric addresses work in both files without name resolution:
+
+    ~/.rhosts          10.0.0.2 curt
+                       10.0.0.3 root
+    /etc/hosts.equiv   10.0.0.2
+                       10.0.0.3
+
+`boot` needs root for this: it creates the shared bridge (once), the
+namespace `hwsim-<sim>` and a veth pair, enters the namespace, drops
+back to the invoking user (`SUDO_UID`/`SUDO_GID`) and runs d1/d1p with
+`HWSIM_NIC_ADDR` set.  The card's JOIN answers with that address; the
+card's outbound sockets originate from it and its listening sockets are
+reachable at it.  The namespace is removed when the sim exits; the
+bridge is left for the other sims.  A sim without `config.net` boots on
+loopback exactly as before, no root needed.
+
+The guest addresses the host at `net.host`; on hardware substitute the
+host's LAN address.  Nothing in the guest kernel or the card protocol
+changes — on the ESP32 the same JOIN is answered from DHCP.
+
 ## The boot chain
 
 A boot happens in four levels, numbered by where the code comes from and
@@ -215,7 +260,9 @@ may still want to stand up.  See `stand/boot/LEGACYBOOT.md`.
                        then the volume's file overrides
     files <sim>        write each volume's file overrides into its image
     boot <sim>         launch the volumes; d1p headless by default, d1 with
-                       -g/--debug, logging to /tmp/hwsim-<sim>.log
+                       -g/--debug, logging to /tmp/hwsim-<sim>.log.  With
+                       config.net, run as root: the sim gets its own
+                       network namespace and drops to the invoking user
     volumes <sim>      each volume: controller unit geometry image
     add <sim> <controller> <unit> <geometry> <image>
     del <sim> <controller>:<unit>

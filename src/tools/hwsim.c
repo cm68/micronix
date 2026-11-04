@@ -20,7 +20,9 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <pwd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -719,6 +721,259 @@ v_files(const char *root, const char *name)
 		apply_files(root, vols->v[i]);
 }
 
+/* ------------------------------------------------------------------ */
+/* per-sim network identity                                            */
+
+/*
+ * A sim that stands in for a board on the network gets its own address.
+ * The card's sockets are the host's sockets, so a sim in the host's
+ * namespace would share the host's ports and be known as 127.0.0.1.  A
+ * network namespace on a bridge gives it the address the board would
+ * have, and lets the guest's own daemons bind the same ports as the
+ * host's (and as another sim's).
+ *
+ * sim.json says:
+ *
+ *   "net": { "bridge": "mnx0", "host": "10.0.0.1", "prefix": 24 },
+ *   "sims": { "board": { "config": { "net": "10.0.0.2" }, ... } }
+ *
+ * net.host is the host's stand-in address (what the guest connects to,
+ * where to use the host's LAN address on real hardware); config.net is
+ * the sim's address (what the host sees).  A sim without config.net
+ * boots on loopback exactly as before.
+ */
+
+struct simnet {
+	const char *addr;	/* the sim's address, or NULL */
+	const char *bridge;
+	const char *host;
+	int prefix;
+};
+
+static int
+ipv4_ok(const char *s)
+{
+	unsigned a, b, c, d;
+	char tail;
+
+	if (!s || sscanf(s, "%u.%u.%u.%u%c", &a, &b, &c, &d, &tail) != 4)
+		return 0;
+	return a <= 255 && b <= 255 && c <= 255 && d <= 255;
+}
+
+static void
+sim_net(const char *name, jv *sim, struct simnet *n)
+{
+	jv *net = json_get(db, "net");
+	jv *config = json_get(sim, "config");
+
+	n->addr = json_str(config, "net");
+	n->bridge = json_str(net, "bridge");
+	n->host = json_str(net, "host");
+	n->prefix = (int)json_num(net, "prefix");
+
+	if (!n->addr)
+		return;
+	if (!n->host) {
+		fprintf(stderr,
+		    "hwsim: %s: config.net needs a top-level net.host\n",
+		    name);
+		exit(1);
+	}
+	if (!ipv4_ok(n->host) || !ipv4_ok(n->addr)) {
+		fprintf(stderr,
+		    "hwsim: %s: net addresses must be dotted quads\n", name);
+		exit(1);
+	}
+	if (!strcmp(n->host, n->addr)) {
+		fprintf(stderr,
+		    "hwsim: %s: the sim address is the host's (%s)\n",
+		    name, n->addr);
+		exit(1);
+	}
+	if (n->prefix <= 0 || n->prefix > 32)
+		n->prefix = 24;
+	if (!n->bridge)
+		n->bridge = "mnx0";
+}
+
+/*
+ * Interface names are at most 15 characters.  A short sim name is used
+ * as it is; a longer one folds to a hash so two sims cannot collide.
+ */
+static void
+ifname(char *buf, size_t len, const char *pfx, const char *sim)
+{
+	unsigned h = 5381;
+	const unsigned char *p;
+
+	for (p = (const unsigned char *)sim; *p; p++)
+		h = h * 33 + *p;
+	if (strlen(sim) <= 12)
+		snprintf(buf, len, "%s-%s", pfx, sim);
+	else
+		snprintf(buf, len, "%s%04x", pfx, h & 0xffff);
+}
+
+/* run a command and return its exit status; quiet hides ip's probes */
+static int
+run_status(char **av, int quiet)
+{
+	pid_t pid = fork();
+	int st;
+
+	if (pid < 0) {
+		perror("hwsim: fork");
+		exit(1);
+	}
+	if (pid == 0) {
+		if (quiet) {
+			int fd = open("/dev/null", O_WRONLY);
+
+			if (fd >= 0) {
+				dup2(fd, 1);
+				dup2(fd, 2);
+			}
+		}
+		execvp(av[0], av);
+		if (!quiet)
+			fprintf(stderr, "hwsim: exec %s: %s\n", av[0],
+			    strerror(errno));
+		_exit(127);
+	}
+	if (waitpid(pid, &st, 0) < 0) {
+		perror("hwsim: waitpid");
+		exit(1);
+	}
+	return WIFEXITED(st) ? WEXITSTATUS(st) : 1;
+}
+
+static void
+run_ok(char **av, const char *what)
+{
+	if (run_status(av, 0) != 0) {
+		fprintf(stderr, "hwsim: %s failed\n", what);
+		exit(1);
+	}
+}
+
+static char g_netns[64];	/* the namespace to remove at exit, if any */
+
+static void
+net_teardown(void)
+{
+	char *av[5];
+
+	if (!g_netns[0])
+		return;
+	av[0] = "ip";
+	av[1] = "netns";
+	av[2] = "delete";
+	av[3] = g_netns;
+	av[4] = NULL;
+	run_status(av, 1);
+	g_netns[0] = '\0';
+}
+
+static void
+net_setup(const char *name, const struct simnet *n, char *nsname, size_t nslen)
+{
+	char hs[16], hv[16], hostpfx[64], addrpfx[64], nsfile[PATH_MAX];
+	char *av[12];
+
+	ifname(hs, sizeof hs, "hs", name);
+	ifname(hv, sizeof hv, "hv", name);
+	snprintf(nsname, nslen, "hwsim-%s", name);
+	snprintf(hostpfx, sizeof hostpfx, "%s/%d", n->host, n->prefix);
+	snprintf(addrpfx, sizeof addrpfx, "%s/%d", n->addr, n->prefix);
+
+	/* the bridge is shared by every sim; create it once */
+	av[0] = "ip"; av[1] = "link"; av[2] = "show";
+	av[3] = (char *)n->bridge; av[4] = NULL;
+	if (run_status(av, 1) != 0) {
+		av[0] = "ip"; av[1] = "link"; av[2] = "add";
+		av[3] = (char *)n->bridge; av[4] = "type";
+		av[5] = "bridge"; av[6] = NULL;
+		run_ok(av, "create the sim bridge");
+	}
+	av[0] = "ip"; av[1] = "addr"; av[2] = "replace";
+	av[3] = hostpfx; av[4] = "dev"; av[5] = (char *)n->bridge;
+	av[6] = NULL;
+	run_ok(av, "address the sim bridge");
+	av[0] = "ip"; av[1] = "link"; av[2] = "set";
+	av[3] = (char *)n->bridge; av[4] = "up"; av[5] = NULL;
+	run_ok(av, "bring up the sim bridge");
+
+	/*
+	 * A namespace left by a previous boot would keep the veth name and
+	 * a stale address.  The volume locks, not the network, are what
+	 * stop two copies of one sim, so replacing it is safe.
+	 */
+	snprintf(nsfile, sizeof nsfile, "/var/run/netns/%s", nsname);
+	if (access(nsfile, F_OK) == 0) {
+		av[0] = "ip"; av[1] = "netns"; av[2] = "delete";
+		av[3] = nsname; av[4] = NULL;
+		run_ok(av, "remove the old sim namespace");
+	}
+	av[0] = "ip"; av[1] = "link"; av[2] = "show";
+	av[3] = hs; av[4] = NULL;
+	if (run_status(av, 1) == 0) {
+		av[0] = "ip"; av[1] = "link"; av[2] = "delete";
+		av[3] = hs; av[4] = NULL;
+		run_ok(av, "remove the stale sim veth");
+	}
+
+	av[0] = "ip"; av[1] = "netns"; av[2] = "add";
+	av[3] = nsname; av[4] = NULL;
+	run_ok(av, "create the sim namespace");
+	snprintf(g_netns, sizeof g_netns, "%s", nsname);
+	atexit(net_teardown);
+
+	av[0] = "ip"; av[1] = "link"; av[2] = "add";
+	av[3] = hs; av[4] = "type"; av[5] = "veth";
+	av[6] = "peer"; av[7] = "name"; av[8] = hv; av[9] = NULL;
+	run_ok(av, "create the sim veth");
+
+	av[0] = "ip"; av[1] = "link"; av[2] = "set";
+	av[3] = hv; av[4] = "netns"; av[5] = nsname; av[6] = NULL;
+	run_ok(av, "move the sim veth into its namespace");
+
+	av[0] = "ip"; av[1] = "link"; av[2] = "set";
+	av[3] = hs; av[4] = "master"; av[5] = (char *)n->bridge;
+	av[6] = NULL;
+	run_ok(av, "attach the sim veth to the bridge");
+	av[0] = "ip"; av[1] = "link"; av[2] = "set";
+	av[3] = hs; av[4] = "up"; av[5] = NULL;
+	run_ok(av, "bring up the sim veth");
+
+	av[0] = "ip"; av[1] = "netns"; av[2] = "exec"; av[3] = nsname;
+	av[4] = "ip"; av[5] = "addr"; av[6] = "add"; av[7] = addrpfx;
+	av[8] = "dev"; av[9] = hv; av[10] = NULL;
+	run_ok(av, "address the sim interface");
+	av[0] = "ip"; av[1] = "netns"; av[2] = "exec"; av[3] = nsname;
+	av[4] = "ip"; av[5] = "link"; av[6] = "set"; av[7] = hv;
+	av[8] = "up"; av[9] = NULL;
+	run_ok(av, "bring up the sim interface");
+	av[0] = "ip"; av[1] = "netns"; av[2] = "exec"; av[3] = nsname;
+	av[4] = "ip"; av[5] = "link"; av[6] = "set"; av[7] = "lo";
+	av[8] = "up"; av[9] = NULL;
+	run_ok(av, "bring up loopback in the sim namespace");
+}
+
+/* sudo kept the caller's identity; give d1 the same HOME it would have */
+static void
+adopt_user_env(void)
+{
+	const char *u = getenv("SUDO_UID");
+	struct passwd *pw;
+
+	if (!u || !(pw = getpwuid(atoi(u))))
+		return;
+	setenv("HOME", pw->pw_dir, 1);
+	setenv("USER", pw->pw_name, 1);
+	setenv("LOGNAME", pw->pw_name, 1);
+}
+
 static void
 v_boot(const char *root, const char *name, int debug)
 {
@@ -735,7 +990,18 @@ v_boot(const char *root, const char *name, int debug)
 	char *logpath;
 	char *drvdir;
 	char *av[128];
+	char uidarg[32], gidarg[32];
+	char nsname[64];
+	struct simnet net;
 	int n = 0, i;
+
+	sim_net(name, sim, &net);
+	if (net.addr && geteuid() != 0) {
+		fprintf(stderr,
+		    "hwsim: %s: config.net %s needs root for its network "
+		    "namespace; run hwsim with sudo\n", name, net.addr);
+		exit(1);
+	}
 
 	if (!emu)
 		emu = "hwsim/d1";
@@ -816,7 +1082,40 @@ v_boot(const char *root, const char *name, int debug)
 		av[n++] = wiring;
 	}
 	av[n] = NULL;
-	runv(av);
+
+	if (net.addr) {
+		char *wav[144];
+		int m = 0, j;
+
+		/*
+		 * Give the sim its own namespace, then enter it and run d1
+		 * there.  root did the setup; hand the sim back to the
+		 * invoking user so the volumes keep their owner.
+		 */
+		net_setup(name, &net, nsname, sizeof nsname);
+		wav[m++] = "ip";
+		wav[m++] = "netns";
+		wav[m++] = "exec";
+		wav[m++] = nsname;
+		if (geteuid() == 0 && getenv("SUDO_UID") &&
+		    getenv("SUDO_GID")) {
+			snprintf(uidarg, sizeof uidarg, "--reuid=%s",
+			    getenv("SUDO_UID"));
+			snprintf(gidarg, sizeof gidarg, "--regid=%s",
+			    getenv("SUDO_GID"));
+			wav[m++] = "setpriv";
+			wav[m++] = uidarg;
+			wav[m++] = gidarg;
+			wav[m++] = "--init-groups";
+			adopt_user_env();
+		}
+		for (j = 0; j < n; j++)
+			wav[m++] = av[j];
+		wav[m] = NULL;
+		setenv("HWSIM_NIC_ADDR", net.addr, 1);
+		runv(wav);
+	} else
+		runv(av);
 }
 
 static void

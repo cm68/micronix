@@ -93,6 +93,34 @@ static int joined;
 static char ncSsid[33];
 static char ncPass[65];
 
+/*
+ * The station address JOIN reports.  On the card it is DHCP's; in the
+ * sim it is the host launcher's stand-in (HWSIM_NIC_ADDR), or the host
+ * itself when nothing is configured.  The guest does not use it -
+ * net_join() discards the reply - but it is the card's identity, and a
+ * sim standing in for a board should report the board's address.
+ */
+static unsigned char nicIp[4] = { 127, 0, 0, 1 };
+
+static void
+nic_read_ip(void)
+{
+	const char *s = getenv("HWSIM_NIC_ADDR");
+	unsigned a, b, c, d;
+
+	nicIp[0] = 127;
+	nicIp[1] = 0;
+	nicIp[2] = 0;
+	nicIp[3] = 1;
+	if (s && sscanf(s, "%u.%u.%u.%u", &a, &b, &c, &d) == 4 &&
+	    a <= 255 && b <= 255 && c <= 255 && d <= 255) {
+		nicIp[0] = a;
+		nicIp[1] = b;
+		nicIp[2] = c;
+		nicIp[3] = d;
+	}
+}
+
 /* the RX FIFO (card -> guest): framed bytes the guest reads out */
 #define RXQ  8192
 static unsigned char rxq[RXQ];
@@ -566,10 +594,8 @@ nic_status_cmd(unsigned char s)
 static void
 nic_join(void)
 {
-    unsigned char ip[4] = { 127, 0, 0, 1 }; /* the host, for the sim */
-
     joined = 1;
-    push_frame(P_ACK, 0xff, ip, 4);
+    push_frame(P_ACK, 0xff, nicIp, 4);
 }
 
 /*
@@ -739,6 +765,7 @@ nic_init(void)
         socks[s].rport = 0;
     }
     joined = 0;
+    nic_read_ip();
     ncSsid[0] = ncPass[0] = '\0';
     rxq_head = rxq_tail = rxq_n = 0;
     f_n = f_need = f_payload = 0;

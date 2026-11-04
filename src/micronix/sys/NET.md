@@ -93,8 +93,9 @@ Each is a frame; the socket is in the header, arguments in the payload.
 
 `JOIN` puts the card on its network — the firmware does wifi associate +
 DHCP — and the `ACK` carries the assigned `ip[4]` in network order; the
-sim answers immediately with the host's address.  `RDY` stays clear until
-the join has finished.
+sim answers immediately with its configured address (the host's address,
+127.0.0.1, when none is configured).  `RDY` stays clear until the join
+has finished.
 
 `RECV` is a pull, not a pushed stream: the guest names the socket and the
 count it can take, and the card answers `DATA` with as much as it has, or
