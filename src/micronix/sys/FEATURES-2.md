@@ -206,14 +206,12 @@ slot:
 | 3 | `hddma` | `hddma` |
 | 4 | - | `ide` (ATA) |
 | 5 | - | `ncr5380` (SCSI) |
-| 6 | - | `nd` (network disk; minor 1 is `/dev/net`) |
+| 6 | - | - |
 | 7 | - | `disk2` (CompuPro Disk 2) |
 | 8 | - | `disk3` (CompuPro Disk 3) |
 | 9 | - | `disk1` (CompuPro Disk 1A) |
 
-Major 6 grew a second face: the network disk is minor 0 and `/dev/net`
-is minor 1, an ioctl device rather than a character channel.  On the
-character side, major 1's MultIO console is now one of two consoles,
+On the character side, major 1's MultIO console is now one of two consoles,
 the MultIO ACE or the SS1's 2651, chosen at boot; 1.6 had the MultIO
 only.
 
@@ -250,10 +248,9 @@ These came with the same work and are worth knowing:
   entry points are chosen from what answered, and each card's
   interrupt line is discovered rather than compiled in.  1.6's
   interrupt table named its handlers.
-- **`/dev/net`.**  The network interface is block major 6 minor 1, one
-  `ioctl(CDBCMD)` command block per operation, and its code lives in the
-  ND module's page (`sys/net.c`); it did not exist in 1.6.  See
-  `sys/NET.md`.
+- **`/dev/net0`.**  The network interface is char major 6, a clone node
+  that makes one socket per open, and its code lives in `net.mod`
+  (`sys/net.c`); it did not exist in 1.6.  See `sys/NET.md`.
 - **`/dev/mem` and `/dev/ports`** keep their 1.6 meanings; both are
   now served by `sys/memdev.c`'s `memread`/`memwrite`, which tell
   memory from ports by the major.

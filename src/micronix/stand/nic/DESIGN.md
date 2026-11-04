@@ -183,17 +183,18 @@ The line is level-asserted, so the guest releases it by draining
 `NETDATA`, not by acknowledging an edge.  That is why the producer does
 not need to know whether the guest is in its handler.
 
-The guest side is the network face of the ND module: `sys/net.c` is
-linked into `nd.mod`, and `ndstart()` registers its probe and handler
-with the attach loop when the module is placed.  `intr_attach()` tickles
+The guest side is the card's socket face in its own page: `sys/net.c`
+is linked into `net.mod` behind `nethdr.c`, whose header names the probe
+(`netprobe`) and the handler (`netint`).  The attach loop registers them
+when the module is placed.  `intr_attach()` tickles
 it with a `STATUS` for socket 0, finds the line from the PIC's pending
 register and writes `netint` into `ovlint[]`.  The line is never named
 in the driver: `intrline(netint, seg)` finds it again from the handler's
 own address and the module's segment.
 
-`/dev/net` is block major 6, minor 1, and every operation is one
-`ioctl(CDBCMD)` command block: the driver builds the frame from the
-block's typed fields, sends it, and reads the reply before returning.
+`/dev/net0` is char major 6, a clone node: each open is one socket, and
+the driver builds each frame itself, sends it, and reads the reply
+before returning.
 A wait (`netwait()`) unmasks the line, looks at `RXRDY`, and sleeps on
 `netchan`, the one resident piece (module data addresses are shared
 between modules); the handler masks the line and wakes the caller.  The

@@ -146,7 +146,6 @@ extern int rom_size;		// set this nonzero to read
 extern char *rom_image;		// binary from
 extern char *rom_filename;	// here
 extern char *medias_file;	// media set manifest (-e)
-extern char *nd_image;		// network-card ND backing image (-N)
 
 extern int trace_bio;		// multiple drivers trace block i/o
 extern int running;

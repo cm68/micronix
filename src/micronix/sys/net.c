@@ -21,9 +21,7 @@
  * kernel swaps the child's file to it, so the parent's descriptor is
  * still the listener and the child's is the connection.
  *
- * This is its own module page (sys/nethdr.c), char major 6.  The network
- * disk on block major 6 is the ND page (sys/nd.c) and the two share
- * nothing but the resident event and lock in sys/netint.c.
+ * This is its own module page (sys/nethdr.c), char major 6.
  */
 #include <types.h>
 #include <sys/sys.h>

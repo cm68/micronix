@@ -56,7 +56,7 @@ EXTRA	= BUILDING ARCHITECTURE.md FEATURES-2.md TODO
 # and linked again as a module - so its objects, .mod and .page are not
 # in OBJS; they ride GENERATED for the same reason.  unix itself is
 # $(TARGET), which clobber removes.
-MODS	= dj mw ide ncr hdca nd net disk1 disk2 disk3 pty tty mem io
+MODS	= dj mw ide ncr hdca net disk1 disk2 disk3 pty tty mem io
 
 # Nothing is staged: every driver in the tree is linked into a module and
 # placed at boot.  A driver costs no address space when it is not placed -
@@ -201,7 +201,7 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 	 dj.c djhdr.c djinit.c dlabel.c exec.c \
 	 fio.c fork.c hdca.c hdcahdr.c ialloc.c ide.c idehdr.c iget.c imap.c \
 	 job.c link.c main.c main_init.c makedate.c malloc.c memdev.c mount.c \
-	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c nd.c ndhdr.c \
+	 multio.c mw.c mwhdr.c name.c ncr.c ncrhdr.c ncrinit.c \
 	 net.c netint.c open.c ovl.c probe.c \
 	 pty.c pty_leaf.c ptydata.c ptyhdr.c tty.c ttyhdr.c ttyres.c ttysys.c \
 	 multio.c ss1_uart.c ss1_uartleaf.c select.c memhdr.c iohdr.c ovlb.c queue.c rdwri.c reg.c upd1990.c sig.c sleep.c ss1_clock.c \
@@ -502,7 +502,7 @@ unix.link: $(OBJS)
 # warning is the measure of what is left to do: it goes away when the
 # driver leaves the kernel.
 #
-$(filter-out nd.mod mem.mod io.mod pty.mod tty.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o unix.link
+$(filter-out mem.mod io.mod pty.mod tty.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ $*hdr.o $*.o
 
 # The memory and ports cdevs are the same driver (sys/memdev.c).  Each
@@ -530,11 +530,6 @@ pty.mod: ptyhdr.o pty.o pty_leaf.o tty.o ttysys.o unix.link
 tty.mod: ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o unix.link
 	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
 		ttyhdr.o tty.o ttysys.o multio.o ss1_uartleaf.o
-
-# The ND module is the network disk alone; the socket face that shares
-# its major number in the other namespace is net.mod.
-nd.mod: ndhdr.o nd.o unix.link
-	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ ndhdr.o nd.o
 
 #
 # One module is one page.  What the link produced is a 16 byte object

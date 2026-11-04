@@ -50,8 +50,8 @@ The module header (sys/ovl.h) drops its line number and gains the tickle.
     };
 
 `probe()` makes the card raise its interrupt with no side effect — a
-reset or sense that completes for a disk controller, an `ND_READ` for the
-network disk.  It runs with the module mapped and nothing else in flight,
+reset or sense that completes for a disk controller.  It runs with the
+module mapped and nothing else in flight,
 and it is the one thing a driver knows about interrupts that the rest of
 the system does not.
 

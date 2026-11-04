@@ -1,10 +1,9 @@
 /*
  * The network card's socket module header (sys/ovl.h).
  *
- * Char major 6, /dev/net0 and the sockets it clones (sys/net.c).  This
- * is a page of its own: the card's socket face and the network disk
- * (block major 6, sys/nd.c) share a number across two namespaces and
- * nothing else, so neither costs the other page space.
+ * Char major 6, /dev/net0 and the sockets it clones (sys/net.c).  It is
+ * a page of its own, so the socket face costs nothing when the module is
+ * not placed.
  *
  * nettick() is the wakeup a card with no interrupt line needs; the line
  * itself is discovered by the attach loop from the probe named here, the

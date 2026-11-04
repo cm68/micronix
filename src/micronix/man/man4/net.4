@@ -44,9 +44,8 @@ STATUS and JOIN, and the card answers with ACK, pushes received bytes as
 DATA and reports asynchronous changes as EVENT.  JOIN puts the card on
 its network and answers with the address DHCP gave it.  Eight sockets,
 one connection each; the socket is in the frame header, so one device
-carries all eight.  The faces built on it are tftp, the network disk
-(see nd in section 4) and rlogin; rcp in section 1 speaks rsh over a
-tcp socket.
+carries all eight.  The faces built on it are rsh, rlogin, telnet and
+ftp; rcp in section 1 speaks rsh over a tcp socket.
 .sp 2
 .in -5
 .bd

@@ -727,7 +727,6 @@ usage(char *complaint, char *p)
     fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
     fprintf(stderr, "\t-d\t<directory holding the hard drive unit files>\n");
     fprintf(stderr, "\t-e\t<media set manifest file> (the /dev/mediachg sets)\n");
-    fprintf(stderr, "\t-N\t<nd backing image> for the network card\n");
     fprintf(stderr, "\t-m\t<bytes> ram size - 768k, 0xc0000, 1m (default 16m)\n");
     fprintf(stderr, "\t-5\t<file> a floppy on the 5 1/4 inch port\n");
     fprintf(stderr, "\t-H\tdon't exit the simulation on a task-0 halt\n");
@@ -792,7 +791,6 @@ char *progname;			/* argv[0], for the configuration layer's errors */
 char *rom_filename;
 char *bootrom_filename;
 char *medias_file;
-char *nd_image;
 char *sym_filename;
 char *kern_filename;
 char *rom_image;
@@ -2198,12 +2196,6 @@ main(int argc, char **argv)
                     usage("media set manifest missing\n", progname);
                 }
                 medias_file = *argv++;
-                break;
-            case 'N':
-                if (!argc--) {
-                    usage("nd backing image missing\n", progname);
-                }
-                nd_image = *argv++;
                 break;
             case 'H':
                 halt_exit = 0;

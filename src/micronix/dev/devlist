@@ -31,10 +31,10 @@ c 2 0 mem
 c 3 0 io
 c 3 210 mediachg
 #
-# The network socket face.  Char major 6 is a different namespace from
-# block major 6 (the network disk): /dev/net0 is the clone node, and an
-# open asks the card for the next free socket.  The path a program gets
-# back is that socket, not this node, so there is exactly one name.
+# The network socket face, char major 6: /dev/net0 is the clone node,
+# and an open asks the card for the next free socket.  The path a
+# program gets back is that socket, not this node, so there is exactly
+# one name.
 #
 c 6 0 net0
 b 1 0 hda
@@ -87,7 +87,6 @@ b 5 4 scsi4
 b 5 5 scsi5
 b 5 6 scsi6
 b 5 7 scsi7
-b 6 0 nd
 #
 # The CompuPro DISK 2 and DISK 3, four drives each.  Both take the drive
 # from the low two bits of the minor, like every other disk here, and

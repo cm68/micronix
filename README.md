@@ -78,9 +78,8 @@ higher performance on the same hardware:
 
 	a network interface has been added supporting an ESP32 connection.
 	the ESP32 runs tcp/ip and wifi; rcp copies files over rsh, rshd
-	serves rsh into the box, and nd is a network disk on the same
-	card - a block device that can serve a volume with no local
-	controller.
+	serves rsh into the box, and inetd runs rlogin, telnet and ftp
+	there.
 
 	the console is chosen at boot: the morrow multio ACE or the compupro
 	SS1's 2651.  wunderbus ACEs and the serial lines give additional

@@ -205,16 +205,6 @@ because it is a strap on a board being simulated and not a property of a
 disk — and because `-b mon447.bin -B djdma -j bc` is a machine somebody
 may still want to stand up.  See `stand/boot/LEGACYBOOT.md`.
 
-### The network disk: nd
-
-The ND card is a block driver (major 6) and a character device
-(`/dev/net`, major 5) in the kernel (`src/micronix/sys/nd.c`,
-`src/micronix/sys/net.c`; see `src/micronix/sys/NET.md`).  It has no
-row in the level 1 controller table (`ctable`,
-src/micronix/stand/roms/l1boot.s) and no level-2 image, so it is not a
-boot medium.  The tool's major table does not name it, and nothing
-about the card is in `sim.json`.
-
 ## The verbs
 
 `hwsim [-f sim.json] <verb> [sim] [args]`:
