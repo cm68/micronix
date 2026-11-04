@@ -97,6 +97,26 @@ struct expr *scaleptr(struct expr *e);
  * one arm's worth of spill instead of the union of all of them.
  */
 
+/*
+ * Is this expression a zero?  A constant 0 is the null pointer constant
+ * wherever it is assigned, and so is the value of a chained assignment
+ * that ends in one: "i_count = i_mount = 0" stores a zero in both,
+ * though the inner assignment's type is the pointer.
+ */
+static int
+zeroval(struct expr *e)
+{
+	for (;;) {
+		if (!e)
+			return 0;
+		if (e->flags & E_CONST)
+			return e->v == 0;
+		if (e->op != ASSIGN || !e->right)
+			return 0;
+		e = e->right;
+	}
+}
+
 struct expr *
 parseExpr(unsigned char pri)
 {
@@ -306,6 +326,29 @@ parseExpr(unsigned char pri)
             if (is_assignment && assign_type) {
                 if (!ptrcompat(assign_type, e->right->type))
                     gripe(ER_E_PT);
+                /*
+                 * The null pointer constant is an address wherever
+                 * it is written: "p = 0" must not be an incompatible
+                 * conversion, and 0's type here is the smallest one
+                 * that holds it.
+                 */
+                if ((op == ASSIGN || op == BFASSIGN) &&
+                    !ptrassign(assign_type, e->right->type) &&
+                    !zeroval(e->right))
+                    gripe(ER_E_PT);
+                /*
+                 * The implicit form of the widening the cast warns
+                 * about: an address put into an integer wider than an
+                 * address, with nothing to say it was meant.
+                 */
+                if ((op == ASSIGN || op == BFASSIGN) &&
+                    assign_type && e->right->type &&
+                    (e->right->type->flags & (TF_POINTER | TF_ARRAY)) &&
+                    !(assign_type->flags &
+                      (TF_POINTER | TF_ARRAY | TF_FUNC)) &&
+                    assign_type->size > TS_PTR)
+                    warn("address widened to an integer wider than"
+                         " an address");
                 e->type = assign_type;
             }
             else if (IS_CMPLOG(op))

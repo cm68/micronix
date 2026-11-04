@@ -235,6 +235,34 @@ isdestreg(Expr *e)
 }
 
 /*
+ * Does the value side of a store need a register before the store?
+ *
+ * A store rule writes the value out of a register or as a constant:
+ * =(V,A), =(V,H), =(V,num) through a register, =(D(..),...) for an
+ * address.  An operand that NAMES AN ADDRESS - a global's base
+ * (SYMREF), a frame slot or its (iy+d) form (LOCALVAR, INDEX) - is a
+ * locdesc, but as a VALUE it reduces to itself and emits nothing: the
+ * (reg+d) rules read through it in place, and that is what makes it
+ * cheap where it is a location.  A store whose value is one has no
+ * rule at all - "*p = arr" and "*p++ = arr" left the tree with an
+ * INDEX under the ASSIGN and no form to match, and the compile died
+ * with "expression(s) that no rule could build code for".
+ *
+ * So the address forms count as needing a register here even though
+ * they are descriptors: the store lowering stages the destination and
+ * lets valtohl form the value, which is what the pop below wants.
+ */
+static unsigned char
+needsspill(Expr *e)
+{
+	if (!e || e->op == NUMBER)
+		return 0;
+	if (e->op == SYMREF || e->op == LOCALVAR || e->op == INDEX)
+		return 1;
+	return !islocdesc(e) && !isdestreg(e);
+}
+
+/*
  * Base operator behind a compound assignment: += is +, and so on.
  * Returns 0 for anything that is not a compound assignment.
  */
@@ -2106,6 +2134,20 @@ rewrite1(Expr *e)
 	}
 
 	/*
+	 * A conversion of an address.  "(long)arr" and "(char)arr"
+	 * arrive from c0 as NARROW/WIDEN/SEXT over the array's frame
+	 * form, and those forms reduce to themselves and emit nothing -
+	 * the conversion rules name registers only.  Form the address in
+	 * HL first, exactly as the store paths form a value, so the
+	 * conversion has something to narrow or extend.
+	 */
+	if ((e->op == NARROW || e->op == WIDEN || e->op == SEXT) &&
+	    e->left &&
+	    (e->left->op == INDEX || e->left->op == SYMREF ||
+	     (e->left->op == LOCALVAR && !farslot(e->left))))
+		e->left = valtohl(rewrite1(e->left));
+
+	/*
 	 * A compare whose left operand is a bare symbol.  The address is
 	 * the value, so load it up front and let the (H,x) forms carry
 	 * every context - the table only ever grew flag-context rules
@@ -2788,7 +2830,7 @@ spilled:	;
 		if (e->op == ASSIGN && e->left && e->right &&
 		    !islocdesc(e->left) && !isdestreg(e->left) &&
 		    e->left->op != DEREF &&
-		    !islocdesc(e->right) && e->right->op != NUMBER) {
+		    needsspill(e->right)) {
 			Expr *addr;
 
 			/*
@@ -3026,8 +3068,7 @@ spilled:	;
 			 * holding two values.
 			 */
 			if (!islocdesc(e->left->left) && e->right &&
-			    !islocdesc(e->right) && !isdestreg(e->right) &&
-			    e->right->op != NUMBER) {
+			    needsspill(e->right)) {
 				Expr *w;
 
 
@@ -3036,6 +3077,20 @@ spilled:	;
 				w = spiltstore(e, e->left);
 				if (w)
 					return w;
+				goto children_end;
+			} else if (e->right &&
+				   (e->right->op == INDEX ||
+				    e->right->op == LOCALVAR)) {
+				/*
+				 * The destination is a descriptor, so it
+				 * needs no register and nothing is spilled -
+				 * but the value is an address (a frame slot
+				 * or its (iy+d) form), and a descriptor's
+				 * address reduces to itself and emits
+				 * nothing.  Form it in HL and let the
+				 * =(V,H)/(I,H) store rule write that.
+				 */
+				e->right = valtohl(rewrite1(e->right));
 				goto children_end;
 			}
 		} else if ((e->op == PREINC || e->op == PREDEC ||
@@ -3078,9 +3133,10 @@ spilled:	;
 			Expr *addr = rewrite1(e->left);
 			if (islocdesc(addr)) {
 				e->left = addr;
-			} else if (e->right && !islocdesc(e->right) &&
-				   !isdestreg(e->right) &&
-				   e->right->op != NUMBER) {
+				if (e->right && (e->right->op == INDEX ||
+				    e->right->op == LOCALVAR))
+					e->right = valtohl(rewrite1(e->right));
+			} else if (e->right && needsspill(e->right)) {
 				/*
 				 * The address is live in HL and the value
 				 * is about to be computed over it.  Same

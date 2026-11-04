@@ -149,7 +149,7 @@ sig()
     register UINT8 s;
     register INT16 func;
 
-    s = u.p->slist[0];
+    s = (UINT8) u.p->slist[0];	/* the disposition's low byte */
 
     if (!s)
         return 0;              /* no signal to process */

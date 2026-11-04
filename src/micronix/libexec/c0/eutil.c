@@ -541,6 +541,46 @@ ptrcompat(struct type *lt, struct type *rt)
 	return 1;
 }
 
+/*
+ * Assigning an address to something that cannot hold one.
+ *
+ * K&R lets an address live in an int - the same width here - and the
+ * tree leans on that; a char is narrower than an address, and storing
+ * through one kept a byte of it.  "*p = arr" was accepted without a
+ * word, reached c1 as a byte ASSIGN whose value was an array, and died
+ * there with "no rule" instead of failing here.
+ *
+ * Only the plain assignment: "p += n" is a pointer and an integer by
+ * design, and "p += c" is legal, so the compound forms are not this.
+ * Function designators decay and are left alone, as ptrcompat does.
+ */
+int
+ptrassign(struct type *lt, struct type *rt)
+{
+	struct type *t;
+	int lp, rp;
+
+	if (!lt || !rt)
+		return 1;
+	if ((lt->flags | rt->flags) & TF_FUNC)
+		return 1;
+	lp = (lt->flags & (TF_POINTER | TF_ARRAY)) != 0;
+	rp = (rt->flags & (TF_POINTER | TF_ARRAY)) != 0;
+	if (lp == rp)
+		return 1;		/* both or neither: ptrcompat's case */
+	if (lp)
+		return 1;		/* an address from an integer: K&R */
+	/*
+	 * The lossy direction only.  An address going into an integer at
+	 * least as wide as one is K&R's address-in-an-int, which this
+	 * machine and this tree use; a char is narrower than an address
+	 * and keeps one byte of it - that is the conversion with no
+	 * meaning, and the one "*p = arr" wrote.
+	 */
+	t = lt;
+	return t->size >= TS_PTR;
+}
+
 
 /*
  * Parse an expression using precedence climbing algorithm

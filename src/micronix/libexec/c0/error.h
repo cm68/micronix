@@ -70,7 +70,7 @@ char *errmsg[] = {
 	"bad op",
 	"undefined symbol",
 	"no fold",
-	"ptr compat",
+	"incompatible pointer conversion",
 	"struct value",
 	"addr of register",
 	"out of memory",

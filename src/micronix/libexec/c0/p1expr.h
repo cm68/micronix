@@ -85,6 +85,7 @@ extern struct expr *mkIncDec(struct expr *operand,
     unsigned char inc_op, unsigned char is_postfix);
 extern int isaggr(struct type *t);
 extern int ptrcompat(struct type *lt, struct type *rt);
+extern int ptrassign(struct type *lt, struct type *rt);
 extern unsigned char binopPri(unsigned char t);
 /*
  * parseConst leaves its answer here rather than returning it.  A long

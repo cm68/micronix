@@ -10,12 +10,19 @@
 # now a description of how the bug looked before the fix, kept because
 # that is the shape the tree's sources still avoid in the places the
 # port worked around them.  Entry 6 is open: the kernel code that found
-# it no longer asks for the conversion, the compiler still gets it
-# wrong.  The unnumbered section at the end is not a miscompile and is
+# it no longer asks for the conversion, but the compiler still gets it
+# wrong.  Entries 7 and 8 were fixed on 2026-11-03: the sources that
+# found them still avoid the shapes, but no longer have to.  The unnumbered section at the end is not a miscompile and is
 # left as it was.
 #
-# Each fix was checked with its repro and with a self-host pass - every
-# compiler source, host output and simulated output, byte-identical.
+# The 2026-09-30 fixes were each checked with its repro and with a
+# self-host pass - every compiler source, host output and simulated
+# output, byte-identical.  Entries 7 and 8 (2026-11-03) have their
+# repros, a full rebuild - passes, libraries, kernel, commands - with
+# unrelated programs linking byte-identical, and the footprint run
+# (make -C src/micronix footprint) after them: every pass fits every
+# source with no gap under 256, the tightest being c1 compiling its own
+# lower.c at 350 bytes.
 #
 # Each one was re-run against the tree's own mxccc while this file was
 # written, and the output quoted is that run's.  Unless an entry says
@@ -266,6 +273,77 @@
 # "34 1234", with and without -O.
 
 # ---------------------------------------------------------------------
+# 7.  *p++ = <ADDRESS OF A LOCAL ARRAY> HAS NO CODE RULE     [FIXED 2026-11-03]
+#
+# The store of a local aggregate's address through a post-incremented
+# pointer is an expression c1 cannot build.  It reports
+#
+#	/tmp/cc1_0.s: 1 expression(s) that no rule could build code for
+#	                 - the output is missing them
+#	Error: c1 failed on prog.c
+#
+# and the object is not written, so the build stops there.  The same
+# store of a GLOBAL array is fine; a separate increment is fine
+# (p[0] = x; p++); and a char * temporary is fine (q = x; *p++ = q).
+# What is not fine is the increment and the aggregate's address in the
+# one store, with and without -O.
+#
+# Found porting inetd, which builds its exec argv with
+#
+#		*p++ = s->arg[j];
+#		...
+#		*p++ = ipstr;
+#
+# ipstr is a local char[18], and the second store took the whole
+# compile down.  The source walks a char * temporary now:
+#
+#		ps = s->arg[j];
+#		*p++ = ps;
+#
+# It was first seen as "av[1 + s->narg] = ..." - a member expression in
+# a subscript - which is the same no-rule failure and the same
+# workaround: compute the index (or assign through a temporary) and the
+# code builds.
+#
+#	#include <types.h>
+#	main()
+#	{
+#		char x[18];
+#		char *av[16];
+#		char **p;
+#
+#		p = av;
+#		*p++ = x;		/* c1 cannot build this store */
+#	}
+#
+# Make x static and it compiles.  Split the increment out and it
+# compiles.  Copy x's address into a char * first and it compiles.
+#
+# The cause was islocdesc().  A bare address operand - SYMREF for a
+# global's base, LOCALVAR or its (iy+d) form INDEX for a frame slot - is
+# a location descriptor, and the store lowering read that as "needs no
+# register, the store rule will read it in place".  That is true when
+# the operand IS the location, and false when it is the VALUE: as a
+# value it reduces to itself and emits nothing, and the store rules
+# ((V,num), (V,A), (V,H), the =(D(..),..) family) name no address form.
+# The tree reached the matcher as ASSIGN(DEREF(HL), INDEX(IY-54)) with
+# nothing to match.
+#
+# Fixed in c1/lower.c with needsspill(): the address forms count as
+# needing a register on the value side, so the existing spill path
+# stages the destination and lets valtohl() form the value in HL.  When
+# the destination is itself a descriptor and needs no staging, the same
+# two forms are materialized with valtohl() where they stand, and the
+# (V,H)/(I,H) store rule writes the result.
+#
+# Checked with this repro and with "*pp = x" (a destination held in a
+# frame slot, value a local array - the same failure by the other
+# branch).  The compiler's own passes (pass0, c0, c1) and cp, tar, sh,
+# make, sed, awk, cpp and df rebuild, and rshd and ftpd - neither of
+# which contains the shape - link to bytes identical to their build
+# before the fix.
+
+# ---------------------------------------------------------------------
 # NOT A MISCOMPILE - a diagnostic that is missing
 #
 # A literal TAB inside a string or character constant is not valid C,
@@ -280,3 +358,100 @@
 #
 # Found porting v7 cal, whose year layout positions the month headings
 # with literal tabs.
+# ---------------------------------------------------------------------
+# 8.  A CAST TO A WIDER TYPE RELABELLED AN ADDRESS IN PLACE   [FIXED 2026-11-03]
+#
+# "(long)p" with p a pointer relabelled the pointer's node as long: the
+# cast code converted plain scalars and left everything else alone, and
+# a pointer was not one of the plain ones.  The tree carried
+#
+#	(ASSIGN:long (LOCALVAR:long IY-4) (REGVAR:long BC))
+#
+# a thirty-two bit value homed in a sixteen-bit register, and c1 had no
+# rule to store it.  Nothing above said the cast had happened; the node
+# was simply relabelled.
+#
+# Found while testing the pointer-conversion diagnostic.  The p = 0 is
+# what matters: it puts the pointer in a register, and a register home
+# is what shows the relabel.  Without it the pointer is loaded and the
+# shape does not arise, which is why this survived.
+#
+#	#include <types.h>
+#	main()
+#	{
+#		char *p;
+#		long l;
+#
+#		p = 0;
+#		l = (long) p;		/* REGVAR:long BC */
+#	}
+#
+# An address is a plain sixteen-bit value for purposes of conversion,
+# and c0/pfx.c now says so: a pointer or array source takes part in a
+# NARROW and in a widening (always WIDEN, never SEXT - a pointer is
+# unsigned), and the width it is compared against is TS_PTR and not an
+# array's extent.  "(char)arr" and "(long)arr" are the same fix seen
+# from the two ends.
+#
+# c1 had to be told the other half: NARROW, WIDEN and SEXT over an
+# (iy+d) or symbol form name registers in their rules, and the address
+# form reduces to itself and emits nothing.  rewrite1() now forms such
+# an operand in HL with valtohl() before the conversion.
+#
+# Checked with the repro, with "(char)arr", "(long)arr" and "(int)p";
+# the kernel, the passes, the libraries and the commands rebuild, and
+# rshd links to the same bytes as before the fix.
+
+# ---------------------------------------------------------------------
+# A POINTER STORED IN A CHAR USED TO GO UNNOTICED
+#
+# "char *p; char a[4]; *p = a;" assigns an address to a char.  c0 kept
+# the assignment (its type was the char) and c1 met a byte store whose
+# value was an array's address and answered "no rule could build code
+# for" - when it got as far as c1 at all.  A char is narrower than an
+# address, so the conversion has no meaning; it should be refused where
+# it is written.
+#
+# c0 now diagnoses it at the assignment:
+#
+#	char c; char *p;
+#	c = p;			/* error: incompatible pointer conversion */
+#
+#	char a[4]; char *p;
+#	*p = a;			/* the same */
+#
+# ER_E_PT's message was "ptr compat" and is now "incompatible pointer
+# conversion" (errorcodes, regenerated into error.h).  The check,
+# ptrassign() in c0/eutil.c, is directional.  An address into an
+# integer at least as wide as one is the K&R address-in-an-int this
+# machine and this tree use; an integer into an address is the
+# signal() SIG_IGN idiom, "slist[SIGTINT] = 1".  Neither is diagnosed.
+# A zero is the null pointer constant wherever it is written, chained
+# assignments included - "i_count = i_mount = 0" was the kernel's case -
+# and a cast states the conversion and is left alone.
+#
+# Two kernel sources had relied on the silence.  sig() read a signal
+# disposition's low byte with "s = u.p->slist[0]" and now says
+# "(UINT8)"; the chained zero in iget() is what zeroval() allows.
+#
+# Not covered: initialization ("char c = p;") and call arguments go
+# through other paths and are still silent.
+# ---------------------------------------------------------------------
+# AN ADDRESS WIDENED TO A LONG IS DIAGNOSED
+#
+# There is no value wider than an address here: the machine is sixteen
+# bits.  Putting an address in a long is therefore a statement about
+# representation that the source chose to make, and it is always worth
+# a second look - the kernel's own instance (dlook() in sys/name.c
+# counting a struct dir * into u.offset, entry 6) was a defect, and the
+# compiler itself has no legitimate use for it.
+#
+# Both forms now warn, at the cast and at the implicit assignment:
+#
+#	char *p; long l;
+#	l = (long) p;		/* warning: address widened ... */
+#	l = p;			/* the same */
+#
+# A conversion through a word, "(long)(UINT)p", states the intent and
+# is not warned about, and same-width conversions - "(int)p", "(char)p"
+# - are not widening and are not either.

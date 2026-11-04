@@ -158,30 +158,42 @@ pfxCast(void)
          * nobody emitted it.
          */
         if (e1) {
-            int srcval, plain;
+            int srcval, srcaddr, plain, srcsize;
 
             /*
              * A cast is a width change only when the source is a
-             * plain value: an address or an aggregate is not shrunk
-             * the same way.  The target may still be a pointer -
-             * sixteen bits on this machine - so "(struct cell *)
-             * (long)" narrows rather than relabels.  Relabelling it
-             * typed the AND underneath as a pointer, the folder's
-             * "x & 0xffff -> x" dropped the mask as word-width, and
-             * objptr() handed the high word over as the pointer.
+             * plain value: an aggregate is not shrunk the same way.
+             * The target may still be a pointer - sixteen bits on
+             * this machine - so "(struct cell *)(long)" narrows
+             * rather than relabels.  Relabelling it typed the AND
+             * underneath as a pointer, the folder's "x & 0xffff -> x"
+             * dropped the mask as word-width, and objptr() handed the
+             * high word over as the pointer.
+             *
+             * An ADDRESS is a plain sixteen-bit value for exactly
+             * that purpose, though: "(long)p" has to widen the word
+             * the address lives in, and "(char)p" has to take its low
+             * byte.  Leaving it out of both conversions relabelled
+             * the pointer node as a long - "(REGVAR:long BC)", a
+             * thirty-two bit value homed in a sixteen-bit register -
+             * and c1 had no rule for the store that followed.
              */
+            srcaddr = e1->type &&
+                (e1->type->flags & (TF_POINTER | TF_ARRAY)) != 0 &&
+                !(e1->flags & E_CONST);
             srcval = e1->type && tp &&
                 !(e1->type->flags & (TF_POINTER | TF_ARRAY | TF_FUNC |
                                      TF_AGGREGATE)) &&
                 !(e1->flags & E_CONST);
-            plain = srcval &&
+            srcsize = srcaddr ? TS_PTR : (e1->type ? e1->type->size : 0);
+            plain = (srcval || srcaddr) &&
                 !(tp->flags & (TF_POINTER | TF_ARRAY | TF_FUNC |
                                TF_AGGREGATE));
 
-            if (srcval && tp->size < e1->type->size) {
+            if ((srcval || srcaddr) && tp->size < srcsize) {
                 e = mkexpr(NARROW, e1);
                 e->type = tp;
-            } else if (plain && tp->size > e1->type->size) {
+            } else if (plain && tp->size > srcsize) {
                 /*
                  * And the other direction, which is the same
                  * mistake read the other way: relabelling a byte
@@ -191,8 +203,24 @@ pfxCast(void)
                  * sign-extends and an unsigned one zero-extends,
                  * and the instructions differ.
                  */
-                e = mkexpr((e1->type->flags & TF_UNSIGNED) ?
-                    WIDEN : SEXT, e1);
+                /*
+                 * A pointer is unsigned, whatever its type flags say:
+                 * sign-extending an address at 0x8000 would put ff in
+                 * the high half.
+                 */
+                /*
+                 * An address in a wider integer is not a value the
+                 * machine has; it is a decision the source made.
+                 * Worth hearing about: the one place the kernel did
+                 * it (dlook() counting a struct dir * into a long
+                 * offset) was a defect, and the compiler itself has
+                 * no legitimate use for it.
+                 */
+                if (srcaddr)
+                    warn("address widened to an integer wider than"
+                         " an address");
+                e = mkexpr((srcaddr ||
+                    (e1->type->flags & TF_UNSIGNED)) ? WIDEN : SEXT, e1);
                 e->type = tp;
             } else {
                 /*

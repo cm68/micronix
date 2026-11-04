@@ -78,7 +78,7 @@ ER_E_FA		bad fn args
 ER_E_UO		bad op
 ER_E_UD		undefined symbol
 ER_E_CF		no fold
-ER_E_PT		ptr compat
+ER_E_PT		incompatible pointer conversion
 ER_E_AG		struct value
 ER_E_RA		addr of register
 
