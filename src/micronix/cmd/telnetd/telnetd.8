@@ -1,0 +1,73 @@
+.he "telnetd (8)                   11/03/26                    telnetd (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+telnetd
+- the telnet server
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+/bin/telnetd [ port ]
+.br
+/bin/telnetd -i <peer> <pid>
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Telnetd serves one login per connection.  It puts /bin/login on a pty
+slave and shuttles bytes between the master and the connection, so the
+account and password are asked on the pty and the shell that follows
+has its terminal, its line discipline and its job control.
+.sp
+The telnet protocol is filtered at both ends: IAC sequences from the
+client are taken out of the byte stream (IAC IAC is a literal 255), and
+a literal 255 from the pty is doubled on the way out.  Option
+negotiation is refused - WILL is answered DONT and DO is answered
+WONT - which leaves the terminal in plain NVT mode.  Subnegotiations
+are skipped.
+.sp
+The port defaults to 23; the command-line port exists for the
+simulator, which binds a high host port for the guest.  Under inetd
+the connection is already on fd 0 and the arguments are the caller's
+dotted quad and inetd's pid.
+.sp
+The daemon serves one request per process when run by inetd, and forks
+a child per connection when it owns the listener.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/ptyp0, /dev/ttyp0	the first pty pair
+.br
+/dev/ptyp1, /dev/ttyp1	the second
+.br
+/bin/login	the login program
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+telnet (1), inetd (8), login (1), getty (8)
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+There is no terminal-type negotiation, so the remote termcap entry is
+the caller's business.  Every option is refused rather than
+negotiated.

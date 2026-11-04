@@ -53,7 +53,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = sys
+DIRS = sys netinet
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \
@@ -70,7 +70,7 @@ NOWARN	 = --warning=no-ignore-newer
 CCCOWNED = cpm.h errno.h hitech.h setjmp.h stdio.h time.h
 HDRS	   = 8080.h alloc.h bios.h cpm.h crypt.h dirent.h dtab.h dump.h \
 	 errno.h fio.h fslib.h grp.h hitech.h mtab.h obj.h pascal.h pwd.h \
-	 setjmp.h std.h stdio.h time.h types.h utmp.h
+	 netdb.h setjmp.h std.h stdio.h time.h types.h utmp.h
 OURS	 = $(filter-out $(CCCOWNED),$(HDRS))
 
 #

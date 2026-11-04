@@ -49,7 +49,9 @@ stdin/stdout, so the client and the server both use fd 0; the pty is for
 an interactive login only.  The stream is a sequence of pieces, each of
 which the receiver acknowledges with one NUL byte:
 
-The source opens with a NUL, then a piece per directory entry:
+The rshd answers a successful request with one NUL byte (RFC 1282);
+that byte is the stream's opening NUL, and the receiver acks it.  The
+source then sends a piece per directory entry:
 
     D<mode> <size> <name>\n         a directory (size is 0); ack it
     C<mode> <size> <name>\n         a file; ack the header, then it sends
@@ -92,7 +94,8 @@ where its terminal is cooked.
 
 ## Deferred
 
-`-p` time preservation (the source's `T` nanoseconds, ignored here) and
-the stderr back-channel (the request's first field, kept `0`).  Nothing
-here sends a password, and nothing keeps the connection for anything but
-the one copy.
+`-p` time preservation (the source's `T` nanoseconds, ignored here).  The
+stderr back-channel is left unused: `0` in the request's first field, so
+rshd keeps the command's stderr on the connection, and rcp's server
+halves send and receive on fd 0 alone.  Nothing here sends a password,
+and nothing keeps the connection for anything but the one copy.

@@ -530,7 +530,8 @@ server_fetch(args, nargs)
     fd = 0;
     rawmode();
     signal(SIGALRM, onalarm);
-    if (send_bytes("\0", 1) < 0 || rx_exact(rbuf, 1) < 0)
+    /* rshd's reply NUL is the opening byte; the client acks it */
+    if (rx_exact(rbuf, 1) < 0)
         return (1);
     for (i = 0; i < nargs; i++)
         if (send_tree(args[i]) < 0)
@@ -545,8 +546,7 @@ server_sink(dest)
     fd = 0;
     rawmode();
     signal(SIGALRM, onalarm);
-    if (send_bytes("\0", 1) < 0)
-        return (1);
+    /* rshd's reply NUL is the opening byte; nothing to send here */
     recv_all(dest, isdirpath(dest));
     return (0);
 }
@@ -706,13 +706,15 @@ client(args, nargs)
     send_bytes(req, n);
 
     if (get) {
-        /* the source sends a NUL first, then D/C/E pieces, and closes at
-         * the end; ack each piece, the C header and its data too */
+        /* rshd's reply NUL opens the stream; ack it, then D/C/E pieces
+         * follow and the source closes at the end; ack each piece, the
+         * C header and its data too */
         rx_exact(rbuf, 1);
         send_bytes("\0", 1);    /* ack the opening NUL */
         recv_all(dest, isdir);
     } else {
-        /* the sink sends a NUL first; the remote -t places by basename */
+        /* rshd's reply NUL opens the stream; the remote -t places by
+         * basename */
         rx_exact(rbuf, 1);
         for (j = 0; j < nsrc; j++)
             if (send_tree(args[j]) < 0)

@@ -16,11 +16,12 @@ MAN	= rshd.8
 MANDIR	= /usr/man/man8
 PROG	= rshd
 OBJS	= rshd.o
+LIBS	= /lib/libsocket.a
 
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
 
 install: $(PROG)
 	mkdir -p $(BIN)

@@ -271,7 +271,7 @@ nic_close(unsigned char s)
             int r;
 
             r = send(socks[s].fd, socks[s].txbuf, socks[s].txlen,
-                     MSG_DONTWAIT);
+                     MSG_DONTWAIT | MSG_NOSIGNAL);
             if (r > 0) {
                 if (r == socks[s].txlen)
                     socks[s].txlen = 0;
@@ -467,7 +467,12 @@ nic_send(unsigned char s, const unsigned char *p, int len)
         push_ack(s, E_NO_MEMORY);   /* a backlog is still draining */
         return;
     }
-    r = send(socks[s].fd, p, len, MSG_DONTWAIT);
+    /*
+     * MSG_NOSIGNAL: a guest writing to a client that has gone must see
+     * the error, not have SIGPIPE kill the simulator.  EPIPE below
+     * becomes the card's closed status.
+     */
+    r = send(socks[s].fd, p, len, MSG_DONTWAIT | MSG_NOSIGNAL);
     if (r == len) {
         push_ack(s, 0);
         return;
@@ -504,6 +509,16 @@ nic_recv(unsigned char s, int cap)
         push_ack(s, E_AGAIN);
         return;
     }
+    /*
+     * The peer has already gone.  The slot is still the guest's: it
+     * stays S_TCP_OPEN with no host fd until CLOSE, so ACCEPT cannot
+     * hand the same slot to a new connection the guest still believes
+     * it holds.
+     */
+    if (socks[s].fd < 0) {
+        push_ack(s, E_CLOSED);
+        return;
+    }
     if (cap <= 0 || cap > MAXPAY)
         cap = MAXPAY;
     r = recv(socks[s].fd, buf, cap, MSG_DONTWAIT);
@@ -515,7 +530,8 @@ nic_recv(unsigned char s, int cap)
     if (r == 0) {                       /* the peer closed cleanly */
         close(socks[s].fd);
         socks[s].fd = -1;
-        socks[s].state = S_CLOSED;
+        socks[s].notified = 0;
+        push_event(s, EV_CLOSED);
         push_ack(s, E_CLOSED);
         return;
     }
@@ -525,7 +541,8 @@ nic_recv(unsigned char s, int cap)
     }
     close(socks[s].fd);
     socks[s].fd = -1;
-    socks[s].state = S_CLOSED;
+    socks[s].notified = 0;
+    push_event(s, EV_RESET);
     push_ack(s, E_CLOSED);
 }
 
@@ -622,6 +639,9 @@ nic_sockstat(void)
 
         if (socks[i].state != S_TCP_LISTEN && socks[i].state != S_TCP_OPEN)
             continue;
+        if (socks[i].state == S_TCP_OPEN && socks[i].fd < 0)
+            continue;           /* the peer is gone; the guest has yet to
+                                 * reap the slot with CLOSE */
         lport = socks[i].lport;
         rport = socks[i].rport;
         memset(tab + n + 3, 0, 4);
@@ -837,7 +857,7 @@ nic_poll(void)
         } else if (socks[s].state == S_TCP_OPEN || socks[s].state == S_UDP) {
             if (rev & POLLOUT && socks[s].txlen > 0) {
                 int r = send(socks[s].fd, socks[s].txbuf, socks[s].txlen,
-                             MSG_DONTWAIT);
+                             MSG_DONTWAIT | MSG_NOSIGNAL);
 
                 if (r > 0) {
                     if (r == socks[s].txlen)

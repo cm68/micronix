@@ -42,6 +42,17 @@ card's connected event carries the peer's dotted quad.  Root is never
 trusted through hosts.equiv, only through its own .rhosts.  There is no
 password and no encryption.
 .sp
+The daemon then answers the request as RFC 1282 does: one NUL byte when
+the caller is trusted, or a byte of value 1 and a message when it is
+not.  A client reads that byte before the command's output, so a server
+that stays silent fails the client even when the command would run.
+.sp
+The request's first field is the client's stderr port.  When it is not
+zero the daemon connects back to that port at the address the request
+came from, and the command's standard error goes there; a classic
+client blocks until that connection arrives.  A zero field (rcp) leaves
+standard error on the connection itself.
+.sp
 A request with a command runs it with the connection itself as its
 standard input, output and error: the login shell's sh -c starts on the
 socket, no pty is spent, and the session child forks it and waits so the
@@ -85,14 +96,14 @@ FILES
 SEE ALSO
 .in +5
 .br
-rcp (1), netstat (1), sys/NET.md
+rcp (1), rlogind (8), netstat (1), sys/NET.md
 .sp 2
 .in -5
 .bd
 BUGS
 .in +5
 .br
-There is no stderr back-channel: the request's first field is ignored
-and a command's standard error is the same connection as its output.
 The authentication is by address, and the request carries the user
-names in clear.
+names in clear.  The stderr back-channel is connected from an ephemeral
+source port, not the daemon's own port, so a client that checks it the
+classic way would refuse the channel.

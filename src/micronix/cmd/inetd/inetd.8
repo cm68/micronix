@@ -1,0 +1,87 @@
+.he "inetd (8)                      11/03/26                     inetd (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+inetd
+- the internet superserver
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+/bin/inetd
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Inetd reads /etc/inetd.conf, opens one socket per service on the
+network card (sys/NET.md), binds its port, arms the listener and
+selects over the descriptors.  A service that is not being used costs
+no process, which is the point: the card has one listening socket per
+service whether or not a daemon waits on it.
+.sp
+A line is
+.sp
+.nf
+.in +4
+<port> <program> [args...]
+.in -4
+.fi
+.sp
+and '#' starts a comment.  A blank line and a line starting with #
+are skipped.  The port is the config's, not the protocol's: 514 and
+513 on real hardware, anything high under d1, which binds the guest's
+port number on the host.
+.sp
+When a listener is ready the connection is accepted on a duplicate, so
+the listener keeps its descriptor, and the service is forked with the
+connection on standard input, output and error.  inetd appends three
+arguments to the program: -i, the caller's dotted quad, and inetd's
+pid.  The program takes the connection on fd 0, calls no open, bind or
+accept of its own, and kills the pid when it is done.  That is how this
+process reaps: the kernel has no SIGCHLD, so a finished service stops
+the parent and the next pass calls wait.  A program that exits without
+the kill leaves a zombie until the process table fills.
+.sp
+The listener is armed once with NETLISTEN, which no longer blocks: the
+card keeps it armed and an ACCEPT reopens it after taking a connection.
+A wake that was another socket's frame is an EAGAIN and costs no child.
+.sp
+The card has eight sockets, and every listener holds one for the life
+of this process.  A command session on rshd holds two more (its
+connection and the stderr back-channel), a login one.  Keep the file to
+the services that are actually run.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/net0	the card's socket clone
+.br
+/etc/inetd.conf	the service table
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rshd (8), rlogind (8), sys/NET.md
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+There is no re-exec on SIGHUP, no wait/nowait or socket-type field,
+and no per-service user: every program runs as root, the account inetd
+was started as.

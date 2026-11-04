@@ -204,10 +204,12 @@ descriptor is the socket for everything after the open:
 
     read(fd, buf, n)        pull this socket's bytes
     write(fd, buf, n)       send on this socket
-    ioctl(fd, NETLISTEN, 0) blocking: returns when a connection waits
+    ioctl(fd, NETLISTEN, 0) arm the listener and return; the card keeps
+                            it armed, and a parked connection sets the
+                            socket's ready bit for select(2)
     ioctl(fd, NETACCEPT, &peer)
-                            takes it; the descriptor becomes the
-                            connection and the same fd number is used
+                            take the parked connection; the descriptor
+                            becomes it and the same fd number is used
     ioctl(fd, NETBIND, &port), ioctl(fd, NETCONNECT, &addr)
     ioctl(fd, NETCARD, &req)
                             one card-level request (JOIN, GETCONF,
@@ -217,8 +219,12 @@ The request codes and the two structures are in `include/sys/net.h`.
 `read` and `write` move at most 128 bytes a call and report end of file
 as 0; `read` returns `EAGAIN` when the selector woke for another socket's
 event, so `select(2)` is the wait (and an alarm bounds it when the card
-has no interrupt line).  The card and the driver never share a pushed
-frame stream, which is what makes concurrent sessions safe.
+has no interrupt line).  A listener is armed once: `ACCEPT` reopens it on
+the card after taking a connection, and an `ACCEPT` that finds nothing
+parked returns `EAGAIN`, which is a frame for some other socket.  That is
+what lets one process (inetd) select over several listeners.  The card
+and the driver never share a pushed frame stream, which is what makes
+concurrent sessions safe.
 
 ## 9. The three implementations
 

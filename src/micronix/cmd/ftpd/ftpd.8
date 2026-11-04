@@ -1,0 +1,60 @@
+.he "ftpd (8)                      11/03/26                      ftpd (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+ftpd
+- the file transfer server
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+/bin/ftpd [ port ]
+.br
+/bin/ftpd -i <peer> <pid>
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Ftpd serves one control connection per process.  The caller signs in
+with USER and PASS; the machine's accounts are its own business, and
+this server accepts the pair and runs the file operations as the user
+ftpd was started as.
+.sp
+Data connections are passive: PASV opens a listener on a port above
+20000 and the reply names it.  LIST and NLST send the directory's
+names, RETR sends a file, STOR receives one, and each closes the data
+connection and answers 226.  PORT is refused - a client may not name a
+listening socket here.
+.sp
+The other commands are QUIT, SYST, PWD, CWD, CDUP, TYPE, MODE, STRU,
+NOOP and ABOR.
+.sp
+The port defaults to 21; the command-line port exists for the
+simulator, which binds a high host port for the guest.  Under inetd
+the connection is already on fd 0 and the arguments are the caller's
+dotted quad and inetd's pid.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+ftp (1), inetd (8), socket (3)
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+The password is not checked, the listing is bare names, and PASS/ACCT
+and the ASCII transfer type do not change what the bytes are.

@@ -10,7 +10,7 @@
 #
 # vim: tabstop=4 shiftwidth=4 noexpandtab:
 
-DIRS = libunix libc libutil libccc fslib
+DIRS = libunix libc libsocket libutil libccc fslib
 
 RECURSE = @for d in $(DIRS) ; do \
 		( cd $$d && $(MAKE) $@ ) || exit 1 ; \

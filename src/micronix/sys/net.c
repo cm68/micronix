@@ -478,8 +478,8 @@ netread(dev)
     if (evcode[slot] == N_EV_CLOSED || evcode[slot] == N_EV_RESET) {
         evcode[slot] = 0;
         netready[slot] = 0;
-        u.count = 0;            /* end of file */
-        return;
+        return;                 /* end of file: u.count stays the request,
+                                 * so iread() answers 0 bytes */
     }
     if (u.count == 0)
         return;
@@ -493,8 +493,7 @@ netread(dev)
         netlockoff();
         evcode[slot] = 0;
         netready[slot] = 0;
-        u.count = 0;
-        return;
+        return;                 /* end of file, as above */
     }
     if (netcmd(NET_OP_RECV, slot, p, 2, &rt, &rs, netbuf, cap, &n) < 0) {
         netlockoff();
@@ -511,8 +510,8 @@ netread(dev)
             u.error = EAGAIN;
             netready[slot] = 0;
         } else if (st == N_CLOSED_E) {
-            netready[slot] = 0;
-            u.count = 0;        /* end of file */
+            netready[slot] = 0; /* end of file: leave u.count at the
+                                 * request, so iread() answers 0 */
         } else {
             u.error = EIO;
         }
@@ -592,19 +591,6 @@ waitconnect(slot)
     return (0);
 }
 
-static
-INT16
-waitlisten(slot)
-    INT16 slot;
-{
-    if (pend[slot] && !delivered[slot]) {
-        delivered[slot] = 1;
-        netready[slot] = 0;
-        return (1);
-    }
-    return (0);
-}
-
 /*
  * Requests on the socket this descriptor names.  The descriptor is the
  * socket, so no request carries a socket number; the request code says
@@ -654,11 +640,17 @@ netioctl(dev, cmd, arg)
         return (0);
 
     case NETLISTEN:
+        /*
+         * Arm the listener and return.  The card keeps it armed until
+         * a connection is parked, and ACCEPT reopens it after taking
+         * one, so a server calls this once and selects on the
+         * descriptor; readiness is the CONNECTED event netstash keeps
+         * for this socket.
+         */
         if (netcall(N_LISTEN, slot, (UINT8 *) 0, 0) != 0) {
             u.error = EIO;
             return (-1);
         }
-        netawait(waitlisten, slot);
         return (0);
 
     case NETACCEPT:

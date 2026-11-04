@@ -17,10 +17,18 @@
  *
  *	ioctl(fd, NETBIND, &port)	port[2] network order
  *	ioctl(fd, NETCONNECT, &addr)	ip[4], port[2] network order
- *	ioctl(fd, NETLISTEN, 0)		blocks until a connection waits
- *	ioctl(fd, NETACCEPT, 0)		takes it; the descriptor becomes it
+ *	ioctl(fd, NETLISTEN, 0)		arm the listener and return
+ *	ioctl(fd, NETACCEPT, &peer)	take a parked connection; the
+ *					descriptor becomes it
  *	ioctl(fd, NETCARD, &card)	one card-level request (JOIN,
  *					GETCONF, SETCONF, the socket table)
+ *
+ * LISTEN does not wait: the card keeps the listener armed and pushes a
+ * CONNECTED event when a connection is parked, which sets the socket's
+ * ready bit for select(2).  A server therefore calls LISTEN once and
+ * selects on the descriptor; ACCEPT then takes the connection, and
+ * EAGAIN means another socket's frame woke the selector.  ACCEPT
+ * reopens the listener on the card, so there is nothing to re-arm.
  *
  * The card never pushes data.  It pushes an event when a socket has
  * something and the guest pulls the bytes with RECV - the driver asks

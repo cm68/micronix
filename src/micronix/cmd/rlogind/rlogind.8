@@ -1,0 +1,102 @@
+.he "rlogind (8)                     11/03/26                   rlogind (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+rlogind
+- the remote login server
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd 2
+/bin/rlogind [ port ]
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Rlogind listens on a tcp socket and serves the rlogin request over the
+network card (sys/NET.md).  The port defaults to 513; the command-line
+port exists for the simulator, which binds a high host port for the
+guest.
+.sp
+Each connection is one request:
+.sp
+.nf
+.in +4
+<empty> NUL <luser> NUL <ruser> NUL <term>/<speed> NUL
+.in -4
+.fi
+.sp
+The first field is the client's separate terminal type when it sends
+one and is empty otherwise; the terminal type and speed ride in the
+fourth as <term>/<speed>, with any further arguments after more
+slashes.  This daemon reads the two user names and ignores the terminal.
+.sp
+The caller is checked against /etc/hosts.equiv and the remote user's
+~/.rhosts (/.rhosts for an account whose home is /), by address: the
+card's connected event carries the peer's dotted quad.  Root is never
+trusted through hosts.equiv, only through its own .rhosts.  There is no
+password and no encryption, so an untrusted caller is refused rather
+than asked to log in.
+.sp
+A trusted request is answered with one NUL byte, as RFC 1282 does, or
+with a byte of value 1 and a message when it is refused.  Everything
+after that byte is the terminal.  The daemon puts a login shell on a
+pty slave and shuttles bytes between the master and the connection,
+which gives the shell its terminal, its line discipline and its job
+control.  There are two pairs, /dev/ptyp0 with /dev/ttyp0 and
+/dev/ptyp1 with /dev/ttyp1; a session claims one by trying each and the
+driver refuses a pair another session holds.  If both pairs are held
+the connection is closed.
+.sp
+There is no command form.  Running a command is rshd (8)'s business:
+rsh (1) with a command speaks the rsh request, and with no command it
+execs rlogin, which is this protocol.  The window-size negotiation the
+classic daemon offers is not done here.
+.sp
+The daemon forks a child per request.  The parent keeps the listener:
+LISTEN returns when the card has a connection parked - its one pending
+slot - and ACCEPT hands the child the connected socket while the parent
+goes back to listening, so two sessions run at once.  A finished child
+sends the parent SIGTERM and is reaped on the next pass; a one-second
+alarm bounds the wait for a card with no interrupt line.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/net0	the card's socket clone
+.br
+/dev/ptyp0, /dev/ttyp0	the first pty pair
+.br
+/dev/ptyp1, /dev/ttyp1	the second
+.br
+/etc/hosts.equiv	hosts trusted for ordinary users
+.br
+~/.rhosts	hosts and users trusted for this account
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+rlogin (1), rshd (8), rsh (1), sys/NET.md
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+The authentication is by address, and the request carries the user
+names in clear.  The terminal type and window size are ignored, so the
+guest's idea of the screen is whatever its pty driver defaults to.

@@ -1,0 +1,88 @@
+.he "socket (3)                   11/03/26                     socket (3)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+SUBROUTINE(S)
+.in +5
+.br
+.bd
+socket, bind, listen, accept, connect, getpeername, getsockname,
+setsockopt, shutdown, inet_addr, inet_ntoa, htons, ntohs, htonl, ntohl
+- BSD sockets over the network card
+.sp 2
+.in -5
+.bd
+C
+.in +5
+.br
+.bd
+#include <sys/socket.h>
+.br
+int socket(int domain, int type, int protocol);
+.br
+int bind(int s, struct sockaddr *addr, int addrlen);
+.br
+int listen(int s, int backlog);
+.br
+int accept(int s, struct sockaddr *addr, int *addrlen);
+.br
+int connect(int s, struct sockaddr *addr, int addrlen);
+.br
+int getpeername(int s, struct sockaddr *addr, int *addrlen);
+.br
+int getsockname(int s, struct sockaddr *addr, int *addrlen);
+.br
+int setsockopt(int s, int level, int name, char *val, int len);
+.br
+int shutdown(int s, int how);
+.br
+int net_join(int s);
+.br
+UINT32 inet_addr(char *cp);
+.br
+char *inet_ntoa(struct in_addr *in);
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+The card's clone node (/dev/net0, sys/NET.md) is a TCP socket.  Socket
+opens it; bind, listen, connect and accept are the driver's ioctls;
+read and write move the bytes.  There is no fd_set layer: select (2)
+takes the descriptor mask it always has.
+.sp
+The calls are IPv4 and TCP only.  The card parks one connection per
+listener and refuses further connections until it is accepted; it has
+no half-close, no options and no name store.  shutdown and setsockopt
+succeed and do nothing.  getpeername and getsockname answer from what
+bind, connect and accept recorded in this process, not from the card.
+.sp
+accept returns a new descriptor and the listener keeps its own: the
+library duplicates the listener and the driver turns the duplicate
+into the connection.
+.sp
+inet_ntoa takes a pointer to the address, not the address by value:
+this compiler will not pass a structure as a call argument.
+
+.HEADING net_join
+net_join is not a socket call.  One call puts the card on its network
+for every socket the process holds (N_JOIN, sys/NET.md); a daemon does
+it once, on one of its sockets, before binding.
+.sp 2
+.in -5
+.bd
+DIAGNOSTICS
+.in +5
+.br
+-1 with errno set, as the calls always have.  v6 has no ENOTSOCK,
+ENOTCONN or EAFNOSUPPORT, so the unsuitable domain, type and absent
+peer name all answer EINVAL.
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+select (2), sys/NET.md, inetd (8), rshd (8)
