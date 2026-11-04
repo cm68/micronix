@@ -15,6 +15,7 @@
 #
 # The layout (include/sys/sys.h, sys/GNUmakefile):
 #
+#   freed low bss           0x260 (uhdr.s) up to _trapad 0x400
 #   resident text/data/bss  0x1000 up to _ebss
 #   highmem.o               parked at _ebss, may run to OVLBASE
 #   buffer headers          _ebss (blist+8) up to SCRWIN
@@ -76,6 +77,28 @@ blist=$(sym _blist)
 ebss=$(( 0x$ebss ))
 blist=$(( 0x$blist ))
 
+# freed low memory: the block the boot leaves in page 0, from _lowbss to
+# the last byte the kernel publishes, against the board's registers at
+# _trapad.  The symbols are absolute values from uhdr.s.
+lowbss=$(sym _lowbss)
+nmtab=$(sym _nmtab)
+nbufs=$(sym _nbufs)
+trapad=$(sym _trapad)
+[ -n "$lowbss" ] || die "no _lowbss in $image"
+[ -n "$nbufs" ] || die "no _nbufs in $image"
+[ -n "$trapad" ] || die "no _trapad in $image"
+lowbss=$(( 0x$lowbss ))
+trapad=$(( 0x$trapad ))
+lowend=$(( 0x$nbufs + 1 ))
+if [ -n "$nmtab" ]; then
+	nmtab=$(( 0x$nmtab ))
+	if [ $(( nmtab + 1 )) -gt "$lowend" ]; then
+		lowend=$(( nmtab + 1 ))
+	fi
+fi
+lowused=$(( lowend - lowbss ))
+lowfree=$(( trapad - lowend ))
+
 # sizeof(struct buf): compile the one expression, and cross-check it
 # against what textpad.s reserved for blist's 8 boot headers.
 hsz=
@@ -120,6 +143,10 @@ segments=$(( 1 + (nnew + 7) / 8 ))
 spare=$(( room - nnew * hsz ))
 
 printf 'kernel memory budget: %s\n' "$image"
+printf '\n'
+printf 'low 1k      %-8s %s-%s  %6d\n' "firmware" "$(hex 0)" "$(hex "$lowbss")" "$lowbss"
+printf '            %-8s %s-%s  %6d  _trapad %s, %d free\n' "kernel" \
+	"$(hex "$lowbss")" "$(hex "$lowend")" "$lowused" "$(hex "$trapad")" "$lowfree"
 printf '\n'
 printf 'resident    text   %s-%s  %6d\n' "$(hex "$toff")" "$(hex $(( toff + lt )))" "$lt"
 printf '            data   %s-%s  %6d\n' "$(hex "$doff")" "$(hex "$dataend")" "$ld"
@@ -176,4 +203,8 @@ fi
 if [ "$bssend" -ne "$ebss" ]; then
 	printf '\nwarning: low.o data+bss ends at %s, _ebss says %s.\n' \
 		"$(hex "$bssend")" "$(hex "$ebss")"
+fi
+if [ "$lowend" -gt "$trapad" ]; then
+	printf '\nwarning: the freed low memory ends at %s, past _trapad %s.\n' \
+		"$(hex "$lowend")" "$(hex "$trapad")"
 fi

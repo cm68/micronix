@@ -138,7 +138,8 @@ struct
 #define SEPERATOR	"  "    /* between entries */
 #define NOTTY		"    "  /* for procs without a tty */
 
-#define MEMORY		"/dev/mem"      /* memory device */
+#define KMEM		"/dev/kmem"     /* the kernel's own address space */
+#define MEM		"/dev/mem"      /* physical: a process's u page */
 
 /*
  * Satisfy the definitions of u and plist (proc.h)
@@ -189,27 +190,35 @@ init(ac, av)
 
 ps()
 {
-    static int mem, addr;
+    static int kmem, mem, addr;
     static struct proc *p, *ptab;
     static UINT uoff;           /* the u structure's offset in its page */
     struct tty tty;
     char *tname;
 
-    if ((mem = open(MEMORY, O_RDONLY)) < 0 || seek(mem, 0x1003, 0) < 0      /* pointer
-                                                                             * to
-                                                                             * process
-                                                                             * table
-                                                                             */
-        || read(mem, &ptab, sizeof ptab) != sizeof ptab)
-        fail();
+    if ((kmem = open(KMEM, O_RDONLY)) < 0 || seek(kmem, 0x1003, 0) < 0    /* pointer
+                                                                           * to
+                                                                           * process
+                                                                           * table
+                                                                           */
+        || read(kmem, &ptab, sizeof ptab) != sizeof ptab)
+        fail(KMEM);
 
     /* and the hook that says where u sits in the u page */
-    if (seek(mem, 0x1007, 0) < 0 || read(mem, &uoff, sizeof uoff) != sizeof uoff)
-        fail();
+    if (seek(kmem, 0x1007, 0) < 0 || read(kmem, &uoff, sizeof uoff) != sizeof uoff)
+        fail(KMEM);
     uoff &= 0x0fff;
 
-    seek(mem, ptab, 0);
-    read(mem, plist, sizeof plist);
+    /*
+     * A process's u page is named by physical segment, not by an address
+     * in the kernel's map, so it is read through /dev/mem; the tables
+     * above are kernel addresses and come through /dev/kmem.
+     */
+    if ((mem = open(MEM, O_RDONLY)) < 0)
+        fail(MEM);
+
+    seek(kmem, ptab, 0);
+    read(kmem, plist, sizeof plist);
 
     heading();
 
@@ -226,10 +235,10 @@ ps()
          */
 
         if (p->tty) {           /* proc. assoc. with terminal */
-            if (seek(mem, p->tty, 0) < 0)
-                fail();
-            if (read(mem, &tty, sizeof tty) != sizeof tty)
-                fail();
+            if (seek(kmem, p->tty, 0) < 0)
+                fail(KMEM);
+            if (read(kmem, &tty, sizeof tty) != sizeof tty)
+                fail(KMEM);
             if (myterm != tty.dev && !aflag)
                 continue;       /* not my terminal */
             tname = ttyname(tty.dev);
@@ -359,9 +368,10 @@ heading()
     printf("\n");
 }
 
-fail()
+fail(name)
+    char *name;
 {
-    perror(MEMORY);
+    perror(name);
     exit(0);
 }
 

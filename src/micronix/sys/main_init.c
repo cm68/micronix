@@ -117,7 +117,7 @@ main()
 
     cus();                      /* custom hardware */
     zero(lowbss, 416);          /* clear the freed low-memory bss */
-    nmtab = NMOUNT;             /* publish the mount table's size, 0x3ea */
+    nmtab = NMOUNT;             /* publish the mount table's size, 0x30a */
     enable();                   /* enable interrupts */
     plogo();
     pinit();                    /* plist, see below */
@@ -449,15 +449,15 @@ pcon()
  * Memory runs up from segment 16 with no gap in it, so the first page
  * that is not there is where the machine ends and there is nothing above
  * it to ask about.  The probe stops on that page and the rest of the
- * window is marked used, not left free: segalloc() reads segmap[n] as
+ * window is marked used, not left free: segalloc() reads its bit as
  * "in use" (the map is reused for allocation once this is done), and a
  * segment past the end of memory left looking free is one it can hand
  * out - which aliases real memory onto open bus, 0xff reads, and a
  * system that behaves as though the block it read was the block it
  * asked for.
  *
- * Set nsegs to the number of 4K segments, and set segmap[n] to 1 if the
- * nth segment is missing.
+ * Set nsegs to the number of 4K segments, and set the nth segment's bit
+ * in segmap if it is missing.
  */
 void
 meminit()
@@ -474,7 +474,7 @@ meminit()
             break;
     }
     for (; n < MAXSEG; n++) {
-        segmap[n] = 1;
+        segmap[SEGBYTE(n)] |= segbit[n & 7];
         nsegs--;
     }
     map0[2] = 1;                /* seg 1 -> page 1, back to identity */

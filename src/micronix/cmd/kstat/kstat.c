@@ -13,7 +13,7 @@
  * /micronix - the same object file the boot loader loads.  Each table is
  * then read out of /dev/mem at the address its symbol gives.  The two
  * sizes are not symbols at all: the kernel publishes NMOUNT and the
- * buffer count as bytes at fixed low addresses, 0x3ea and 0x3eb
+ * buffer count as bytes at fixed low addresses, 0x30a and 0x30b
  * (sys/uhdr.s), so this program reports the kernel's sizes without
  * having to be rebuilt when either changes.
  *
@@ -336,7 +336,7 @@ dump_mount(addr)
 	int i;
 	unsigned ba;
 
-	/* the kernel publishes its NMOUNT at 0x3ea, see sys/uhdr.s */
+	/* the kernel publishes its NMOUNT at 0x30a, see sys/uhdr.s */
 	kread(NMTAB_ADDR, (char *)&nm, 1);
 	printf("\n== mount table (_mlist @ 0x%x, %u x %d) ==\n",
 	    addr, nm, sizeof(struct mount));

@@ -64,7 +64,7 @@ MODS	= dj mw ide ncr hdca net disk1 disk2 disk3 pty tty mem io
 # the only price of carrying one is its 4K in the image, and a card that
 # is not in the machine spends nothing.
 GENERATED = build.h unix.link $(MODS:%=%.mod) $(MODS:%=%.page) \
-	$(MODS:%=%.o) $(MODS:%=%hdr.o) \
+	$(MODS:%=%.o) $(MODS:%=%hdr.o) phys.o \
 	pic.o pic_init.o picdata.o probe.o probe_init.o \
 	ss1_clock.o ss1clk_init.o upd1990_init.o
 
@@ -182,7 +182,7 @@ $(KERNEL_C) $(WIN_C) $(HIGHMEM_C_OBJ) user.o \
 	ttysys.o multio.o ss1_uartleaf.o: %.o: %.c
 	$(CCC) $(CCFLAGS) $(INC) -c $<
 
-$(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
+$(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ) phys.o: %.o: %.s
 	$(CCC) $(CCFLAGS) -c $<
 
 # The PIC topology is discovered at boot, not compiled in.
@@ -213,7 +213,7 @@ CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
 ASSRCS	= csv.s idiv.s imul.s inits.s inout.s intrpt.s mem.s mio.s oarg.s \
 	 ovlslot.s qadd.s qand.s qcmp.s qinc.s qldst.s qmul.s qor.s qsar.s \
 	 qshl.s qshr.s qsub.s slavevec.s sub8.s swdisp.s swdispw.s textpad.s \
-	 tramp.s uhdr.s unbcd.s unixtobcd.s
+	 tramp.s phys.s uhdr.s unbcd.s unixtobcd.s
 
 include $(DEPTH)/GNUmakefile.inc
 
@@ -508,11 +508,13 @@ $(filter-out mem.mod io.mod pty.mod tty.mod,$(MODS:%=%.mod)): %.mod: %hdr.o %.o 
 # The memory and ports cdevs are the same driver (sys/memdev.c).  Each
 # carries its own copy of it: a page is linked at OVLBASE and a module
 # cannot name another module, so the two pages are independent.
-mem.mod: memhdr.o memdev.o unix.link
-	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ memhdr.o memdev.o
+mem.mod: memhdr.o memdev.o phys.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
+		memhdr.o memdev.o phys.o
 
-io.mod: iohdr.o memdev.o unix.link
-	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ iohdr.o memdev.o
+io.mod: iohdr.o memdev.o phys.o unix.link
+	$(MXLD) -s -Sdata -Tdata=$(OVLBASE) -Aunix.link -o $@ \
+		iohdr.o memdev.o phys.o
 
 # The pty page carries its own copy of the line discipline and the tty
 # syscall half (tty.o, ttysys.o), so the calls between pty and tty are

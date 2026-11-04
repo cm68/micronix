@@ -156,7 +156,9 @@ are in sys/uhdr.s.
 	0014	begsav	the trap entry's own frame, 30 bytes to 0031
 	0032	bounce	256 bytes: staging for reading a rom that lives
 			above the first megabyte, where a bank switch
-			hides all of the machine's own low memory
+			hides all of the machine's own low memory.
+			After boot, the kernel's /dev/mem driver puts
+			its own banked copy loop here (sys/phys.s)
 	0132	conram	the console driver the monitor builds at reset
 	0166	ramhome	the level 0 copy loop, the thing that reads the
 			level 1 rom out of its socket

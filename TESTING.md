@@ -40,16 +40,19 @@ columns here; the script prints one per line, sorted by free space):
 ```
 kernel memory budget: /home/curt/micronix/src/micronix/sys/unix
 
-resident    text   0x1000-0x91ae   33198
-            data   0x91ae-0xada7    7161
-            bss    0xada7-0xb2d4    1325
-            extent 0x1000-0xb2d4   41684  SCRWIN 0xc000, 3372 free
+low 1k      firmware 0x0-0x260     608
+            kernel   0x260-0x30c     172  _trapad 0x400, 244 free
 
-init-only   highmem.o 0xb2d4-0xca25    5969  OVLBASE 0xd000, 1499 free
-            link needs _ebss <= 0xb8af: 1499 bytes of resident growth
+resident    text   0x1000-0x924b   33355
+            data   0x924b-0xae4c    7169
+            bss    0xae4c-0xb379    1325
+            extent 0x1000-0xb379   41849  SCRWIN 0xc000, 3207 free
 
-pool        19 bytes/header: 8 boot + 177 = 185 buffers (MAXBUFS 256)
-            headers 0xb2d4-0xbff7, 24 segments = 96K of buffer data, 9 bytes spare
+init-only   highmem.o 0xb379-0xcaff    6022  OVLBASE 0xd000, 1281 free
+            link needs _ebss <= 0xb87a: 1281 bytes of resident growth
+
+pool        19 bytes/header: 8 boot + 168 = 176 buffers (MAXBUFS 256)
+            headers 0xb379-0xbff1, 22 segments = 88K of buffer data, 15 bytes spare
             every 19 bytes of resident growth costs one buffer
 
 pages       driver slot 0xd000  4096/4096
@@ -57,29 +60,34 @@ pages       driver slot 0xd000  4096/4096
             u page      0xf000  4033/4096    63 free
 
 modules     one 4096-byte page at 0xd000
-            net 4015/81 free      pty 3986/110 free
+            pty 3986/110 free     net 3948/148 free
             hdca 3851/245 free    disk1 3619/477 free
             ncr 3605/491 free     tty 3597/499 free
             ide 3506/590 free     dj 3367/729 free
             mw 2896/1200 free     disk3 2319/1777 free
-            disk2 2268/1828 free  nd 975/3121 free
-            io 546/3550 free      mem 546/3550 free
-            14 pages, 57344 bytes stacked after the link
+            disk2 2268/1828 free  io 546/3550 free
+            mem 546/3550 free
+            13 pages, 53248 bytes stacked after the link
 ```
 
-Read the three hard ceilings, not the row sizes:
+Read the four hard ceilings, not the row sizes:
 
-- **resident extent vs `SCRWIN`** (`3372 free`) — data/bss growth past
+- **freed low memory vs `_trapad`** (`244 free`) — the block the boot
+  leaves in page 0 runs from `0x260` to the front-panel registers at
+  `0x400`. A mount costs 13 bytes of `mlist`, a segment one bit of
+  `segmap`; anything new in the low page has this much room.
+- **resident extent vs `SCRWIN`** (`3207 free`) — data/bss growth past
   `0xc000` collides with the screen window.
-- **`highmem.o` vs `OVLBASE`** (`1499 free`) — init-only code is parked
+- **`highmem.o` vs `OVLBASE`** (`1281 free`) — init-only code is parked
   at `_ebss` and may run to the driver slot. This is the number most
   kernel changes spend; once it is gone the link fails.
 - **the page budgets** — the driver slot is always full by design; the
   buffer window has `530 free` and the **u page has only 63**, so leaf
   code added there is effectively out of room.
 
-The pool line is the consequence of the first: every `19` bytes of
-resident growth costs one buffer, and the pool tops out at `MAXBUFS`.
+The pool line is the consequence of the resident extent: every `19`
+bytes of resident growth costs one buffer, and the pool tops out at
+`MAXBUFS`.
 
 ## Compiler self-host footprint
 

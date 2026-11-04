@@ -38,7 +38,7 @@ typedef unsigned int   k32;
  */
 #define K_NPROC 20
 #define K_NINODE 50
-#define K_NMTAB 0x3ea		/* low memory: byte, the guest's NMOUNT (uhdr.s) */
+#define K_NMTAB 0x30a		/* low memory: byte, the guest's NMOUNT (uhdr.s) */
 #define K_NFILE 60
 #define K_NMIO 4
 #define K_NSIG 16

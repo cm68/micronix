@@ -1,4 +1,4 @@
-.he "ps (1)                       9/30/26                       ps (1)"
+.he "ps (1)                       11/4/26                       ps (1)"
 .fo "                               -#-"
 .in 5
 .rm 65
@@ -35,12 +35,19 @@ that, and one of them lengthens the listing.
 .sp
 The table is read out of
 .bd
-/dev/mem.
+/dev/kmem.
 Ps seeks to 0x1003, where the kernel leaves the address of the table
 for it, and reads the whole table from there, so what it reports is the
 live table and not a copy.  Any user may see other users' command
 names.  The data those commands are processing is not readable this
 way.
+.sp
+The PC column needs one more read.  A process's user structure lives
+in its u page, which is named by physical segment rather than by an
+address in the kernel's map, so ps reads that page through
+.bd
+/dev/mem
+(mem (4)).
 .sp 2
 .in -5
 .bd
@@ -171,9 +178,13 @@ carried over from the original rather than fixed here: ps exits 1 after
 a successful listing, and 0 when it cannot read the table.  It cannot
 read the table when
 .bd
-/dev/mem
+/dev/kmem
 cannot be opened or read, and it names that file on the standard error
-first.  A shell script that tests the status of ps gets it backwards.
+first.  A u page that cannot be read through
+.bd
+/dev/mem
+leaves that process's PC at 0 rather than failing the listing.
+A shell script that tests the status of ps gets it backwards.
 .sp
 -p is accepted and does nothing.  The original had it to add the PC to
 the short listing; here the PC is always in the long listing and there
@@ -196,6 +207,8 @@ FILES
 .br
 /bin/ps
 .br
+/dev/kmem
+.br
 /dev/mem
 .sp 2
 .in -5
@@ -203,4 +216,4 @@ FILES
 SEE ALSO
 .in +5
 .br
-kill (1), sh (1), signal (2)
+kill (1), sh (1), signal (2), kmem (4), mem (4)

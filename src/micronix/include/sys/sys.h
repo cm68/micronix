@@ -32,13 +32,16 @@ extern UINT16 cdevseg[NCDEV];	/* char major -> module segment, 0 = none */
  * kstat, df - does not have to be built with either size.  The
  * convention is the one the pointers at 0x1003 and 0x1005 use.
  */
-#define NMTAB_ADDR	0x3ea
-#define NBUFS_ADDR	0x3eb
+#define NMTAB_ADDR	0x30a
+#define NBUFS_ADDR	0x30b
 #define NOPEN	16
 #define NSIG	16
 #define MINRUN	2               /* minimum run time before swapout */
 #define MAXMEM	0xffff          /* maximum process size */
 #define MAXSEG	256             /* max 4K memory segments, not inc. kernel */
+/* segmap[]: one bit per segment, MAXSEG bits in MAXSEG/8 bytes */
+#define SEGBYTE(n)	((n) >> 3)
+extern UINT8 segbit[8];	/* 1 << (n & 7); a table, not a variable shift */
 #define USERSEG 15              /* u page segment; the buffer window is 14 */
 #define BUFSEG  14              /* the buffer-cache window (bwin, uio.c) */
 #define BUFWIN  (BUFSEG * 0x1000)   /* ... its page base; the pool tops out at SCRWIN */

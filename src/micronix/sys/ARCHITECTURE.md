@@ -70,7 +70,7 @@ first byte of each segment, starting at 16, mapped temporarily into the
 memory; every segment past it is marked used in `segmap[]`, because a
 "free" segment past the end would alias real memory onto open bus.
 
-`segalloc()` and `segfree()` (malloc.c) keep `segmap[]`, one byte per
+`segalloc()` and `segfree()` (malloc.c) keep `segmap[]`, one bit per
 segment, with `lastseg` as a hint.  `nsegs` is the count free.  The
 allocator is shared by processes and the buffer cache; a shortage is a
 panic, not a swapout, because returning a garbage segment aliases two
@@ -148,6 +148,12 @@ only other exceptions:
 `zerouser`) to map two arbitrary segments at once, restoring them
 afterwards.  Those are the kernel's own text and data pages, so the
 copies keep interrupts off across the whole transfer.
+
+`sys/phys.s` cannot use a window at all: /dev/mem's 1MB bank above the
+first is selected by the task register, which moves every mapped page
+with it.  Its loop is therefore installed in the CPU board's on-board
+page at 0x32 - the one page the bank bits do not touch in supervisor
+mode - and called there, as the monitor's level 0 ROM copy does.
 
 ### User memory
 
@@ -444,7 +450,7 @@ them into place.  The pool grows to `SCRWIN` (0xc000), capped at
 is 0xb60a, which leaves room for 142 headers - eight boot headers and
 134 minted.  The count is a function of where `.bss` ends, so every
 byte added to the resident kernel costs a buffer; it is printed by
-`signon()` and published one byte at 0x3eb for kstat (256 reads as 0).
+`signon()` and published one byte at 0x30b for kstat (256 reads as 0).
 
 `make DEBUGBUFS=1` clamps the pool to 32 buffers, so a cache bug shows
 up in seconds rather than an hour into a recompile.

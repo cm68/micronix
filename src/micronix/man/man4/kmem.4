@@ -1,0 +1,96 @@
+.in 5
+.rm 65
+.he "kmem (4)                    11/4/26                      kmem (4)"
+.fo "                              -#-"
+.bd
+DEVICE
+.in +5
+.br
+.bd
+kmem
+- kernel memory device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Char major 2, minor 1.
+.bd
+/dev/kmem
+reads and writes the kernel's own 64K address space, the space task 0
+runs in: the resident kernel, its windows, and the u page.  A seek
+sets the address of a transfer, and a read or write advances it.
+
+Only the CPU board's first page, 0x0000 to 0x0FFF, holds hardware.
+A transfer that would touch it is answered as a whole from the zero
+page, or discarded when it is a write, and the whole count is
+reported with no error.  The front-panel task and mask registers and
+the map registers are not there to be read or changed.  The 1K of RAM
+at 0x0000 and the monitor EPROM at 0x0800 are memory, and a transfer
+wholly inside either block is served.
+
+A transfer that would run past 0xFFFF wraps at the top of the space
+and is answered the same way, with zeroes.
+
+A write changes the running kernel.  One to the wrong address crashes
+the machine, and the device should be protected accordingly even though
+ps only needs to read it.
+.sp 2
+.in -5
+.bd
+LOW MEMORY
+.in +5
+.br
+A few things the kernel wants other programs to find are left at
+fixed low addresses.  A program seeks to one and reads it; the
+lengths of a table's entries still come from the headers the
+program is built with, but the table's address and size need not
+be.
+
+.in +10
+.ti -10
+0x1000		The kernel's entry point, a jump instruction.
+.ti -10
+0x1003		The address of the process table, a word.
+.bd
+ps
+seeks here and reads the pointer.
+.ti -10
+0x1005		The address of the mount table, a word.
+.bd
+df
+seeks here and reads the pointer.
+.ti -10
+0x30a		The number of entries in the mount table, a byte.
+The kernel writes it from its own NMOUNT at boot, so df and
+kstat report the running kernel's size and are not rebuilt when
+it changes.
+
+.ti -10
+0x30b		The number of buffer cache headers, a byte, written
+when the cache reaches its final size.  A pool of exactly 256
+reads as zero; the pool never has fewer than eight, so zero
+means 256.
+
+.sp
+The words at 0x1003 and 0x1005 are low byte first.  The
+addresses are the kernel's own; the kernel's symbol table in
+.bd
+/micronix
+is the general way to find everything else, and is what kstat
+reads.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/dev/kmem
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+mem (4), io (4), ps (1), df (1), kstat (1)

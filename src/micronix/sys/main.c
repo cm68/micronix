@@ -155,7 +155,7 @@ expand_bufs()
         }
     }
     /*
-     * Publish the header count at 0x3eb for kstat.  One byte: exactly
+     * Publish the header count at 0x30b for kstat.  One byte: exactly
      * 256, the most MAXBUFS allows, reads as zero.  The pool never has
      * fewer than binit's eight, so zero unambiguously means 256.
      */

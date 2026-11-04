@@ -8,21 +8,23 @@
 # to build this, we have some prerequsites:
 # bison, lib32ncurses-dev
 
-all: sim d1 hwsim filesystem toolchain man
+all: sim d1 hwsim mnix filesystem toolchain man
 	cd src ; make
 
 #
-# The simulators and the provisioning tool, installed as symlinks into
-# bin/.  bin/ is also where the cross tools (mxccc, mxar, mxnm) land;
-# these are their peers there.  The link is relative so that moving the
-# whole tree keeps it pointing at its target, and -f replaces a plain
-# file left behind by the copy-style rule this used to be.
+# The simulators, mnix and the provisioning tool, installed as symlinks
+# into bin/.  bin/ is also where the cross tools (mxccc, mxar, mxnm)
+# land; these are their peers there.  The link is relative so that
+# moving the whole tree keeps it pointing at its target, and -f replaces
+# a plain file left behind by the copy-style rule this used to be.
 #
 sim: bin/sim
 
 d1: bin/d1
 
 hwsim: bin/hwsim
+
+mnix: bin/mnix
 
 #
 # The cross toolchain: the compiler and its passes, the host tools in
@@ -48,6 +50,10 @@ bin/hwsim: src/tools/hwsim
 	mkdir -p bin
 	ln -sf ../src/tools/hwsim bin/hwsim
 
+bin/mnix: src/tools/mnix
+	mkdir -p bin
+	ln -sf ../src/tools/mnix bin/mnix
+
 #
 # The simulator and image tools have to be told what they are built
 # from, or a rule with no prerequisites is "up to date" forever: the
@@ -63,6 +69,9 @@ USERSIMSRCS = $(wildcard src/usersim/*.c src/usersim/*.h src/lib/*.c \
 TOOLSRCS = $(wildcard src/tools/*.c src/tools/*.h)
 
 src/usersim/sim: $(USERSIMSRCS)
+	cd src ; make
+
+src/tools/mnix: $(TOOLSRCS)
 	cd src ; make
 
 src/tools/readall: $(TOOLSRCS)

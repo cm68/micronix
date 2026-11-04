@@ -318,8 +318,14 @@ low.o: uhdr.o $(KERNEL_C) probe.o intrpt.o mio.o textpad.o
 # at 0xe000 so the final link parks it in the window's page.  -Sdata is
 # upage.o's reason too, not an aesthetic: the loader writes text and then
 # data in address order, so text parked up here is overwritten.
-win.o: $(WIN_C)
-	$(LD) -r -Sdata -Tdata=0xe000 -o win.o $(WIN_C)
+win.o: $(WIN_C) phys.o
+	$(LD) -r -Sdata -Tdata=0xe000 -o win.o $(WIN_C) phys.o
+
+# The banked physical-memory trampoline (sys/phys.s).  It rides the
+# window page with memdev, which installs it in on-board ram and calls
+# it there.
+phys.o: phys.s
+	$(CC) -m micronix -c phys.s
 
 # ovlslot.o is the overlay slot (sys/ovlslot.s): one page of data at
 # OVLBASE, which setdev later writes the root driver's page onto.  The -r
@@ -431,6 +437,7 @@ clean:
 	rm -f subc.o swap.o sys1.o system.o time.o trap.o tty.o uio.o
 	rm -f multio.o ss1_uart.o dlabel.o ovl.o main.o upd1990.o
 	rm -f ss1_clock.o picdata.o netint.o open.o sys2.o rdwri.o memdev.o link.o
+	rm -f phys.o
 	rm -f access.o $(HIGHMEM)
 	rm -f $(MOD_OBJ) $(MOD_HDR)
 	rm -f dj.mod mw.mod ide.mod ncr.mod hdca.mod

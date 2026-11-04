@@ -27,7 +27,14 @@ c 5 0 ptyp0
 c 5 1 ptyp1
 c 5 8 ttyp0
 c 5 9 ttyp1
+#
+# Memory.  Char major 2 is one driver with two minors: /dev/mem is the
+# S-100 physical space, read and written a 4K page at a time through the
+# map window, and /dev/kmem is the kernel's own address space, where the
+# on-board hardware page is answered as zeroes rather than touched.
+#
 c 2 0 mem
+c 2 1 kmem
 c 3 0 io
 c 3 210 mediachg
 #

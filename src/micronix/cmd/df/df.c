@@ -15,7 +15,7 @@
  * (0x1005, next to ps's process-table pointer at 0x1003) and /dev/mem,
  * and it is the authority on what is mounted - a mounted filesystem's
  * live counts come from it, an unmounted one's from its superblock.
- * The table's size is published in the low page, one byte at 0x3ea, so
+ * The table's size is published in the low page, one byte at 0x30a, so
  * df reads whatever the running kernel was built with.
  * /etc/mtab names which filesystems to report when no argument is given.
  * An argument is reported whether mounted or not, and may be given with
@@ -38,7 +38,7 @@
 #define SUPERBLK 1		/* the superblock */
 #define MEMORY "/dev/mem"
 #define MPTAB 0x1005		/* low memory: &mlist, beside &plist at 0x1003 */
-#define NMTAB 0x3ea		/* low memory: byte, the kernel's NMOUNT (uhdr.s) */
+#define NMTAB 0x30a		/* low memory: byte, the kernel's NMOUNT (uhdr.s) */
 #define INOPB 16		/* inodes per block, as iget.c's "isize << 4" */
 
 struct mtab mtab[MAXMOUNT];

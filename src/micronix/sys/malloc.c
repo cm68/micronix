@@ -40,11 +40,19 @@ extern UINT8 memwant;
 extern UINT16 nsegs;
 
 /*
- * Segment map. Segment n is allocated iff segmap[n] != 0.  Lives in the
+ * Segment map.  One bit per segment: segment n is allocated iff
+ * segmap[n >> 3] has bit n & 7.  MAXSEG bits in MAXSEG/8 bytes, in the
  * freed low-memory bss (uhdr.s's _segmap).
  */
 extern UINT8 segmap[];
 extern UINT16 lastseg;            /* uhdr.s's _lastseg: the allocator hint */
+
+/*
+ * 1 << (n & 7), kept in a table because a shift by a variable is a call
+ * out to the shift routines, and these are the hottest two expressions
+ * in the allocator's scan.
+ */
+UINT8 segbit[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 
 /*
  * Task map.  Bit n is set while task n is assigned to a process.
@@ -74,7 +82,7 @@ extern UINT16 taskmap;            /* uhdr.s's _taskmap: the task bitmap */
 UINT8
 segalloc()
 {
-    UINT16 n; UINT8 limit;
+    UINT16 n; UINT8 limit; UINT8 bit; UINT8 *p;
 
     di();
 
@@ -85,8 +93,10 @@ segalloc()
             n = 16;             /* wrap around */
         }
 
-        if (!segmap[n]) {       /* segment free ? */
-            segmap[n] = 1;
+        p = &segmap[SEGBYTE(n)];
+        bit = segbit[n & 7];
+        if (!(*p & bit)) {      /* segment free ? */
+            *p |= bit;
             nsegs--;
             lastseg = n + 1;    /* advice for the future */
             ei();
@@ -114,10 +124,15 @@ void
 segfree(n)
     UINT16 n;
 {
+    UINT8 bit;
+    UINT8 *p;
+
     di();
-    if (segmap[n]) {            /* allocated ? */
+    p = &segmap[SEGBYTE(n)];
+    bit = segbit[n & 7];
+    if (*p & bit) {             /* allocated ? */
         nsegs++;
-        segmap[n] = 0;
+        *p &= (UINT8) ~bit;
         lastseg = n;            /* advice */
     }
     ei();

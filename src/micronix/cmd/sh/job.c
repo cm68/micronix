@@ -17,9 +17,9 @@
  * and the mechanism is worth writing down because the obvious reading
  * is wrong.  ps gets the name out of the KERNEL: struct proc begins
  * "char args[8];  / * for ps * /", so the process table carries it,
- * and ps opens /dev/mem to go and read it.
+ * and ps opens /dev/kmem to go and read it.
  *
- * THE SHELL DOES NOT DO THAT.  There is no /dev/mem anywhere in the
+ * THE SHELL DOES NOT DO THAT.  There is no /dev/kmem anywhere in the
  * image - the only device string in it is /dev/null - so it cannot be
  * looking at the process table at all.  It matches against its own
  * record of what it started: it knows the name because it ran it, and
@@ -30,7 +30,7 @@
  * The cost of it being the shell's own record rather than the
  * system's: a command started by a subshell is invisible here, since
  * the record belongs to whichever shell forked it and that one has
- * exited.  Nothing can be done about that short of reading /dev/mem,
+ * exited.  Nothing can be done about that short of reading /dev/kmem,
  * which the image does not do either.
  *
  * vim: tabstop=4 shiftwidth=4 noexpandtab:

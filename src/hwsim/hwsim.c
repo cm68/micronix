@@ -1847,7 +1847,7 @@ opt_takes_value(int c)
 {
 	switch (c) {
 	case 'b': case 'M': case 'B': case 'j': case 'c': case 'w':
-	case 'd': case 'm': case 'e': case 'N': case '5': case 'L':
+	case 'd': case 'm': case 'e': case '5': case 'L':
 	case 'S': case 'D': case 'T': case 'W': case 'K': case 'P':
 	case 'R': case 'G': case 't':
 		return 1;

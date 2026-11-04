@@ -50,6 +50,44 @@ static void iorw();
 #define K4(x)	(4096 - ((UINT16)(x) & 4095))
 
 /*
+ * The physical path is the S-100 bus and never the CPU board's own
+ * page.  Both paths move data through windows above 0x1000 - memrw
+ * maps the bus page into segment 2 (0x2000), the trampoline into
+ * segment 1 (0x1000) - so physical address 0 is S-100 memory 0.  The
+ * board's low RAM, registers and EPROM are the kernel's low page, and
+ * only /dev/kmem (minor 1) answers those.
+ */
+
+/*
+ * The banked physical path.  Above the first megabyte the 24-bit space
+ * is reached a 1MB bank at a time, and the task register that selects
+ * the bank also moves the kernel out from under itself - so the copy is
+ * done by phys.s's trampoline, installed in on-board ram at 0032h and
+ * called there (see phys.s).  It moves PHSIZE bytes a call through the
+ * map window and leaves them in its bounce buffer.
+ */
+#define PHSIZE		128
+#define PHYSLOW		0x0032	/* where phys.s's code is installed */
+#define PHBOUNCE	0x0090	/* the trampoline's bounce buffer */
+
+extern UINT8 physcode[], physend[];	/* phys.s: the code to install */
+extern void physxfer();		/* phys.s: the call runs at 0032h */
+
+static UINT8 phready;		/* the trampoline is in on-board ram */
+
+static void
+phinstall()
+{
+    register UINT8 *s, *d;
+
+    s = physcode;
+    d = (UINT8 *) PHYSLOW;
+    while (s < physend)
+        *d++ = *s++;
+    phready = 1;
+}
+
+/*
  * The size of a Morrow MPZ80 memory map address segment.
  */
 
@@ -126,16 +164,49 @@ krw(dev, rw)
         iomove(rw, (UINT8 *) off, u.count);
     }
 
-    else {                      /* outer space */
+    else {                      /* outer space: the 24-bit bus */
+        UINT8 x[6];
+        INT32 pa;
+        INT16 off;
+
         while (u.count) {
-            n = min(u.count, K4(u.base));
-            n = min(n, K4(u.offset));
+            pa = u.offset;
+            off = pa & 0xfff;
+            n = min(u.count, PHSIZE);
+            if (n > 4096 - off)
+                n = 4096 - off;
 
-            memrw(u.base, u.offset, rw, n);
+            /*
+             * The first megabyte is the bank the kernel is in; the
+             * ordinary window path serves it, and costs no trampoline.
+             * Above that the bank has to be selected.
+             */
+            if (((pa >> 20) & 0xf) == 0) {
+                n = min(n, K4(u.base));
+                n = min(n, K4(pa));
+                memrw(u.base, pa, rw, n);
+                u.offset += n;
+                u.base += n;
+                u.count -= n;
+                continue;
+            }
 
-            u.offset += n;
-            u.base += n;
-            u.count -= n;
+            if (!phready)
+                phinstall();
+            x[0] = pa & 0xff;           /* offset in the page */
+            x[1] = (pa >> 8) & 0x0f;
+            x[2] = n;
+            x[3] = (pa >> 16) & 0xf0;   /* bank << 4 */
+            x[4] = (pa >> 12) & 0xff;   /* page in the bank */
+            if (rw == READ) {
+                x[5] = 0;
+                physxfer(x);            /* physical -> bounce */
+                iomove(READ, (UINT8 *) PHBOUNCE, n);
+            } else {
+                x[5] = 1;
+                iomove(WRITE, (UINT8 *) PHBOUNCE, n);
+                physxfer(x);            /* bounce -> physical */
+            }
         }
     }
 }
