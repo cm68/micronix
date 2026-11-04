@@ -1,0 +1,110 @@
+.he "booting (8)                   11/4/26                    booting (8)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+booting
+- how Micronix starts, and single and multi-user
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Micronix starts in four levels.  The monitor ROM in its socket
+(level 0) loads the level 1 ROM; level 1 probes the disk controllers
+and boots the first labelled medium it finds.  That medium's first
+sector knows its own controller (level 2), and the filesystem loader
+it starts reads /micronix and enters the kernel (level 3).
+.sp
+The kernel's first process is init, which owns the console and brings
+the machine up.  It runs /etc/rc.single if that file exists - on the
+console, before the shell - prints /etc/signon, and execs /bin/sh as a
+login shell, with argv[0] beginning with a dash.  Root's home is /, so
+the shell reads /.sh and, because it is a login shell, /.login.
+.sp
+A shell that has finished its login script and is waiting at the
+console has no work in hand.  Init samples it once a second; when the
+shell has been at that tty wait for thirty seconds with no command
+going through it, init kills it and goes multi-user.  Printing on the
+console marks both ends of the wait:
+.sp
+.nf
+.in +4
+init: single user ttywait; 30 seconds
+init: single user idle; going multiuser
+.in -4
+.fi
+.sp
+A command after the wait is somebody using the machine: a live child
+of the shell, or the shell leaving the tty wait at any sample, cancels
+the automatic change for the rest of the session.  A machine that is
+being used stays single user until the shell exits.
+.sp 2
+.in -5
+.bd
+MULTI USER
+.in +5
+.br
+Init runs /etc/rc to completion, then reads /etc/ttys and starts one
+login per enabled line; it respawns them as they end.  The shipped
+/etc/rc checks every filesystem /etc/fstab names with fsck -a -y,
+skipping the mounted root, and then starts update.
+.sp
+A failed check signals init, which returns to the single-user shell
+instead of opening the logins, so a machine whose disk needs repair
+comes up where it can be repaired.  Every later multiuser start runs
+the same check, so the repairs are tested again before the logins.
+.sp 2
+.in -5
+.bd
+RETURNING TO SINGLE USER
+.in +5
+.br
+Sending SIGINT to init - kill -INT 1 - asks for the single-user
+shell.  Init kills every other process, runs /etc/rc.single and the
+console shell again, and puts the logins back when that shell exits.
+A session requested this way has no idle timer: it stays until
+somebody types exit.  This is what fsck -a does when a check fails.
+.sp 2
+.in -5
+.bd
+FILES
+.in +5
+.br
+/etc/rc.single	work run before each single-user shell
+.br
+/etc/rc	multi-user start-up
+.br
+/etc/fstab	the filesystems fsck -a checks
+.br
+/etc/ttys	the lines init starts logins on
+.br
+/etc/signon	the message printed at power-up
+.br
+/.sh, /.login	read by the console login shell
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+init (1), fsck (1), mount (1), halt (1), boot (1)
+.sp 2
+.in -5
+.bd
+BUGS
+.in +5
+.br
+The wait is sampled once a second.  A command that begins and ends
+between two samples is not seen, and the next sample finds the shell
+at the tty again; the timeout is about the shell being idle, not a
+record of everything typed.
+.sp
+The timer is the host's wall clock: the console's clock registers name
+a real rate, so the thirty seconds are real seconds even though the
+simulated processor runs much faster.
