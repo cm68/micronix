@@ -517,10 +517,12 @@ console()
 				if ((f & 1) && !sawwait) {
 					sawwait = 1;
 					ticks = 0;
+					consmsg("init: single user ttywait; 30 seconds");
 				}
 				if (useractive)
 					break;		/* wait normally */
 				if (sawwait && ++ticks >= 30) {
+					consmsg("init: single user idle; going multiuser");
 					kill(pid, SIGKILL);
 					break;
 				}
