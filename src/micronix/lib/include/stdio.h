@@ -85,10 +85,10 @@ extern uchar _setup;
 #define	stdout	(&_iob[1])
 #define	stderr	(&_iob[2])
 
-FILE *		fopen();
-FILE *		freopen();
-FILE *		fdopen();
-long		ftell();
+FILE *		fopen(char *, char *);
+FILE *		freopen(char *, char *, FILE *);
+FILE *		fdopen(int, char *);
+long		ftell(FILE *);
 /*
  * A prototype, and it has to be one: fseek takes a long, and almost
  * every caller in the tree writes fseek(fp, 0, SEEK_SET) with a plain
@@ -101,7 +101,7 @@ long		ftell();
  * copy it into the object, and copied nothing.
  */
 int		fseek(FILE *, long, int);
-char *		fgets();
+char *		fgets(char *, int, FILE *);
 char *		_bufallo();
 int _flsbuf(unsigned char, FILE *);
 /*
@@ -111,8 +111,19 @@ int _flsbuf(unsigned char, FILE *);
  * char spelling made every "!= EOF" test depend on the sign-extension
  * of a truncated return.
  */
-int fgetc();
-int fputc();
+int fgetc(FILE *);
+int fputc(int, FILE *);
+/*
+ * These five had no declaration here at all, and perror none
+ * anywhere: ccc warns "call without parameter types" at every call
+ * that has no prototype in view.  The types are the bodies' own.
+ */
+int fclose(FILE *);
+int fflush(FILE *);
+int fputs(char *, FILE *);
+int fread(char *, int, int, FILE *);
+int fwrite(char *, int, int, FILE *);
+void perror(char *);
 int printf(char *, ...);
 int fprintf(FILE *, char *, ...);
 int sprintf(char *, char *, ...);

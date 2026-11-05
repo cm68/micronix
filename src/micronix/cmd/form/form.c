@@ -11,9 +11,7 @@
  */
 
 #include <stdio.h>
-#ifdef linux
 #include <stdlib.h>
-#endif
 
 #define MAXLINE     512     /* an input line */
 #define MAXOUT      256     /* a built output line */
@@ -56,7 +54,7 @@ int owords;
 
 char *progname = "form";
 
-char *skipsp();
+char *skipsp(char *);
 
 /*
  * The request table.  The binary looks its requests up in a table of

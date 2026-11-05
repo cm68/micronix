@@ -38,9 +38,9 @@
  */
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #ifdef linux
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <dirent.h>
@@ -121,14 +121,17 @@ static char *root = "/usr";
 static char *formprog = "form";
 #endif
 
-#ifdef linux
 extern char *concat(char *, ...);
 extern int putstr(int, ...);
-#else
-extern char *concat();
-extern int putstr();
-extern char *getenv();
+#ifndef linux
+extern char *getenv(char *);
 #endif
+
+/*
+ * Defined below, after the callers, so the calls would have no
+ * parameter types in view without this.
+ */
+int equal(char *, char *);
 
 /*
  * The section argument is a run of digits.  An empty string is a section
