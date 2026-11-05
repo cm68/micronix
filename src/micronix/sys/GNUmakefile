@@ -173,6 +173,15 @@ HIGHMEM_C_OBJ = main_init.o cus.o djinit.o ncrinit.o
 HIGHMEM_AS_OBJ = inits.o unbcd.o
 HIGHMEM       = $(HIGHMEM_C_OBJ) $(HIGHMEM_AS_OBJ)
 
+# Objects folded into another one before the link - pic.o into upage.o,
+# probe.o into low.o, the four boot-only inits into highmem.o - and so
+# named on no link line.  They are build products all the same and
+# belong in $(OBJS): left out of it, "clean" did not remove them and a
+# rebuild linked the objects the previous compiler had made.  The ABI
+# check in mxld is what caught it, on _super and then _inton.
+FOLDED_C_OBJ = pic.o probe.o pic_init.o probe_init.o \
+	upd1990_init.o ss1clk_init.o
+
 # The generic .c and .s objects, named outright so that a stray generated
 # .s sitting beside a .c (ccc -s leaves one for reading) cannot shadow the
 # .c the way a wildcard "%.o : %.s" would.  These two rules are the whole
@@ -193,7 +202,7 @@ $(KERNEL_AS_OBJ) $(LEAF_AS) $(HIGHMEM_AS_OBJ): %.o: %.s
 # What IS here from a module is its init (djinit, ncrinit): it runs once,
 # from the kernel's side of the seam, and folding it into highmem.o is
 # what keeps it out of the driver's one 4K page.
-OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) low.o win.o $(OVLSLOT)
+OBJS     = $(KERNEL_AS) $(LEAF_AS) $(LEAF_C) user.o upage.o $(KERNEL_C) $(WIN_C) $(HIGHMEM) $(FOLDED_C_OBJ) low.o win.o $(OVLSLOT)
 TREELIBS =
 
 CSRCS	= access.c balloc.c bus.c cio.c consts.c create.c cus.c \
