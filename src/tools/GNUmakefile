@@ -80,8 +80,17 @@ icheck.o: ../micronix/cmd/icheck/icheck.c
 ncheck.o: ../micronix/cmd/ncheck/ncheck.c
 	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/ncheck/ncheck.c -o $@
 
+#
+# fsck's -a reads /etc/fstab with sscanf, perror, fclose and wait.  The
+# micronix <stdio.h> in that include list is the Whitesmith one and
+# declares none of them, and gcc 13 made an implicit declaration an
+# error.  ccc, which builds the same source for the guest, has always
+# taken one, so the host build says so too rather than teaching the
+# shared source a second way to print and parse.
+#
 fsck.o: ../micronix/cmd/fsck/fsck.c
-	$(CC) $(CFLAGS) -I../include -I../micronix/include -c ../micronix/cmd/fsck/fsck.c -o $@
+	$(CC) $(CFLAGS) -Wno-implicit-function-declaration \
+		-I../include -I../micronix/include -c ../micronix/cmd/fsck/fsck.c -o $@
 
 setdev.o: ../micronix/cmd/setdev/setdev.c
 	$(CC) $(CFLAGS) -c ../micronix/cmd/setdev/setdev.c -o $@

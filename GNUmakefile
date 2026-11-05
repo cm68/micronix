@@ -185,11 +185,71 @@ clean:
 		(cd $$dir ; make clean) \
 	done
 
+#
+# A clobbered tree is a checkout: nothing is left that a make just
+# made.
+#
+# The recursion is the whole of it for the directories a GNUmakefile
+# builds in order.  What it cannot reach is here: the NODEBUG
+# simulator (d1p and its library have names of their own), the guest's
+# select(2) harness, and the outputs of the top-level targets, which
+# land in the root, kernels/, dist/ and disks/ where no recursion goes.
+# And then the last line of defence, because the per-directory lists
+# have holes and always will: what the tree ignores and does not track
+# is what a build makes, so after everything above has had its turn,
+# that set is deleted too.  A file worth keeping is tracked - that is
+# what the .gitignore says of every recovered artifact under extra/ and
+# lib/objects - so nothing tracked is ever named, and the exceptions
+# below are the ignore entries that are not build output: imported and
+# recovered trees, this machine's secrets, and what a run leaves
+# behind (a delta is the disk, a log a recording, a lock a claim on an
+# image).
+#
 clobber:
 	for dir in src src/hwsim src/micronix ; do \
 		(cd $$dir ; make clobber) \
 	done
+	for dir in src/lib src/hwsim/d1 ; do \
+		(cd $$dir ; make clobber NODEBUG=1) \
+	done
+	(cd src/micronix/test/seltest ; make clobber)
 	rm -rf filesystem bin libexec ccc lib usr sim man
+	#
+	# Also here for a tree that is not a git checkout - a source tar
+	# has no .git and the sweep below is skipped.  *.o catches the
+	# stray host objects in the root, micronix.k the kernel a REGEN
+	# step copies out of sys/, kernels/ its dated mates.
+	#
+	rm -f *.o micronix.k
+	rm -f kernels/micronix.ccc kernels/micronix.ccc.sym kernels/unix.*
+	rm -f dist/*.IMD dist/*.img disks/bootdisks/*.img
+	rm -rf disks/new
+	rm -rf disks/q540-dual disks/wunderbus disks/wunderbus-mio \
+		disks/mio-cascade disks/ss1 disks/wren.img
+	find disks -name '*.vol' -delete
+	rm -f disks/hdinstall/hddma-0
+	rm -rf src/micronix/stand/nic/.pio
+	#
+	# The sweep.  --directory collapses wholly ignored trees
+	# (src/tools/destdir, sys/cccobj, the PlatformIO build); the
+	# second pass takes the ignored files in directories that also
+	# hold sources.  Both use the same keep list.
+	#
+	if [ -z "$$(git rev-parse --show-cdup 2>/dev/null)" ] && \
+		git rev-parse --git-dir >/dev/null 2>&1 ; then \
+		keep='(^|/)(attic|extra|old|resources|\.claude)(/|$$)'; \
+		keep="$$keep|(^|/)secrets\.h$$"; \
+		keep="$$keep|(^|/)(typescript|logfile|benchmem)(\..*)?$$"; \
+		keep="$$keep|(^|/)[^/]*(\.lock|-delta|\.trace|\.swp)$$"; \
+		keep="$$keep|(^|/)\.(gdbargs|last)$$"; \
+		keep="$$keep|^disks/hdinstall/sys$$"; \
+		git ls-files -o -i --exclude-standard --directory | \
+			grep -vE "$$keep" | \
+			while IFS= read -r f ; do rm -rf "$$f" ; done ; \
+		git ls-files -o -i --exclude-standard | \
+			grep -vE "$$keep" | \
+			while IFS= read -r f ; do rm -rf "$$f" ; done ; \
+	fi
 
 rebuildfs:
 	rm -rf filesystem

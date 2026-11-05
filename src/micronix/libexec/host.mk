@@ -134,10 +134,19 @@ hostinstall: host
 	mkdir -p $(HOSTSYSDIR)
 	install -m 755 $(HOSTINSTDIR)/$(HOSTPROG) $(HOSTSYSDIR)/$(HOSTPROG)
 
+#
+# dbgtags.c alone, and not debug.h beside it.  The header is generated
+# by the same script, but it is checked in (see the git tree), so a
+# clobber that removed it left a tracked deletion behind - a tree that
+# does not look like the checkout it started from.  makedebug.sh still
+# regenerates it: the rule names makedebug.sh and every source, so a
+# header that has fallen behind is remade on the next build.
+#
 hostclean:
-	rm -f $(HOSTOBJS) $(DBGFILES) $(HOSTINSTDIR)/$(HOSTPROG)
+	rm -f $(HOSTOBJS) dbgtags.c $(HOSTINSTDIR)/$(HOSTPROG)
 
 # clobber takes the host build too: the .ho objects and the generated
-# debug files are as much build product as the Z80 .o's, and a clobbered
-# tree should look like a clean checkout.
+# dbgtags.c are as much build product as the Z80 .o's, and a clobbered
+# tree should look like a clean checkout.  debug.h stays for that
+# reason - it is tracked, and a checkout has it.
 clobber: hostclean
