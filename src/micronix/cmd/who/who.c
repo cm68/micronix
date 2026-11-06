@@ -52,6 +52,10 @@
 #include <sys/dir.h>
 #include <dirent.h>
 
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 struct utmp {			/* 20 bytes, v7 layout - see login.c */
 	char	ut_line[8];	/* +0  the tty name, e.g. "tty2" */
 	char	ut_name[8];	/* +8  the login name */
@@ -62,8 +66,11 @@ struct utmp utmp;
 struct passwd *pw;
 
 char *ttyname();
-char *index();
+char *index(char *, int);
 
+
+/* prototypes for functions defined below */
+char * ttyname(int);
 main(argc, argv)
 int argc;
 char **argv;

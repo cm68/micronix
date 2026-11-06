@@ -135,23 +135,23 @@ extern char *pathv[MAXPATHV];
 extern char **shargv;       /* $0 upwards - a window on our argv */
 extern int  shargc;
 
-int  isbuiltin();
-int  dobuiltin();
-int  execute();
-int  sourcefile();
-void aliasexpand();
-int  pushredir();
-void popredir();
-int  runpipeline();
-int  addmatch();
-char *saveword();
-void runline();
-int  backtick();
-int  nextline();
+int  isbuiltin(char *);
+int  dobuiltin(int, struct cmd *);
+int  execute(struct pipeline *);
+int  sourcefile(char *, int);
+void aliasexpand(struct cmd *);
+int  pushredir(struct cmd *, int *);
+void popredir(int *);
+int  runpipeline(struct pipeline *);
+int  addmatch(char *, struct cmd *);
+char *saveword(char *, int);
+void runline(char *);
+int  backtick(char *, char *, int);
+int  nextline(char *, int);
 char *strdup();
-void fatal();
-void perr();
-void warn();
+void fatal(char *, char *);
+void perr(char *);
+void warn(char *, char *);
 
 /* parse.c
  *
@@ -168,22 +168,22 @@ void warn();
  * missing here, and single quoting is here without being in the image
  * at all.  NOTES has the behaviour of each, read by running it.
  */
-int  parse(/* char **pp, struct pipeline *p */);
+int  parse(char **, struct pipeline *);
 
 /* job.c - the background jobs */
-void jobadd();
-void jobdone();
-int  jobpid();
+void jobadd(int, char *);
+void jobdone(int);
+int  jobpid(char *);
 
 /* hash.c - the search path, remembered */
-void hashpath();
-void hashflush();
-int  inhash(/* int i, char *name */);
+void hashpath(void);
+void hashflush(void);
+int  inhash(int, char *);
 
 /* hist.c */
-void histadd();
-int  histexpand(/* char *line, int size */);
+void histadd(char *);
+int  histexpand(char *, int);
 
 /* glob.c */
-int  ispattern();
-int  globword(/* char *w, struct cmd *c */);
+int  ispattern(char *);
+int  globword(char *, struct cmd *);

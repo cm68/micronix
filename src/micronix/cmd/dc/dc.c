@@ -89,6 +89,9 @@
 #include <stdio.h>
 #include <sys/signal.h>
 #include "dc.h"
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /* The character parameters are byte-wide and ride in A; without these
  * the calls before each definition would use the word convention. */
@@ -96,6 +99,40 @@ int unreadc(char);
 int binop(char);
 int cond(char);
 
+
+/* prototypes for functions defined below */
+struct blk * add(struct blk *, struct blk *);
+struct blk * add0(struct blk *, int);
+int chsign(struct blk *);
+struct blk * copy(struct blk *, int);
+struct blk * exp(struct blk *, struct blk *);
+int garbage(char *);
+struct blk * getdec(struct blk *, int);
+struct blk * getwd(struct blk *);
+int init(int, char *[]);
+int log2(long);
+struct blk * lookwd(struct blk *);
+int more(struct blk *);
+struct blk * mult(struct blk *, struct blk *);
+char * nalloc(char *, unsigned);
+int oneot(struct blk *, int, char);
+int ospace(char *);
+int print(struct blk *);
+int pushp(struct blk *);
+int putwd(struct blk *, struct blk *);
+int redef(struct blk *);
+int release(struct blk *);
+struct blk * removc(struct blk *, int);
+struct blk * removr(struct blk *, int);
+struct blk * salloc(int);
+int salterwd(struct wblk *, struct blk *);
+struct blk * scale(struct blk *, int);
+struct blk * scalint(struct blk *);
+int sdump(char *, struct blk *);
+int seekc(struct blk *, int);
+struct blk * sqrt(struct blk *);
+int sunputc(struct blk *);
+int tenot(struct blk *, int);
 main(argc,argv)
 int argc;
 char *argv[];
@@ -2042,7 +2079,6 @@ nalloc(p,nbytes)
 register char *p;
 unsigned nbytes;
 {
-	char *malloc();
 	register char *q, *r;
 	q = r = malloc(nbytes);
 	if(q==0)

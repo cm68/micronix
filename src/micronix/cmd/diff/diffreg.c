@@ -11,6 +11,13 @@
  */
 
 #include "diff.h"
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 /*
  *	Uses an algorithm due to Harold Stone, which finds
@@ -78,7 +85,7 @@
 #define	prints(s)	fputs(s,stdout)
 
 FILE	*input[2];
-FILE	*fopen();
+FILE	*fopen(char *, char *);
 
 struct cand {
 	int	x;
@@ -145,6 +152,23 @@ char	cup2low[256] = {
 0xf0,0xf1,0xf2,0xf3,0xf4,0xf5,0xf6,0xf7,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd,0xfe,0xff
 };
 
+
+/* prototypes for functions defined below */
+int asciifile(FILE *);
+int change(int, int, int, int);
+int equiv(struct line *, int, struct line *, int, int *);
+int fetch(long *, int, int, FILE *, char *, int);
+int newcand(int, int, int);
+int prepare(int, FILE *);
+int range(int, int, char *);
+int readhash(FILE *);
+int search(int *, int, int);
+int skipline(int);
+int sort(struct line *, int);
+char * splice(char *, char *);
+int stone(int *, int, int *, int *);
+int unravel(int);
+int unsort(struct line *, int, int *);
 diffreg()
 {
 	register int i, j;

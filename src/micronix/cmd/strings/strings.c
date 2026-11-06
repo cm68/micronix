@@ -36,8 +36,9 @@
 #include <stdio.h>
 #include <obj.h>
 #include <ctype.h>
+#include <stdlib.h>
 
-long	ftell();
+long	ftell(FILE *);
 
 struct	obj header;
 
@@ -46,6 +47,10 @@ char	oflg;
 char	asdata;
 int	minlength = 4;
 
+
+/* prototypes for functions defined below */
+int dirt(int);
+int find(long);
 main(argc, argv)
 	int argc;
 	char *argv[];

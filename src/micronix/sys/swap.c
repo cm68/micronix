@@ -11,16 +11,16 @@
 #include <sys/con.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern UINT8 block();
-extern void sleep();
-extern void send();
-extern void pr();
-extern void sfree();
-extern void bwait();
-extern void brelse();
-extern UINT8 swapin();
-extern UINT8 swapout();
-extern UINT8 mget();
+extern UINT8 block(struct buf *);
+extern void sleep(INT16, UINT8);
+extern void send(struct proc *, UINT8);
+extern void pr(UINT8 *, INT16);
+extern void sfree(INT16, UINT16);
+extern void bwait(struct buf *);
+extern void brelse(struct buf *);
+extern UINT8 swapin(struct proc *);
+extern UINT8 swapout(struct proc *);
+extern UINT8 mget(struct proc *);
 
 UINT8 memwant = 0;              /* someone wants memory, so look for a
                                  * swapout */
@@ -31,11 +31,16 @@ UINT8 swapping = 0;             /* run status of swap process */
  * forking the login process, the power-up process falls
  * into this code, becoming the swapping process.
  */
+
+/* prototypes for functions defined below */
+INT16 procid(struct proc *);
+UINT16 salloc(INT16);
+void mfree(struct proc *);
+INT16 swapio(INT16, struct proc *);
 void
 swap()
 {
     register struct proc *n;
-    extern void mfree();
 
     /*
      * The swap map was built by swapinit() during system initialization

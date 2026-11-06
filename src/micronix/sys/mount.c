@@ -13,15 +13,15 @@
 #include <sys/buf.h>
 #include <errno.h>
 #include <sys/pic8259.h>
-extern UINT8 super();
-extern void irelse();
-extern void bopen();
-extern void bdwrite();
-extern void brelse();
-extern void isync();
-extern void iflush();
+extern UINT8 super(void);
+extern void irelse(struct inode *);
+extern void bopen(UINT16, UINT16);
+extern void bdwrite(struct buf *);
+extern void brelse(struct buf *);
+extern void isync(void);
+extern void iflush(INT16);
 extern void iclose();
-extern void idec();
+extern void idec(struct inode *);
 
 extern INT16 rootdev;
 extern INT32 seconds;
@@ -31,6 +31,17 @@ extern struct inode ilist[];
 /*
  * Mount system call
  */
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+struct buf * bread(UINT16, UINT16);
+struct buf * getsb(UINT16);
+struct inode * iget(INT16, INT16);
+struct inode * iname(UINT8 *);
+void iclose(struct inode *, UINT8, UINT16);
+void zero(char *, int);
+struct mount * mlook(INT16);
+INT16 tmount(INT16, struct inode *, UINT8, UINT8 *);
 void
 mount(ioname, dname, ronly)
     UINT8 *ioname, *dname;

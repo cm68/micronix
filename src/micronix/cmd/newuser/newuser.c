@@ -64,6 +64,9 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 #define	PASSWD	"/etc/passwd"
@@ -106,7 +109,7 @@ FILE	*pwfp;
 FILE	*grfp;
 
 extern int errno;
-char	*strdup();
+char	*strdup(char *);
 
 /*
  * Write to the terminal a line at a time, unbuffered: the prompts have

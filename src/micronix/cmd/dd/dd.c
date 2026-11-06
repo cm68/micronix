@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <sys/signal.h>
 #include <unistd.h>
+#include <signal.h>
 
 
 #define	BIG	2147483647L
@@ -53,8 +54,8 @@ char	*ifile;
 char	*ofile;
 unsigned char	*ibuf;
 unsigned char	*obuf;
-char	*sbrk();
-long	number();
+char	*sbrk(int incr);
+long	number(long);
 int	ibs	= 512;
 int	obs	= 512;
 int	bs;
@@ -176,14 +177,20 @@ unsigned char	atoibm[] =
 };
 
 
+
+/* prototypes for functions defined below */
+int match(char *);
+int null(int);
+int term(int);
+int ebcdic(int), ibm(int), ascii(int), null(int), cnull(int), block(int), unblock(int);
+static int (*conv)(int);
+
 main(argc, argv)
 int	argc;
 char	**argv;
 {
-	int (*conv)();
 	register unsigned char *ip;
 	register c;
-	int ebcdic(), ibm(), ascii(), null(), cnull(), term(), block(), unblock();
 	int a;
 
 	conv = null;

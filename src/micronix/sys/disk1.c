@@ -37,20 +37,20 @@
 #include <sys/dlabel.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-extern void brelse();
-extern void iodone();
-extern void bsort();
-extern void d1start();
-extern void newdrv();
-extern void newrw();
-extern void d1putb();
-extern void d1dma();
-extern void advque();
-extern void wakeup();
-extern void sleep();
-extern UINT8 dlslice();
-extern UINT8 busgive();
-extern UINT8 busget();
+extern void brelse(struct buf *);
+extern void iodone(struct buf *);
+extern void bsort(struct buf *, struct buf *);
+extern void d1start(void);
+extern void newdrv(void);
+extern void newrw(void);
+extern void d1putb(UINT16);
+extern void d1dma(void);
+extern void advque(void);
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
+extern UINT8 busgive(INT16 (*)());
+extern UINT8 busget(INT16 (*)());
 
 extern INT16 in(), out();
 
@@ -58,8 +58,8 @@ extern INT16 in(), out();
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definition says static.
  */
-static void d1error(), d1seek(), d1cmd(), d1sel(), d1motor(), d1specify();
-static UINT16 d1res();
+static void d1error(void), d1seek(), d1cmd(), d1sel(), d1motor(), d1specify();
+static UINT16 d1res(UINT16);
 
 #define NDRIVES 8               /* two banks of four */
 #define RETRIES 10              /* no. of retries on r/w error */
@@ -139,6 +139,15 @@ static UINT8 retry = 0,         /* number of retries so far */
  * by its label and by nothing else, so the label is read once per drive
  * and its geometry and slice table cached.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
+static void d1cmd(UINT16, UINT16);
+INT16 d1cyl(UINT16, UINT16, UINT16, UINT16, UINT16);
+static void d1motor(UINT16);
+static void d1seek(UINT16, UINT16);
 INT16
 disk1open(dev, mode)
     UINT16 dev, mode;

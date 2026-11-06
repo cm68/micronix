@@ -69,6 +69,9 @@ static struct ient {
 
 static unsigned short nextid = 1;
 
+
+/* prototypes for functions defined below */
+long seekraw(int, unsigned, int);
 #ifdef DEBUG
 void
 poolstats(void)
@@ -191,7 +194,7 @@ idOf(char *s)
  * position; nothing here wants it.
  */
 #ifdef CCC
-extern long seekraw();
+extern long seekraw(int, unsigned, int);
 #define NSEEK(fd, off) seekraw(fd, (int)(off), 0)
 #else
 #define NSEEK(fd, off) lseek(fd, (long)(off), 0)
@@ -262,7 +265,6 @@ tokcpy(struct token *d, struct token *s)
 {
 #ifdef DEBUG
     extern short verbose;
-    extern int fdprintf(int, char*, ...);
     if ((verbose & 2) && s->type == SYM)
         fdprintf(2, "tokcpy SYM: %s\n", s->v.name ? s->v.name : "(null)");
 #endif

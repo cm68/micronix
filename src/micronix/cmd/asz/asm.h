@@ -102,11 +102,11 @@ struct expval {
 /* interface functions */
 
 void appendtmp();
-void list_line();
-void list_take();
-void list_symbols();
-void asm_reset();
-void assemble();
+void list_line(void);
+void list_take(void);
+void list_symbols(void);
+void asm_reset(void);
+void assemble(void);
 char peek();
 char get_next();
 void outbyte(char);

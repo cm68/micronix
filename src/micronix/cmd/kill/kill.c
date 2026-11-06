@@ -60,8 +60,10 @@
 #include <types.h>
 #include <stdio.h>
 #include <sys/signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-int	kill();			/* lib/libunix/kill.s */
+int	kill(int pid, int sig);			/* lib/libunix/kill.s */
 
 struct	sig {
 	char	*name;
@@ -94,6 +96,11 @@ struct	sig sigs[NSIG] = {
 
 int	status;
 
+
+/* prototypes for functions defined below */
+int onesig(char *, int);
+int signame(char *);
+int upper(int);
 main(argc, argv)
 	int argc;
 	char *argv[];

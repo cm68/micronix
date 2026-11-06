@@ -60,7 +60,7 @@
  * for".  The function is v7's own, commented out further down dc.c;
  * see the note there.
  */
-int	sunputc();
+int	sunputc(struct blk *);
 #define zero(p)	for(pp=(p)->beg;pp<(p)->last;)*pp++='\0'
 #define OUTC(x) {printf("%c",x); if(--count == 0){printf("\\\n"); count=ll;} }
 #define TEST2	{if((count -= 2) <=0){printf("\\\n");count=ll;}}
@@ -77,10 +77,10 @@ struct blk {
 	char	*last;
 };
 struct	blk *hfree;
-struct	blk *getwd();
-struct	blk *lookwd();
-struct	blk *getdec();
-struct	blk *morehd();
+struct	blk *getwd(struct blk *);
+struct	blk *lookwd(struct blk *);
+struct	blk *getdec(struct blk *, int);
+struct	blk *morehd(void);
 
 struct	blk *arg1, *arg2;
 int	svargc;
@@ -102,14 +102,14 @@ struct	blk *rem;
 int	k;
 struct	blk *irem;
 int	skd,skr;
-struct	blk *pop(),*readin(),*add0(),*mult();
-struct	blk *scalint();
-struct	blk *removc();
-struct	blk *add(),*div(),*removr();
+struct	blk *pop(void),*readin(void),*add0(struct blk *, int),*mult(struct blk *, struct blk *);
+struct	blk *scalint(struct blk *);
+struct	blk *removc(struct blk *, int);
+struct	blk *add(struct blk *, struct blk *),*div(struct blk *, struct blk *),*removr(struct blk *, int);
 struct	blk *exp();
 struct	blk *sqrt();
-struct	blk *salloc(),*copy();
-struct	blk *scale();
+struct	blk *salloc(int),*copy(struct blk *, int);
+struct	blk *scale(struct blk *, int);
 int	neg;
 struct	sym {
 	struct	sym *next;
@@ -130,15 +130,15 @@ long	all;
 long	headmor;
 long	obase;
 int	fw,fw1,ll;
-int	(*outdit)();
-int	bigot(),hexot();
+int	(*outdit)(struct blk *, int);
+int	bigot(struct blk *, int),hexot(struct blk *, int);
 int	logo;
 int	log10;
 int	count;
 char	*pp;
-int	(*signal())();
-int	onintr();
-char	*malloc();
-char	*nalloc();
-char	*realloc();
+int	(*signal(short sig, short handler))();
+int	onintr(void);
+char	*malloc(unsigned);
+char	*nalloc(char *, unsigned);
+char	*realloc(char *, unsigned short);
 char	*dummy;

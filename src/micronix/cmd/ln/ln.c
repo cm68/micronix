@@ -20,13 +20,19 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 struct	stat stb;
 char	fflag;		/* force flag set? - a truth value */
 char	name[BUFSIZ];
-char	*rindex();
+char	*rindex(char *, int);
 extern	int errno;
 
+
+/* prototypes for functions defined below */
+int linkit(char *, char *);
 main(argc, argv)
 	int argc;
 	register char **argv;

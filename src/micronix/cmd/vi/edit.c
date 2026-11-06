@@ -7,6 +7,18 @@
 
 #include "stevie.h"
 
+#include <unistd.h>
+
+/* prototypes for functions defined below */
+int cntlines(char *, char *);
+int inschar(int);
+int insertchar(int);
+int insstr(char *);
+int message(char *);
+int normal(int);
+int scrolldown(int);
+int windexit(int);
+int windgoto(int, int);
 edit()
 {
     int c, c1, c2;

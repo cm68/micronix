@@ -21,6 +21,8 @@
 
 #define	LEN	45
 
+#include <stdlib.h>
+#include <unistd.h>
 char	line[4 * LEN + 8];
 
 main(argc, argv)

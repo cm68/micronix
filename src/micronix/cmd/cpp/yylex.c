@@ -21,6 +21,13 @@
 #define IB 1
 #define COFF 128
 
+#include <string.h>
+int tobinary(char *, int);
+
+/* prototypes for functions defined below */
+char * skipbl(char *);
+int pperror(char *, int, int);
+struct symtab * lookup(char *, int);
 yylex() {
 	static int ifdef=0;
 	static char *op2[]={"||",  "&&" , ">>", "<<", ">=", "<=", "!=", "=="};
@@ -28,11 +35,11 @@ yylex() {
 	static char *opc="b\bt\tn\nf\fr\r\\\\";
 	extern char fastab[];
 	extern char *outp,*inp,*newp; extern int flslvl;
-	register char savc, *s; char *skipbl(); int val, i;
+	register char savc, *s; int val, i;
 	struct symtab {
 		char *name;
 		char *value;
-	} *sp, *lookup();
+	} *sp;
 
 for (;;) {
 	newp=skipbl(newp);

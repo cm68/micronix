@@ -1,4 +1,6 @@
 #ifndef lint
+#include <stdlib.h>
+#include <string.h>
 static char sccsid[] = "@(#)tran.c	4.4 12/9/83";
 #endif
 
@@ -20,6 +22,15 @@ cell	*recloc;	/* location of record */
 cell	*nrloc;		/* NR */
 cell	*nfloc;		/* NF */
 
+
+/* prototypes for functions defined below */
+cell * lookup(char *, cell **, int);
+int error(int, int, int, int, int, int, int, int, int);
+int isnumber(char *);
+int checkval(cell *);
+int hash(unsigned char *);
+cell * setsymtab(char *, char *, awkfloat, unsigned, cell **);
+char * tostring(char *);
 syminit()
 {
 	setsymtab("0", tostring("0"), 0L, NUM|STR|CON|FLD, symtab);
@@ -79,7 +90,6 @@ cell **tab;
 {
 	register h;
 	register cell *p;
-	cell *lookup();
 
 	if (n != NULL && (p = lookup(n, tab, 0)) != NULL) {
 		if (s != EMPTY ) xfree(s); /* careful here */

@@ -12,16 +12,22 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern UINT8 super();
-extern void irelse();
-extern void ilink();
-extern void ilock();
-extern void idec();
-extern UINT8 access();
+extern UINT8 super(void);
+extern void irelse(struct inode *);
+extern void ilink(INT16);
+extern void ilock(struct inode *);
+extern void idec(struct inode *);
+extern UINT8 access(struct inode *, INT16);
 
 /*
  * Link system call
  */
+
+/* prototypes for functions defined below */
+INT16 nwrite(struct inode *, UINT8 *, UINT16);
+struct inode * iget(INT16, INT16);
+struct inode * iname(UINT8 *);
+void zero(char *, int);
 void
 link(old, new)
     UINT8 *old, *new;

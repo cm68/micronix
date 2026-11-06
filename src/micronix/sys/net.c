@@ -35,13 +35,13 @@
 #include <sys/pic.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern UINT8 pic_mask();
-extern UINT8 inton();
+extern UINT8 pic_mask(UINT16);
+extern UINT8 inton(UINT16);
 
 extern INT16 in(), out();
 extern INT16 copyin(), copyout(); /* mem.s: the user side */
-extern UINT8 valid();             /* malloc.c: is this user page there? */
-extern void sleep(), wakeup();
+extern UINT8 valid(UINT16, UINT16);             /* malloc.c: is this user page there? */
+extern void sleep(INT16, UINT8), wakeup();
 extern INT16 di(), ei();
 extern UINT16 netline;            /* resident: select(2) reopens the line */
 extern INT16 selectchan;          /* resident: select(2)'s event */
@@ -69,6 +69,13 @@ static UINT8 delivered[8];      /* a LISTEN already returned it */
  * which is what the handler and the wait name when they look the line up
  * with intrline().  There is no hardware bring-up beyond that.
  */
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+INT16 copyout(char *, char *, int);
+int in(int);
+int out(int, int);
+void wakeup(INT16);
 INT16
 netstart(seg)
     UINT16 seg;
@@ -558,7 +565,7 @@ netwrite(dev)
 static
 INT16
 netawait(fn, slot)
-    INT16 (*fn) ();
+    INT16 (*fn)(INT16);
     INT16 slot;
 {
     register INT16 r;

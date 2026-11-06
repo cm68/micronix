@@ -17,11 +17,11 @@
 #include <sys/ovl.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
-extern void panic();
-extern void pr();
-extern UINT8 intoff();
-extern UINT8 inton();
-extern UINT8 pic_eoi();
+extern void panic(UINT8 *);
+extern void pr(UINT8 *, INT16);
+extern UINT8 intoff(UINT16);
+extern UINT8 inton(UINT16);
+extern UINT8 pic_eoi(UINT16);
 
 /*
  * The same definition as sys/probe.c's, and it has to stay the same to

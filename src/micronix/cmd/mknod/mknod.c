@@ -8,6 +8,9 @@
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
 
+#include <unistd.h>
+#include <stdio.h>
+int number(char *);
 main(argc, argv)
 int argc;
 char **argv;

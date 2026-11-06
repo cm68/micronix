@@ -4,11 +4,13 @@
 
 #include "less.h"
 #include "position.h"
+#include <stdio.h>
+#include <string.h>
 
 public int hit_eof;	/* Keeps track of how many times we hit end of file */
 
 #if (!REGCMP) && (!RECOMP)
-static int match();	/* defined below its callers; see option.c's getnum */
+static int match(char *, char *);	/* defined below its callers; see option.c's getnum */
 #endif
 
 extern char quiet;
@@ -23,6 +25,11 @@ extern char *first_cmd;
 /*
  * Sound the bell to indicate he is trying to move past end of file.
  */
+
+/* prototypes for functions defined below */
+public void lputs(char *);
+public void jump_loc(POSITION);
+static int match(char *, char *);
 	static void
 eof_bell()
 {
@@ -109,7 +116,7 @@ forw(n, pos, force, only_last)
 				home();
 			} else if (!first_time)
 			{
-				puts("...skipping...\n");
+				lputs("...skipping...\n");
 			}
 		}
 	}

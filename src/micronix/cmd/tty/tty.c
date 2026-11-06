@@ -52,13 +52,16 @@
 #include <string.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /*
  * isatty is in libunix but in no header - see ttyname (3), which documents it
  * beside ttyname.  Declared here so the call below is a call and not an
  * implicit int.
  */
-extern int	isatty();
+extern int	isatty(int fd);
 
 /*
  * The sixteen byte directory entry /dev is read in: a two byte inode

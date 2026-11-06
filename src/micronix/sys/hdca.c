@@ -28,16 +28,16 @@
 #include <sys/hdca.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern void iodone();
-extern void wakeup();
-extern void sleep();
+extern void iodone(struct buf *);
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
 static INT8 exclude();
-extern UINT8 inton();
-extern UINT8 dlslice();
+extern UINT8 inton(UINT16);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
 
 extern INT16 in(), out();
-extern void timeout();
-extern UINT8 inton();
+extern void timeout(INT16 (*)(), int, int);
+extern UINT8 inton(UINT16);
 
 struct hd hdinfo[NHD];
 
@@ -45,9 +45,9 @@ struct hd hdinfo[NHD];
 static struct slicemap hdslice[NHD][NSLICE];
 
 static INT16 hdmutex;		/* the controller, 0 = free */
-static INT16 (*hdintr) ();	/* the phase the op-done interrupt resumes */
+static INT16 (*hdintr)(struct hd *);	/* the phase the op-done interrupt resumes */
 static struct hd *hdintarg;	/* its argument */
-static INT16 (*hdseekintr) ();	/* the phase the seek-done interrupt resumes */
+static INT16 (*hdseekintr)(struct hd *);	/* the phase the seek-done interrupt resumes */
 static struct hd *hdseekarg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
 static struct hd *hdactive;	/* the drive owning the controller */
@@ -56,12 +56,22 @@ static INT16 hdioctl;		/* the ioctl sleep channel */
 
 static void phase00(), phase01(), phase02(), phase03(), phase04(),
     phase06(), phase08(), phase09(), phase11(), phase12(), arrive();
-static struct hd *getinfo();
+static struct hd *getinfo(UINT16);
 
 /*
  * Put the drive and head into the FUNC register.  The head is inverted
  * on the bus, and the drive's own bits ride in the low two.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+static void phase00(struct hd *);
+static void phase01(struct hd *);
+static void phase03(struct hd *);
+static void phase08(struct hd *);
+static void phase11(struct hd *, INT16);
+static void phase12(struct hd *);
 static void
 hdselect(drive, head)
 	UINT8 drive;

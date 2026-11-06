@@ -7,6 +7,13 @@ FSTATIC int nhashed	= 0;
 /* simple linear hash.  hash function is sum of
    characters mod hash table size.
 */
+
+/* prototypes for functions defined below */
+char * copys(char *);
+struct varblock * varptr(char *);
+int * ckalloc(int);
+int fatal(char *);
+int hasslash(char *);
 hashloc(s)
 char *s;
 {
@@ -42,7 +49,6 @@ char *s;
 {
 /* make a fresh copy of the string s */
 
-char *copys();
 register struct nameblock *p;
 
 if(nhashed++ > HASHSIZE-3)
@@ -151,7 +157,7 @@ register char *a,*b;
 static int depth	= 0;
 register char *s;
 char vname[100];
-struct varblock *varptr(), *vbp;
+struct varblock *vbp;
 char closer;
 
 if(++depth > 100)
@@ -200,7 +206,7 @@ return(b);
 setvar(v,s)
 char *v, *s;
 {
-struct varblock *varptr(), *p;
+struct varblock *p;
 
 p = varptr(v);
 if(p->noreset == 0)

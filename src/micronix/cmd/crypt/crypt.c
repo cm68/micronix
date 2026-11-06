@@ -92,11 +92,14 @@ char	t3[ROTORSZ];
  * that arrives in the same register is the same answer only by
  * accident of this machine.
  */
-char	*keyprompt();
+char	*keyprompt(void);
 keysetup();
 
 char	*mkargv[] = { "-", 0 };
 
+
+/* prototypes for functions defined below */
+int keysetup(char *);
 main(argc, argv)
 	int argc;
 	char *argv[];

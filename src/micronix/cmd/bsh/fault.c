@@ -8,6 +8,7 @@
  */
 
 #include	"defs.h"
+#include <signal.h>
 
 
 STRING		trapcom[MAXTRAP];
@@ -16,6 +17,14 @@ BOOL		trapflg[MAXTRAP];
 /* ========	fault handling routines	   ======== */
 
 
+
+/* prototypes for functions defined below */
+int clrsig(INT);
+VOID free(BLKPTR);
+int execexp(STRING, UFD);
+int setbrk(int);
+int getsig(int);
+int ignsig(int);
 VOID	fault(sig)
 	REG INT		sig;
 {

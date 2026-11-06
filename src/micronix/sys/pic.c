@@ -13,8 +13,8 @@
 #include <types.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
-extern UINT8 inton();
-extern UINT8 pic_eoi();
+extern UINT8 inton(UINT16);
+extern UINT8 pic_eoi(UINT16);
 
 extern INT16 in(), out();
 extern INT16 di(), ei();
@@ -23,7 +23,11 @@ extern INT16 di(), ei();
  * Point the group select at this PIC, where there is one.  The SS1's
  * PICs are directly addressed and have no select.
  */
+
+/* prototypes for functions defined below */
 static
+int in(int);
+int out(int, int);
 void
 picselect(p)
     struct pic8259 *p;

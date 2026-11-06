@@ -10,14 +10,14 @@
 #include <sys/tty.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern UINT8 super();
-extern void killall();
-extern void send();
-extern void run();
-extern void drainall();
-extern void write();
-extern void close();
-extern UINT8 valid();
+extern UINT8 super(void);
+extern void killall(struct tty *, UINT8);
+extern void send(struct proc *, UINT8);
+extern void run(struct proc *);
+extern void drainall(struct tty *);
+extern void write(INT16, INT16);
+extern void close(int fd);
+extern UINT8 valid(UINT16, UINT16);
 
 #define TERMIN	0               /* code for terminate */
 #define IGNORE	1               /* code for ignore */
@@ -25,6 +25,11 @@ extern UINT8 valid();
 /*
  * Signal system call
  */
+
+/* prototypes for functions defined below */
+INT16 putword(int, char *);
+struct proc * procptr(INT16);
+void setframe(char *, char *);
 void
 signal(sig, func)
     INT16 sig;

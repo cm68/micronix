@@ -2,6 +2,11 @@
  * mkdir is not a system call in micronix.
  */
 
+#include <string.h>
+#include <unistd.h>
+
+/* prototypes for functions defined below */
+int sprintf(char *, char *, int);
 int
 mkdir(fn, mode)
 char *fn;

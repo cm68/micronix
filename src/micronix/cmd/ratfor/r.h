@@ -56,9 +56,9 @@ struct	nlist {
 	struct	nlist *next;
 };
 
-struct nlist	*lookup();
-char	*install();
-char	*malloc();
+struct nlist	*lookup(char *);
+char	*install(char *, char *, int);
+char	*malloc(unsigned);
 extern	char	*fcnloc;
 
 extern	char	type[];

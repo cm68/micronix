@@ -15,6 +15,9 @@
 
 #include	<stdio.h>
 #include "sed.h"
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 char	*trans[040]  = {
 	"\\01",
@@ -51,6 +54,15 @@ char	*trans[040]  = {
 };
 char	rub[] = {"\177"};
 
+
+/* prototypes for functions defined below */
+int advance(char *, char *);
+int command(struct reptr *);
+int dosub(char *);
+int ecmp(char *, char *, int);
+char	* gline(char *);
+int match(char *, int);
+char	* place(char *, char *, char *);
 execute(file)
 char *file;
 {

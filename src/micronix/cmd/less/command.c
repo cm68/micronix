@@ -5,6 +5,8 @@
 #include "less.h"
 #include "position.h"
 #include <setjmp.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 extern jmp_buf main_loop;
 extern int erase_char, kill_char;
@@ -31,6 +33,11 @@ static char screen_trashed;	/* The screen has been overwritten */
 /*
  * Reset command buffer (to empty).
  */
+
+/* prototypes for functions defined below */
+char * glob(char *);
+int strtcpy(char *, char *, int);
+public void lputs(char *);
 cmd_reset()
 {
 	cp = cmdbuf;
@@ -71,7 +78,7 @@ start_mcc(c)
 	mcc = c;
 	lower_left();
 	clear_eol();
-	putc(mcc);
+	lputc(mcc);
 	cmd_col = 1;
 }
 
@@ -103,11 +110,11 @@ cmd_char(c)
 			*cp++ = c;
 			if (control_char(c))
 			{
-				putc('^');
+				lputc('^');
 				cmd_col++;
 				c = carat_char(c);
 			}
-			putc(c);
+			lputc(c);
 			cmd_col++;
 		} else
 			bell();
@@ -169,11 +176,11 @@ prompt()
 	clear_eol();
 	p = pr_string();
 	if (p == NULL)
-		putc(':');
+		lputc(':');
 	else
 	{
 		so_enter();
-		puts(p);
+		lputs(p);
 		so_exit();
 	}
 }
@@ -187,7 +194,7 @@ prompt()
 getcc()
 {
 	if (first_cmd == NULL)
-		return (getc());
+		return (lgetc());
 
 	if (*first_cmd == '\0')
 	{
@@ -211,7 +218,7 @@ getcc()
 				/* A number; append a 'g' */
 				return ('g');
 		}
-		return (getc());
+		return (lgetc());
 	}
 	return (*first_cmd++);
 }
@@ -523,7 +530,7 @@ commands()
 			 */
 			lower_left();
 			clear_eol();
-			puts("help");
+			lputs("help");
 			cmd_exec();
 			help();
 			screen_trashed = 1;
@@ -535,7 +542,7 @@ commands()
 			 */
 			cmd_reset();
 			start_mcc('E');
-			puts("xamine: ");	/* This looks nicer */
+			lputs("xamine: ");	/* This looks nicer */
 			cmd_col += 8;
 			c = getcc();
 			goto again;
@@ -615,7 +622,7 @@ commands()
 			 */
 			lower_left();
 			clear_eol();
-			puts("mark: ");
+			lputs("mark: ");
 			c = getcc();
 			if (c == erase_char || c == kill_char)
 				break;
@@ -628,7 +635,7 @@ commands()
 			 */
 			lower_left();
 			clear_eol();
-			puts("goto mark: ");
+			lputs("goto mark: ");
 			c = getcc();
 			if (c == erase_char || c == kill_char)
 				break;

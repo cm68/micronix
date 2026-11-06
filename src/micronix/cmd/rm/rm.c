@@ -6,6 +6,10 @@
  *
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 int errcode;
 
 #include <stdio.h>
@@ -14,8 +18,13 @@ int errcode;
 #include <sys/stat.h>
 #include <sys/dir.h>
 
-char *sprintf();
+char *sprintf(char *, char *, ...);
 
+
+/* prototypes for functions defined below */
+int dotname(char *);
+int rm(char [], int, int, int, int);
+int rmdir(char *, int);
 main(argc, argv)
     char *argv[];
 {

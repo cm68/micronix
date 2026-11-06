@@ -3,8 +3,9 @@
  *
  */
 #include	<stdio.h>
+#include <unistd.h>
 
-extern char *	sbrk();
+extern void *	sbrk(int);
 
 static union stdbuf {
 	char		bufarea[BUFSIZ];

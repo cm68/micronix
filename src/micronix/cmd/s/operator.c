@@ -28,10 +28,25 @@
  */
 
 #include "s.h"
+#include <string.h>
 
 /*
  * do_insert - insert text 
  */
+
+/* prototypes for functions defined below */
+int b_delete(int, int);
+int b_getcur(int *, int *);
+int b_gets(int, char *);
+int b_insert(int, char *);
+int b_replace(int, char *);
+int b_setcur(int, int);
+int b_setline(int);
+int do_yank(int, int);
+int s_putmsg(char *);
+int s_savemsg(char *, int);
+int do_delete(int, int, int, int);
+int in_chars(int, int);
 do_insert()
 {
     in_chars(0, 0);

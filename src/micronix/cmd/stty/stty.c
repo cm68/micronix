@@ -107,6 +107,8 @@
 #include <types.h>		/* sgtty.h speaks in UINT8s */
 #include <stdio.h>
 #include <sys/sgtty.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /*
  * The two bits the driver honours that <sys/sgtty.h> does not name.
@@ -207,6 +209,12 @@ int	all;			/* -a: report every option, not the changes */
 int	changed;		/* a keyword was taken: write the mode back */
 struct sgtty mode;
 
+
+/* prototypes for functions defined below */
+int badarg(char *);
+int chr(unsigned char *);
+int eq(char *);
+int fatal(char *);
 main(argc, argv)
 	int argc;
 	char *argv[];

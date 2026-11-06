@@ -9,12 +9,12 @@
 #include <sys/sys.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-extern void drainques();
-extern void ustart();
-extern void drain();
-extern void qinit();
-static UINT8 qfree();
-static UINT8 qalloc();
+extern void drainques(struct tty *);
+extern void ustart(struct tty *);
+extern void drain(struct que *);
+extern void qinit(struct que *);
+static UINT8 qfree(struct que *);
+static UINT8 qalloc(struct que *);
 
 /*
  * The static routines below, declared before anything calls them.
@@ -24,8 +24,8 @@ static UINT8 qalloc();
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-static UINT8 qalloc(), qfree();
-static void qrelse();
+static UINT8 qalloc(struct que *), qfree();
+static void qrelse(struct que *);
 
 /*
  * queue protocol
@@ -64,6 +64,11 @@ struct cblock *cfree = 0;    /* free list */
  * Drain all queues and flush the output.
  * Called from sig().
  */
+
+/* prototypes for functions defined below */
+static UINT8 qfree(struct que *);
+INT16 copyin(char *, char *, int);
+INT16 copyout(char *, char *, int);
 void
 drainall(tty)
     struct tty *tty;

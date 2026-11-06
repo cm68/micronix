@@ -12,11 +12,11 @@
 #include <sys/stat.h>
 #include <sys/inode.h>
 #include <errno.h>
-extern void ilock();
-extern void irelse();
-extern void brelse();
-extern UINT8 direqu();
-extern UINT8 access();
+extern void ilock(struct inode *);
+extern void irelse(struct inode *);
+extern void brelse(struct buf *);
+extern UINT8 direqu(UINT8 *, UINT8 *);
+extern UINT8 access(struct inode *, INT16);
 
 extern struct inode *rootdir;
 
@@ -25,6 +25,14 @@ extern struct inode *rootdir;
  * Leaves u.offset and u.segflg ready
  * for a directory write.
  */
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+INT16 getbyte(char *);
+UINT16 imap(struct inode *, UINT16, UINT16 *, UINT8);
+struct buf * bread(UINT16, UINT16);
+struct inode * iget(INT16, INT16);
+INT16 dlook(struct inode *, UINT8 **);
 struct inode *
 iname(name)
     UINT8 *name;

@@ -44,16 +44,16 @@
 #include <sys/con.h>
 #include <sys/pty.h>
 #include <errno.h>
-extern void wakeup();
-extern void sleep();
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
 
-extern INT16 ttyread();
-extern void ttywrite(), ttymode(), ttyopen(), ttyclose();
-extern void cstart(), ustart(), drainques(), qinit(), sendque();
-extern void pty_start(), pty_put();
-extern void nulldev();          /* the kernel's empty entry */
-extern void ptyioctl();
-extern void ptyhang();            /* the process-table walk, resident */
+extern INT16 ttyread(struct tty *);
+extern void ttywrite(struct tty *), ttymode(), ttyopen(), ttyclose();
+extern void cstart(struct tty *), ustart(), drainques(), qinit(), sendque();
+extern void pty_start(struct tty *), pty_put();
+extern void nulldev(void);          /* the kernel's empty entry */
+extern void ptyioctl(INT16, INT16, UINT8 *);
+extern void ptyhang(INT16);            /* the process-table walk, resident */
 extern INT16 selectchan;          /* select(2): a reader may be watching */
 
 /*
@@ -61,6 +61,14 @@ extern INT16 selectchan;          /* select(2): a reader may be watching */
  * ends differ only in mode and device number, so both come through
  * here; the pty leaf half's init calls it too.
  */
+
+/* prototypes for functions defined below */
+void drainques(struct tty *);
+void qinit(struct que *);
+void sendque(struct que *);
+void ttyclose(struct tty *);
+void ttyopen(struct tty *);
+void ustart(struct tty *);
 void
 ttyinit1(t, dev, mode, ms)
     register struct tty *t;

@@ -62,6 +62,7 @@
 #include <sys/proc.h>
 #include <sys/tty.h>
 #include <dirent.h>
+#include <stdlib.h>
 
 /*
  * Mnemonics. See detail[], quick[], and pro[] below.
@@ -157,6 +158,13 @@ int myterm = 0;                 /* device number of local tty */
 
 struct user u = { 0 };
 
+
+/* prototypes for functions defined below */
+char * cpystr(char *, char *);
+int doflag(char *);
+int init(int, char **);
+int save(char *);
+char * ttyname(int);
 main(ac, av)
     int ac;
     char **av;

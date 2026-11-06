@@ -89,6 +89,6 @@ typedef long		POSITION;
 #define	SIGNAL(sig,func)	signal(sig,func)
 
 /* Library function declarations */
-long lseek();
+long lseek(unsigned char fd, long offset, int whence);
 
 #include "funcs.h"

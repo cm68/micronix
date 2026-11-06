@@ -64,6 +64,8 @@
 #include <grp.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 struct	stat stbuf;
 int	status;

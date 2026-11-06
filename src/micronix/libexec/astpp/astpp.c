@@ -101,9 +101,11 @@ static void parseExpr(void) {
 
     /* Numeric constant */
     if (c == NUMBER) {
+        int w;
+        long v;
         advance();
-        int w = read1();
-        long v = read4();
+        w = read1();
+        v = read4();
         exprAppNum(v);
         exprApp(":");
         exprApp(widthName(w));

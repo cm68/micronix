@@ -32,6 +32,7 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/tty.h>
+#include <signal.h>
 
 extern int errno;
 

@@ -10,6 +10,15 @@
 /*
  * opencmd - Add a blank line below the current line.
  */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* prototypes for functions defined below */
+int appchar(int);
+int canincrease(int);
+int inschar(int);
+int message(char *);
 opencmd()
 {
     /*

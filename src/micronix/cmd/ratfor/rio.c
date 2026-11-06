@@ -8,6 +8,7 @@
  */
 
 #include "r.h"
+#include <stdlib.h>
 #define	BUFSIZE	512
 char	ibuf[BUFSIZE];
 char	*ip = ibuf;
@@ -31,6 +32,12 @@ char	type[] = {
 	LET,	LET,	LET,	'{',	'|',	'}',	'~',	0,
 };
 
+
+/* prototypes for functions defined below */
+int cant(char *);
+int error(char *);
+int pbstr(char *);
+int peek(char *, char);
 gtok(s) char *s; {	/* get token into s */
 	register c, t;
 	register char *p;

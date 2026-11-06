@@ -86,10 +86,10 @@ extern FILE *stdin, *stdout, *stderr;
 #define	stderr	(&_iob[2])
 #endif
 
-FILE *		fopen();
-FILE *		freopen();
+FILE *		fopen(char *, char *);
+FILE *		freopen(char *, char *, FILE *);
 FILE *		fdopen();
-long		ftell();
+long		ftell(FILE *);
 /*
  * A prototype, and it has to be one: fseek takes a long, and almost
  * every caller in the tree writes fseek(fp, 0, SEEK_SET) with a plain
@@ -102,8 +102,8 @@ long		ftell();
  * copy it into the object, and copied nothing.
  */
 int		fseek(FILE *, long, int);
-char *		fgets();
-char *		_bufallo();
+char *		fgets(char *, int, FILE *);
+char *		_bufallo(void);
 int _flsbuf(unsigned char, FILE *);
 /*
  * int, not char: both return the character read or written, or EOF,

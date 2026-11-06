@@ -51,13 +51,13 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <errno.h>
-extern void brelse();
-extern void iodone();
-extern void bsort();
-extern void d2start();
-extern UINT8 dlslice();
-extern UINT8 busgive();
-extern UINT8 busget();
+extern void brelse(struct buf *);
+extern void iodone(struct buf *);
+extern void bsort(struct buf *, struct buf *);
+extern void d2start(void);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
+extern UINT8 busgive(INT16 (*)());
+extern UINT8 busget(INT16 (*)());
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
@@ -125,6 +125,15 @@ static UINT8 d2dead = 0;        /* ticks the request has been in flight */
  * label and by nothing else, so the label is read once per drive and its
  * geometry and slice table cached.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
+INT16 d2cyl(UINT16, UINT16, UINT16, UINT16, UINT16);
+static void d2load(UINT16, UINT16, UINT16);
+static void d2sc(struct buf *, INT16);
+static void d2settle(INT16 (*)());
 INT16
 disk2open(dev, mode)
     UINT16 dev, mode;

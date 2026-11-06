@@ -5,6 +5,8 @@
 #define NOARG 261
 #define yyclearin yychar = -1
 #define yyerrok yyerrflag = 0
+#include <stdlib.h>
+#include <unistd.h>
 extern int yychar, yyerrflag;
 #ifndef YYMAXDEPTH
 #define YYMAXDEPTH 150
@@ -21,9 +23,9 @@ YYSTYPE yylval, yyval;
 /*	expression command - 1.2 of 6/6/76 */
 #include <stdio.h>
 
-extern int yyinit();
-extern int yyparse();
-extern int write();
+extern int yyinit(void);
+extern int yyparse(void);
+extern int write(int, char *, int);
 
 char	**av;
 int	ac;
@@ -31,6 +33,12 @@ char	tmp[100][6];
 int	tmpi;
 int	argi;
 
+
+/* prototypes for functions defined below */
+int atoi(char *);
+int copy(char *, char *);
+int eq(char *, char *);
+int itoa(int);
 main(argc, argv) char **argv; {
 	ac = argc;
 	argi = 1;

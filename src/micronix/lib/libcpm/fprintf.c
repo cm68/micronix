@@ -4,7 +4,7 @@
  */
 #include	<stdio.h>
 
-extern int	_doprnt();
+extern int	_doprnt(void (*)(), char *, int *);
 
 static FILE *	fpf;
 

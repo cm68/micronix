@@ -11,6 +11,7 @@
  */
 #include <types.h>
 #include <sys/sgtty.h>
+#include <unistd.h>
 
 gtty(fd, vec)
     int fd;

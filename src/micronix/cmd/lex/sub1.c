@@ -1,4 +1,5 @@
 #include "ldefs.c"
+#include <stdlib.h>
 getl(p)	/* return next line of input, throw away trailing '\n' */
 	/* returns 0 if eof is had immediately */
 char *p;

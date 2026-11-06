@@ -39,6 +39,10 @@
 #include <pwd.h>
 #include <crypt.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 
 /*
@@ -161,8 +165,8 @@ char *skipblanks(char *p);                  /* 0x0bdb */
    file, and declared the way this tree declares things.  getpwnam and
    endpwent were declared here with them and are libc's now, declared
    by <pwd.h> - see the note below where their code used to be. */
-char *ttyname();                            /* 0x35e7 */
-int   ttyslot();                            /* 0x3719 */
+char *ttyname(int);                            /* 0x35e7 */
+int   ttyslot(int);                            /* 0x3719 */
 
 /* ------------------------------------------------------------------ */
 /*
@@ -171,6 +175,11 @@ int   ttyslot();                            /* 0x3719 */
  * 0x0a39 reads those two cells to build the shell's argv.  The loop never
  * exits: a failed login falls back to the "Name: " prompt.
  */
+
+/* prototypes for functions defined below */
+char * gets(char *);
+char * ttyname(int);
+int ttyslot(int);
 main(argc, argv)
 char **argv;
 {

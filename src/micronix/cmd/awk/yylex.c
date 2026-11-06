@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 #include "awk.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define	CBUFLEN	150
 
@@ -61,6 +63,10 @@ static struct kw {
 	0,		0,		-1
 };
 
+
+/* prototypes for functions defined below */
+cell * fieldadr(int);
+int yyerror(char *);
 static int
 getch()
 {

@@ -14,6 +14,11 @@
  */
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 /*
  * The wtmp record, 20 bytes: line at +0, name at +8, time at +16.
@@ -51,9 +56,9 @@ static int	sflag;		/* -s: summary only */
 static char	*users[MAXF], *ttys[MAXF];
 static int	nusers, nttys;
 
-char	*ctime();
+char	*ctime(time_t *);
 
-static void copy8();
+static void copy8(char *, char *);
 
 /* two 8-byte fields, byte for byte */
 static int

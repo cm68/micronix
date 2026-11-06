@@ -1,4 +1,6 @@
 #ifndef lint
+#include <fcntl.h>
+#include <unistd.h>
 static char sccsid[] = "@(#)freeze.c	4.2 8/11/83";
 #endif
 

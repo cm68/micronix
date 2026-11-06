@@ -71,6 +71,11 @@ struct hddma_cmd cmd = { 0 };   /* braces: a struct is sized from its type */
  * do a read header on each of the 8 possible heads to
  * probe the possible heads.
  */
+
+/* prototypes for functions defined below */
+int bail(char *);
+int out(int, int);
+int outstr(char *);
 reset()
 {
 	register struct dlabel *lp;

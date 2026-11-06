@@ -21,6 +21,7 @@
 
 #define SHELL	"/bin/sh"
 
+#include <unistd.h>
 int
 system(cmd)
 char *cmd;

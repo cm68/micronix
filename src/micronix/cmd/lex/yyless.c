@@ -1,3 +1,6 @@
+
+/* prototypes for functions defined below */
+int yyunput(int);
 yyless(x)
 {
 extern char yytext[];

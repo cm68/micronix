@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define	MAXENT	256
 #define	MAXLEVEL 32
@@ -30,9 +32,9 @@ static char	path[PATHLEN];
 static char	more[MAXLEVEL];
 static int	aflag;
 
-DIR		*opendir();
-struct direct	*readdir();
-int		closedir();
+DIR		*opendir(char *);
+struct direct	*readdir(DIR *);
+int		closedir(DIR *);
 
 static void
 prname(name)

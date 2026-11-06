@@ -42,6 +42,8 @@
 
 #include <stdio.h>
 #include "sh.h"
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * How many lines are kept is not read from the image - there is no

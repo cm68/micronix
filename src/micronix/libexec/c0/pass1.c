@@ -15,9 +15,10 @@
  * them, and an alarm and a creat are all these three provided */
 #ifdef CCC
 #define SIGALRM 14
-extern int creat();
-extern int alarm();
 extern int (*signal())();
+extern int creat(char *, int);
+extern int close(int);
+extern int write(int, char *, int);
 #else
 #include <fcntl.h>
 #include <signal.h>

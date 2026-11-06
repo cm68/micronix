@@ -38,9 +38,11 @@
 #include	<types.h>
 #include	<stdio.h>
 #include	<pwd.h>
+#include <stdlib.h>
+#include <string.h>
 
-static char *	fld();
-int		setpwent();
+static char *	fld(char *);
+int		setpwent(void);
 
 static FILE *		pwf;		/* 0x60c4 - the open stream */
 static char		pwline[256];	/* 0x60c6 - one line of it */
@@ -51,6 +53,9 @@ static struct passwd	pwent;		/* 0x61c8 - the record handed back */
  * the character after it, or NULL if the line ran out first.  The
  * separators are the literal ":\n\r" the binary keeps at 0x1031.
  */
+
+/* prototypes for functions defined below */
+int rewind(FILE *);
 static char *
 fld(p)
 char *p;

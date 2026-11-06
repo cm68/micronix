@@ -7,6 +7,7 @@
  */
 
 #include "r.h"
+#include <string.h>
 
 extern int hollerith;
 int ptc(char);			/* below; the character rides in A */
@@ -20,6 +21,11 @@ char	comment[320];
 int	comptr	= 0;
 int	indent	= 0;
 
+
+/* prototypes for functions defined below */
+int error(char *);
+int outnum(int);
+int pts(char *);
 outdon() {
 	outbuf[outp] = '\0';
 	if (outp > 0)

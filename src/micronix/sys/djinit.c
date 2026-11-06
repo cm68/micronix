@@ -36,12 +36,15 @@
 #include <sys/con.h>
 #include <sys/dj.h>
 #include <sys/ovl.h>
-extern UINT8 inton();
+extern UINT8 inton(UINT16);
 
 extern UINT8 map0[];
 extern INT16 out();
-extern UINT8 inton();
+extern UINT8 inton(UINT16);
 
+
+/* prototypes for functions defined below */
+int out(int, int);
 INT16
 djinit(seg)
     UINT16 seg;

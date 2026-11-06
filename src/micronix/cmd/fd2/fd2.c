@@ -16,7 +16,7 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
-extern int pexec();
+extern int pexec(char *, char **);
 
 static char Sccsid[] = "@(#)fd2.c	1.4";
 /*

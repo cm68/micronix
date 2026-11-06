@@ -9,11 +9,17 @@
 
 #include	"defs.h"
 #include	"sym.h"
+#include <unistd.h>
 
 
 /* ========	character handling for command lines	========*/
 
 
+
+/* prototypes for functions defined below */
+int copy(IOPTR);
+int estabf(REG STRING);
+int syslook(STRING, SYSTAB);
 word()
 {
 	REG CHAR	c, d;

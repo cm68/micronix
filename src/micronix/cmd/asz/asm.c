@@ -27,6 +27,8 @@
 /*
  * segment names and the relocation writer, both in wsobj.c
  */
+#include <stdlib.h>
+#include <string.h>
 extern char *wsSegNames[];
 extern void wsEncBump();
 extern void wsEncReloc();
@@ -50,11 +52,11 @@ extern int lineNum;
 extern char *infile;
 extern char m_flag;
 
-void asm_reset();
-void assemble();
+void asm_reset(void);
+void assemble(void);
 void outbyte(char);
 void outtmp(char);
-unsigned char operand();
+unsigned char operand(struct expval *);
 
 /*
  * all token numbers are biased by 0x80, and are unsigned
@@ -127,7 +129,7 @@ char *tokname[] = {
 };
 #endif
 
-extern char asm_instr();
+extern char asm_instr(char *);
 
 /*
  * operand table
@@ -346,7 +348,7 @@ struct { struct symbol s; char pad[1]; } dollarsym[2];
  */
 #define PERMCHUNK   (8 * 129)       /* 1032 */
 
-extern void gripe();
+extern void gripe(char *);
 
 /*
  * A chunk begins with the link to the one before it, so an arena can
@@ -441,6 +443,11 @@ static unsigned short jidx;     /* ordinal of the jump being handled */
 
 void keep_relaxed();
 
+
+/* prototypes for functions defined below */
+void wsEncBump(FILE *, int);
+void wsEncReloc(FILE *, int, int, int);
+void wsEndReloc(FILE *);
 char *
 arena_alloc(a, n)
 struct arena *a;
@@ -676,10 +683,10 @@ char *name;
     return h & (NSYMHASH - 1);
 }
 
-extern unsigned char skipwhite();
-extern unsigned char nextchar();
-extern char escape();
-extern struct symbol *sym_update();
+extern unsigned char skipwhite(void);
+extern unsigned char nextchar(void);
+extern char escape(void);
+extern struct symbol *sym_update(char *, short, unsigned short, int);
 
 /*
  * convert token to register number
@@ -703,10 +710,10 @@ unsigned char tok;
 	return tok;
 }
 
-extern char match();
-extern unsigned long parsenum();
-extern void gripe();
-extern void gripe2();
+extern char match(char *, char *);
+extern unsigned long parsenum(char *);
+extern void gripe(char *);
+extern void gripe2(char *, char *);
 
 void
 save_symn()
@@ -855,9 +862,9 @@ char dir;
     }
 }
 
-extern void get_line();
-unsigned char nextchar();
-extern void consume();
+extern void get_line(void);
+unsigned char nextchar(void);
+extern void consume(void);
 
 #ifdef DEBUG
 char *tokenname(t)
@@ -1311,7 +1318,7 @@ freejumps()
  * this is what we run between assemblies.
  * it should clean out everything.
  */
-extern void io_reset();
+extern void io_reset(void);
 
 void
 asm_reset()

@@ -10,6 +10,7 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 #include <stdio.h>
+#include <stdlib.h>
 
 main(argc, argv)
 int argc;

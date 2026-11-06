@@ -15,6 +15,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define	digit(c) ((c) >= '0' && (c) <= '9')
 

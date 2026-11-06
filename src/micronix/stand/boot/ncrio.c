@@ -102,11 +102,19 @@ static char cdb[CDBLEN] = {
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int ncrread(), ncrselect(), ncrbyte();
+static int ncrread(UINT, char *), ncrselect(), ncrbyte();
 
 /*
  * Is the label's magic MWDL?  One load of two words, not four bytes.
  */
+
+/* prototypes for functions defined below */
+int bail(char *);
+int in(int);
+int out(int, int);
+int outstr(char *);
+static int ncrbyte(int, char *);
+static int ncrselect(int);
 static int
 hasmagic(lp)
 register struct dlabel *lp;

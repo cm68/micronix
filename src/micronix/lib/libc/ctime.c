@@ -7,6 +7,9 @@
 
 unsigned char	monlen[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+
+/* prototypes for functions defined below */
+struct tm * gmtime(time_t *);
 static
 put2d(cp, i, cl, ct)
 char *		cp, cl, ct;

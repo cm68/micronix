@@ -27,6 +27,9 @@
 #include "ar.h"
 #include <obj.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 
 struct	stat	stbuf;
@@ -58,15 +61,15 @@ char	*man	=	{ "mrxtdpqs" };
 char	*opt	=	{ "uvnbail" };
 
 int	signum[] = {SIGHUP, SIGINT, SIGQUIT, 0};
-int	sigdone();
-int	rcmd();
-int	dcmd();
-int	xcmd();
-int	tcmd();
-int	pcmd();
-int	mcmd();
-int	qcmd();
-int	scmd();
+int	sigdone(void);
+int	rcmd(void);
+int	dcmd(void);
+int	xcmd(void);
+int	tcmd(void);
+int	pcmd(void);
+int	mcmd(void);
+int	qcmd(void);
+int	scmd(void);
 int	(*comfun)();
 char	flg[26];
 char	**namv;
@@ -102,10 +105,18 @@ int	qf;
 int	bastate;
 char	buf[512];
 
-char	*trim();
-char	*mktemp();
-char	*ctime();
+char	*trim(char *);
+char	*mktemp(char *);
 
+
+/* prototypes for functions defined below */
+void (*signal(int, void (*)(int)))(int);
+int arselect(int *);
+int copyfil(int, int, int);
+int done(int);
+int mesg(int);
+int movefil(int);
+int setcom(int (*)());
 main(argc, argv)
 char *argv[];
 {
@@ -691,7 +702,7 @@ char *p;
  */
 arsyms(fd, base, size, fn, arg)
 long base, size;
-int (*fn)();
+int (*fn)(char *, char *);
 char *arg;
 {
 	char hdr[16];

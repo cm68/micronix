@@ -25,35 +25,35 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <sys/pic.h>
-extern void djint();
-extern void pr();
-extern void djack();
-extern void iodone();
-extern void wakeup();
-extern void sleep();
-static UINT8 getstat();
-extern UINT8 busgive();
-extern UINT8 busget();
+extern void djint(void);
+extern void pr(UINT8 *, INT16);
+extern void djack(void);
+extern void iodone(struct buf *);
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
+static UINT8 getstat(INT16);
+extern UINT8 busgive(INT16 (*)());
+extern UINT8 busget(INT16 (*)());
 
 /*
  * The static routines below, declared before anything calls them.
  */
-static void sio(), djwait(), djstart();
-static UINT8 getstat();
-static void memio(), busready(), busplease(), busthanks();
+static void sio(struct dm *, INT16, INT16, INT16, UINT16, INT16), djwait(), djstart();
+static UINT8 getstat(INT16);
+static void memio(INT16, INT16, INT16, INT16), busready(), busplease(), busthanks();
 
 /*
  * From the kernel rather than from a header: the staging page's
  * allocator, the raw user-memory copies, the raw window mapping, and the
  * disk label decoder.
  */
-extern UINT8 segalloc();
+extern UINT8 segalloc(void);
 extern UINT8 map0[], bufseg;
 extern INT16 copyin(), copyout();
 extern void bwin(UINT8);
-extern INT16 dllabel();
+extern INT16 dllabel(UINT16, UINT16, struct dlgeom *, struct slicemap *, struct dltiming *);
 extern UINT8 *swin(UINT8);
-extern void srel();
+extern void srel(void);
 
 /*
  * This driver's initialization is not in this object: it is init-only
@@ -83,6 +83,12 @@ UINT8 djcomm[26] = { 0 };
  */
 static UINT8 kseg = 0;          /* 0 = not taken; segalloc() starts at 16 */
 
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+INT16 copyout(char *, char *, int);
+int out(int, int);
+void copy(char *, char *, int);
 static UINT8
 kstg()
 {

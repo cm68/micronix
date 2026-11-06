@@ -20,10 +20,10 @@
  * anything.
  */
 struct biovec {
-    INT16 (*open) ();
-    INT16 (*close) ();
-    INT16 (*strat) ();
-    INT16 (*ioctl) ();
+    INT16 (*open) (INT16, INT16);
+    INT16 (*close) (INT16, INT16);
+    INT16 (*strat) (struct buf *);
+    INT16 (*ioctl) (INT16, INT16, char *, struct buf *);
 } biosw[];
 
 /*
@@ -35,11 +35,11 @@ struct biovec {
  * Character device switch
  */
 struct ciovec {
-    INT16 (*open) ();
-    INT16 (*close) ();
-    INT16 (*read) ();
-    INT16 (*write) ();
-    INT16 (*ioctl) ();            /* the terminal's requests live here:
+    INT16 (*open) (INT16, INT16);
+    INT16 (*close) (INT16, INT16);
+    INT16 (*read) (INT16);
+    INT16 (*write) (INT16);
+    INT16 (*ioctl) (INT16, INT16, char *);            /* the terminal's requests live here:
                                  * stty/gtty are TIOCSETA/TIOCGETA rather
                                  * than a hook of their own */
 } ciosw[];

@@ -35,8 +35,8 @@ extern UINT8 npics, nlines;         /* how many of each the boot found */
  * boards provide the same three entry points (ss1_clock.c, upd1990.c);
  * pic_init points these at whichever answered. */
 extern INT16 (*clockinit)();          /* the heartbeat */
-extern INT16 (*rtcinit)();            /* set the clock from s_time */
-extern INT16 (*rtcwrite)();           /* read the clock as s_time */
+extern INT16 (*rtcinit)(INT32);            /* set the clock from s_time */
+extern INT16 (*rtcwrite)(INT32);           /* read the clock as s_time */
 
 /* the console, chosen by the same probe.  The SS1's 2651 (ss1_uart.c)
  * and the MultIO's ACE (mio.s) provide the same entry points. */

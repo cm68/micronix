@@ -120,6 +120,8 @@
 
 #include "s.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * buffer operations 
@@ -159,6 +161,18 @@ struct mod_rec *prev_recs;  /* mod recs for previous user change */
 /*
  * b_changed - tell if last command changed the buffer
  */
+
+/* prototypes for functions defined below */
+int buf_delete(int, int);
+int buf_gets(int, char *);
+int buf_id(int);
+int buf_insert(int, char *);
+int buf_replace(int, char *);
+int s_errmsg(char *, int);
+int s_savemsg(char *, int);
+int add_rec(int, int, char *);
+int b_lineid(int);
+int free_recs(struct mod_rec *);
 int
 b_changed()
 {

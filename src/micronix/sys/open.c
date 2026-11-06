@@ -13,18 +13,18 @@
 #include <sys/file.h>
 #include <sys/con.h>
 #include <errno.h>
-extern void irelse();
-extern void copen();
-extern void ilock();
-extern void bopen();
-extern void fclose();
-extern void wakeup();
-extern void cclose();
+extern void irelse(struct inode *);
+extern void copen(INT16, UINT8);
+extern void ilock(struct inode *);
+extern void bopen(UINT16, UINT16);
+extern void fclose(FILE *);
+extern void wakeup(INT16);
+extern void cclose(INT16, UINT8);
 extern void iclose();
-extern void bflush();
-extern void bclose();
-extern void idec();
-extern UINT8 access();
+extern void bflush(UINT16);
+extern void bclose(UINT16, UINT16);
+extern void idec(struct inode *);
+extern UINT8 access(struct inode *, INT16);
 
 /*
  * A descriptor is one byte, and ERROR is -1 - the same byte as 0xff.
@@ -43,6 +43,15 @@ INT8 iopen();                   /* the same */
  * is masked before it is translated, and O_APPEND is remembered in the
  * file structure for rdwri() to honour on every write.
  */
+
+/* prototypes for functions defined below */
+struct inode * ialloc(INT16);
+struct inode * iname(UINT8 *);
+void zero(char *, int);
+void fclose(struct file *);
+void iclose(struct inode *, UINT8, UINT16);
+INT16 imode(INT16);
+INT8 iopen(struct inode *, INT16);
 void
 open(name, flags)
     UINT8 *name;

@@ -55,6 +55,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <stdlib.h>
 char	lflag;
 char	wflag;
 char	cflag;
@@ -63,6 +64,10 @@ char	*distname;			/* chars, lines or words; else 0 */
 
 long	tlines, twords, tchars;
 
+
+/* prototypes for functions defined below */
+int count(FILE *, char *);
+int report(long, long, long, char *);
 main(argc, argv)
 int argc;
 char *argv[];

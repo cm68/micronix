@@ -39,6 +39,10 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define MAXBSIZE 512
 
@@ -58,8 +62,13 @@ char	all = NO;			/* if report all differences */
 unsigned char	buf1[MAXBSIZE],		/* read buffers */
 		buf2[MAXBSIZE];
 char	*file1, *file2;			/* file names */
-unsigned long	otoi();
+unsigned long	otoi(char *);
 
+
+/* prototypes for functions defined below */
+int endoffile(char *);
+int error(char *);
+int skip(unsigned long, int, char *);
 main(argc, argv)
 	int	argc;
 	char	**argv;

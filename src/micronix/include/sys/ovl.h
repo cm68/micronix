@@ -179,17 +179,17 @@ struct ovlhdr {
  * themselves are the exception and ride the u page (sys/ovlb.c); the
  * char trampolines are here with the tables they index.
  */
-extern struct ovlhdr *ovlbmap(); /* ovlbmap(major): map that block module */
-extern struct ovlhdr *ovlcmap(); /* ovlcmap(major): map that char module */
+extern struct ovlhdr *ovlbmap(UINT16); /* ovlbmap(major): map that block module */
+extern struct ovlhdr *ovlcmap(UINT16); /* ovlcmap(major): map that char module */
 extern struct biovec ovlbvec[]; /* entries the block modules registered */
-extern void ovlremap();          /* ovlremap(): put this process's driver back */
-extern UINT8 *ovldata();         /* ovldata(major): the driver's data, or 0;
+extern void ovlremap(void);          /* ovlremap(): put this process's driver back */
+extern UINT8 *ovldata(UINT16);         /* ovldata(major): the driver's data, or 0;
                                  * block first, then char */
-extern UINT8 ovlcall();           /* ovlcall(fn, seg): run fn with its own page mapped */
-extern INT16 ovlcall1();          /* ovlcall1(fn, seg, arg): the same, one argument */
+extern UINT8 ovlcall(INT16 (*)(INT16), UINT16);           /* ovlcall(fn, seg): run fn with its own page mapped */
+extern INT16 ovlcall1(INT16 (*)(INT16), UINT16, INT16);          /* ovlcall1(fn, seg, arg): the same, one argument */
 extern INT8 ovlattach(UINT16);     /* ovlattach(seg): place a module, run its init */
-extern INT16 ovlstart();          /* place the driver stamped into the slot */
-extern UINT8 ovlntr();            /* ovlntr(line): call the handler on a line */
-extern INT8 intrset();           /* intrset(probe, fn, seg): claim for the attach loop */
-extern INT16 intrline();          /* intrline(fn, seg): the line a handler was wired to */
-extern UINT8 intr_attach();       /* intr_attach(): tickle each card, wire ovlint */
+extern INT16 ovlstart(void);          /* place the driver stamped into the slot */
+extern UINT8 ovlntr(UINT16);            /* ovlntr(line): call the handler on a line */
+extern INT8 intrset(INT16 (*)(INT16), INT16 (*)(INT16), UINT16);           /* intrset(probe, fn, seg): claim for the attach loop */
+extern INT16 intrline(INT16 (*)(INT16), UINT16);          /* intrline(fn, seg): the line a handler was wired to */
+extern UINT8 intr_attach(void);       /* intr_attach(): tickle each card, wire ovlint */

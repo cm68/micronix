@@ -51,6 +51,10 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <string.h>
+#include <string.h>
+#include <string.h>
+#include <string.h>
 struct termios oldt;
 #else
 
@@ -60,6 +64,7 @@ struct termios oldt;
 #include <sys/sgtty.h>
 struct sgttyb oldt;
 #endif
+#include <string.h>
 #endif
 
 #else
@@ -70,6 +75,7 @@ struct sgttyb oldt;
 struct sgtty oldt;
 
 #endif
+#include <string.h>
 
 #define CMD_MAX 500             /* longest command that can be redone */
 
@@ -83,6 +89,11 @@ char *push_ptr = pushed;        /* next location in pushed */
 /*
  * k_donext - push a command back on the input stream 
  */
+
+/* prototypes for functions defined below */
+int b_newcmd(int);
+int s_keyboard(int);
+int s_savemsg(char *, int);
 k_donext(cmd)
     char *cmd;
 {

@@ -18,11 +18,11 @@
 #include <errno.h>
 #include <sys/signal.h>
 #include <sys/pic8259.h>
-extern void sleep();
-extern void drainques();
-extern void wakeup();
-extern void killall();
-extern void drain();
+extern void sleep(INT16, UINT8);
+extern void drainques(struct tty *);
+extern void wakeup(INT16);
+extern void killall(struct tty *, UINT8);
+extern void drain(struct que *);
 
 /*
  * The parts of the line discipline that both copies share - the process
@@ -31,7 +31,7 @@ extern void drain();
  * tty.mod and pty.mod, so anything that can be written once is in the
  * resident half instead of twice in a page.
  */
-extern void killfg(), ttynotify(), cstart(), ustart();
+extern void killfg(struct tty *, UINT8), ttynotify(), cstart(), ustart();
 extern UINT8 ttycbuf[];
 extern INT16 selectchan;          /* select(2): a reader is watching */
 
@@ -39,6 +39,15 @@ extern INT16 selectchan;          /* select(2): a reader is watching */
  * Filter the raw input que into the cooked input que
  * We can't afford to sleep here while using the buffer
  */
+
+/* prototypes for functions defined below */
+INT16 putc(struct que *, INT16);
+void ustart(struct tty *);
+INT16 getc(struct que *);
+void cstart(struct tty *);
+void ttynotify(struct tty *);
+INT16 cookout(struct tty *);
+INT16 cwait(struct tty *);
 INT16
 cookin(tty)
     register struct tty *tty;

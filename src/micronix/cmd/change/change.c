@@ -90,6 +90,8 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define	LINESZ	512
 #define	OUTSZ	4096
@@ -119,7 +121,7 @@ char	*tagstart[NTAGS + 1];
 char	*tagend[NTAGS + 1];
 char	line[LINESZ];
 char	out[OUTSZ];
-char	setbuf[LINESZ];
+char	setstr[LINESZ];
 char	sub[LINESZ];
 char	*lineptr;
 
@@ -250,9 +252,9 @@ addnode(type, spec)
 	if (n->type == '[') {
 		if (spec[1] == '^')
 			n->type = ']';
-		mkset(spec, setbuf);
-		n->set = (char *)malloc(strlen(setbuf) + 1);
-		strcpy(n->set, setbuf);
+		mkset(spec, setstr);
+		n->set = (char *)malloc(strlen(setstr) + 1);
+		strcpy(n->set, setstr);
 	}
 	if (n->next != NULL)
 		n->next->type = 0;

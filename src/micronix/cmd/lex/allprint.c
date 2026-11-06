@@ -1,4 +1,7 @@
 #include <stdio.h>
+
+/* prototypes for functions defined below */
+int printable(int);
 allprint(c)
   char c; {
 	extern FILE *yyout;

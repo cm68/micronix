@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include "sh.h"
+#include <string.h>
 
 /*
  * The operator characters only - the tail of the set at 0x17c0, which

@@ -9,9 +9,10 @@
 
 #include	"defs.h"
 #include <unistd.h>
+#include <stdlib.h>
 
 
-PROC BOOL	chkid();
+PROC BOOL	chkid(STRING);
 
 
 /* literals, not the MSG variables: an initializer naming a global's
@@ -30,6 +31,18 @@ NAMPTR		namep = &mailnod;
 
 /* ========	variable and string handling	======== */
 
+
+/* prototypes for functions defined below */
+int assign(NAMPTR, STRING);
+LOCAL VOID namwalk(REG NAMPTR);
+INT cf(REG STRING, REG STRING);
+INT length(STRING);
+int initf(UFD);
+int itos(int);
+int push(FILE);
+NAMPTR lookup(REG STRING);
+STRING make(STRING);
+VOID setname(STRING, INT);
 syslook(w,syswds)
 	STRING		w;
 	SYSTAB		syswds;
@@ -216,7 +229,7 @@ LOCAL BOOL	chkid(nam)
 	return(TRUE);
 }
 
-LOCAL VOID (*namfn)();
+LOCAL VOID (*namfn)(NAMPTR);
 namscan(fn)
 	VOID		(*fn)();
 {

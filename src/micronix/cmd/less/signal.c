@@ -19,6 +19,9 @@
  */
 #include <sys/signal.h>
 #include <setjmp.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /*
  * The type of signal handler functions.
@@ -42,6 +45,9 @@ extern jmp_buf main_loop;
 /*
  * Interrupt signal handler.
  */
+
+/* prototypes for functions defined below */
+public void lputs(char *);
 	static HANDLER
 interrupt()
 {
@@ -165,9 +171,9 @@ lsystem(cmd)
 	{
 		lower_left();
 		clear_eol();
-		puts("!");
-		puts(cmd);
-		puts("\n");
+		lputs("!");
+		lputs(cmd);
+		lputs("\n");
 	}
 
 	/*
@@ -245,7 +251,7 @@ glob(filename)
 		return (filename);
 	for (p = filebuf;  p < &filebuf[sizeof(filebuf)-1];  p++)
 	{
-		if ((ch = getc(f)) == '\n' || ch == EOF)
+		if ((ch = lgetc(f)) == '\n' || ch == EOF)
 			break;
 		*p = ch;
 	}

@@ -10,17 +10,17 @@
 #include	"defs.h"
 #include	"sym.h"
 
-PROC IOPTR	inout();
-PROC VOID	chkword();
-PROC VOID	chksym();
-PROC TREPTR	term();
-PROC TREPTR	makelist();
-PROC TREPTR	list();
-PROC REGPTR	syncase();
+PROC IOPTR	inout(IOPTR);
+PROC VOID	chkword(void);
+PROC VOID	chksym(int);
+PROC TREPTR	term(int);
+PROC TREPTR	makelist(INT, TREPTR, TREPTR);
+PROC TREPTR	list(int);
+PROC REGPTR	syncase(REG INT);
 PROC TREPTR	item(BOOL);
-PROC VOID	skipnl();
-PROC VOID	prsym();
-PROC VOID	synbad();
+PROC VOID	skipnl(void);
+PROC VOID	prsym(int);
+PROC VOID	synbad(void);
 
 
 /* ========	command line decoding	========*/
@@ -28,6 +28,10 @@ PROC VOID	synbad();
 
 
 
+
+/* prototypes for functions defined below */
+int exitsh(INT);
+int prn(INT);
 TREPTR	makefork(flgs, i)
 	INT		flgs;
 	TREPTR		i;

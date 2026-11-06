@@ -14,9 +14,10 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
-char	*mktemp();
-char	*strcpy();
+char	*mktemp(char *);
+char	*strcpy(char *, char *);
 
 char buf[BUFSIZ];
 

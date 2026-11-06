@@ -1,9 +1,12 @@
 #ifndef lint
+#include <stdlib.h>
+#include <string.h>
 static char sccsid[] = "@(#)run.c	4.5 12/4/84";
 #endif
 
 #include "awk.h"
 #include <stdio.h>
+static obj (*proc)(int, int);
 #define RECSIZE BUFSIZ
 
 #define FILENUM	10
@@ -13,9 +16,9 @@ struct
 	int type;
 	char *fname;
 } files[FILENUM];
-FILE *popen();
+FILE *popen(char *, char *);
 
-extern obj execute(), nodetoobj(), fieldel(), dopa2(), gettemp();
+extern obj execute(node *), nodetoobj(), fieldel(), dopa2(), gettemp();
 extern obj (*proctab[])();
 #define PA2NUM	29
 int pairstack[PA2NUM], paircnt;
@@ -31,6 +34,18 @@ static cell nullval ={EMPTY,EMPTY,0L,NUM,0};
 obj	true	= 0x01020000L;	/* objmk(0, OBOOL, BTRUE) */
 obj	false	= 0x02020000L;	/* objmk(0, OBOOL, BFALSE) */
 
+
+/* prototypes for functions defined below */
+obj arrayel(node *, obj);
+obj nodetoobj(node *);
+cell * fieldadr(int);
+int error(int, int, int, int, int, int, int, int, int);
+int freesymtab(cell *);
+int isnumber(char *);
+int match(struct fa *, char *);
+int pclose(FILE *);
+int redirprint(char *, int, node *);
+int tempfree(obj);
 run()
 {
 	register int i;
@@ -45,7 +60,6 @@ run()
 
 obj execute(u) node *u;
 {
-	register obj (*proc)();
 	obj x;
 	node *a;
 	extern char *printname[];
@@ -114,7 +128,6 @@ obj awkgetline()
 obj array(a,n) node **a;
 {
 	obj x, y;
-	extern obj arrayel();
 
 	x = execute(a[1]);
 	y = arrayel(a[0], x);
@@ -253,7 +266,6 @@ obj indirect(a,n) node **a;
 {
 	obj x;
 	int m;
-	cell *fieldadr();
 
 	x = execute(a[0]);
 	m = getfval(objptr(x));

@@ -13,18 +13,18 @@
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <errno.h>
-extern void irelse();
-extern void bdwrite();
-extern void isync();
-extern void brelse();
-extern void itrunc();
-extern void ifree();
-extern void indfree();
-extern void bfree();
-extern UINT8 ifill();
+extern void irelse(struct inode *);
+extern void bdwrite(struct buf *);
+extern void isync(void);
+extern void brelse(struct buf *);
+extern void itrunc(struct inode *);
+extern void ifree(struct inode *);
+extern void indfree(UINT16, UINT8, INT16);
+extern void bfree(UINT16, INT16);
+extern UINT8 ifill(struct buf *, INT16);
 
 extern UINT8 *swin(UINT8);       /* uio.c: the scratch window */
-extern void srel();
+extern void srel(void);
 extern struct inode ilist[];
 
 extern INT32 seconds;
@@ -46,6 +46,12 @@ static UINT16 lastiblock = 2;
  * to release it.  In core is the truth; never offer a number the kernel
  * already owns.
  */
+
+/* prototypes for functions defined below */
+struct buf * bread(UINT16, UINT16);
+struct buf * getsb(UINT16);
+struct inode * iget(INT16, INT16);
+void zero(char *, int);
 static UINT8
 iincore(inum, dev)
     INT16 inum, dev;

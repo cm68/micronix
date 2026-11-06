@@ -21,7 +21,7 @@
 #include <sys/fs.h>
 #include <sys/con.h>
 #include <errno.h>
-extern void pipe();
+extern void pipe(int *fds);
 
 extern INT32 seconds;
 

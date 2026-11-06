@@ -32,6 +32,9 @@ extern void ttyout(struct tty *), ttyin(UINT8, struct tty *), ttymode();
  * Pair and side of a device number; -1 for a minor that is not one of
  * ours.  The caller has already bounded the major through ciosw.
  */
+
+/* prototypes for functions defined below */
+void ttymode(struct tty *, UINT8);
 INT16
 ptyidx(dev)
     INT16 dev;

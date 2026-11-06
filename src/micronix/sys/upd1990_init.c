@@ -26,6 +26,10 @@ extern INT16 in(), out();
  * chip is in group 0 of the MultIO, so select it first; this used to be
  * the clock block in _minit (inits.s).
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
 void
 upd_clockinit(void)
 {

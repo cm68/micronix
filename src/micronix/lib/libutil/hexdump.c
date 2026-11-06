@@ -8,6 +8,7 @@
 #define	INIT	= 0
 #endif
 
+#include <stdio.h>
 static char pchars[16] INIT;
 static int pcol INIT;
 

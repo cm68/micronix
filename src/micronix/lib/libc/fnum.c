@@ -19,12 +19,13 @@
 
 #define	putc(c)	(*pputc)(c)
 
+void			(*pputc)(int);
 _fnum(val, prec, width, efmt, pputc)
 char *			val;
 char			prec;
 unsigned char		width;
 unsigned char		efmt;
-void			(*pputc)();
+void			(*pputc)(int);
 {
 	putc('?');
 	return 1;

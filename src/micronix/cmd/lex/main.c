@@ -6,6 +6,17 @@
 	/* Copyright 1976, Bell Telephone Laboratories, Inc.,
 	    written by Eric Schmidt, August 27, 1976   */
 
+#include <stdlib.h>
+
+/* prototypes for functions defined below */
+char * lxalloc(int, int);
+int cfoll(int);
+int cfree(void *);
+int error(int, int, int);
+int scopy(char *, char *);
+int slength(char *);
+int warning(int, int, int);
+int yyparse(void);
 main(argc,argv)
 int argc;
 char **argv; {

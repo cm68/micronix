@@ -17,6 +17,8 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 #define	MAXBSIZE	512
@@ -33,8 +35,8 @@ char rflag INIT;
 char vflag INIT;
 char cflag INIT;
 char sflag INIT;
-char *rindex();
-char *malloc();
+char *rindex(char *, int);
+char *malloc(size_t);
 
 /*
  * The cptree destination, remembered before the walk.  Copying / into /b
@@ -45,6 +47,11 @@ static UINT wormdev;
 static UINT wormino;
 static char wormset;
 
+
+/* prototypes for functions defined below */
+int Perror(char *);
+int copy(char *, char *);
+int rcopy(char *, char *);
 main(argc, argv)
     int argc;
     char **argv;

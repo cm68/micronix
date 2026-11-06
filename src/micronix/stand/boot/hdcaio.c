@@ -58,6 +58,12 @@ int curcyl INIT;
  * Select drive 0 and a head, and put the controller in its working
  * state: front-end enabled, running, on the drive clock, writes on.
  */
+
+/* prototypes for functions defined below */
+int bail(char *);
+int in(int);
+int out(int, int);
+int outstr(char *);
 static void
 hdselect(head)
 	UINT8 head;

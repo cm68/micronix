@@ -156,22 +156,22 @@
 #include <sys/ncr.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern void wakeup();
-extern void sleep();
-extern void brelse();
-extern void iodone();
-static INT8 scsistart();
-static INT8 scsiselect();
-extern UINT8 dlslice();
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
+extern void brelse(struct buf *);
+extern void iodone(struct buf *);
+static INT8 scsistart(struct scsiif *, UINT8, INT16, UINT32, UINT16);
+static INT8 scsiselect(struct scsiif *, UINT8);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
 
 /*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static INT16 scsibsy(), scsifinish();
-static INT8 scsistart();
-static INT16 scsireset();
-static INT8 scsiselect();
+static INT16 scsibsy(struct scsiif *), scsifinish();
+static INT8 scsistart(struct scsiif *, UINT8, INT16, UINT32, UINT16);
+static INT16 scsireset(struct scsiif *);
+static INT8 scsiselect(struct scsiif *, UINT8);
 
 /*
  * How many targets the bus can hold, and so how many rows scs[] below
@@ -365,8 +365,8 @@ struct scsiif
      * caller learns that from the pointer's type, not the callee */
     INT16 (*rd)(UINT8);           /* rd(reg) -> byte */
     INT16 (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
-    INT16 (*reset)();             /* reset() */
-    INT16 (*intr)();              /* intr(on): connect or cut the chip's IRQ */
+    INT16 (*reset)(void);         /* reset() */
+    INT16 (*intr)(INT16);              /* intr(on): connect or cut the chip's IRQ */
 
     INT16 busy;                   /* a command is out and not yet finished */
     INT16 done;                   /* ... and the card has interrupted for it */
@@ -379,6 +379,11 @@ struct scsiif
 /*
  * One register, read: the register number is the port.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
 static INT16
 myrd(reg)
     UINT8 reg;

@@ -19,8 +19,8 @@
 #include <sys/pic.h>
 #include <sys/pic8259.h>
 #include <sys/tty.h>
-extern UINT8 intoff();
-extern UINT8 pic_init();
+extern UINT8 intoff(UINT16);
+extern UINT8 pic_init(void);
 
 extern INT16 in(), out();
 extern INT16 di(), ei();
@@ -42,7 +42,11 @@ extern UINT8 slave_vectors[];
 /*
  * Write one vector entry: jp <fn>, padded to the 8259's four bytes.
  */
+
+/* prototypes for functions defined below */
 static
+int in(int);
+int out(int, int);
 void
 vecset(v, fn)
     UINT16 v;
@@ -112,12 +116,12 @@ ss1_svec()
 }
 
 /* the two clock boards' entry points (ss1_clock*.c, upd1990*.c) */
-extern INT16 ss1_clockinit(), ss1_rtcinit(), ss1_rtcwrite();
-extern INT16 upd_clockinit(), upd_rtcinit(), upd_rtcwrite();
+extern INT16 ss1_clockinit(void), ss1_rtcinit(), ss1_rtcwrite();
+extern INT16 upd_clockinit(void), upd_rtcinit(), upd_rtcwrite();
 
 /* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
-extern void ss1_putc(), ss1_uart_init();
-extern INT16 ss1_start(), ss1_stop(), ss1_set();
+extern void ss1_putc(struct tty *, UINT8), ss1_uart_init();
+extern INT16 ss1_start(struct tty *), ss1_stop(), ss1_set();
 extern INT16 ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
 
 /* the CompuPro SS1's two CAS-cascaded 8259s */

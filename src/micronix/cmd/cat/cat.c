@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /*
  * The flags are truth values and the line-state pair is 0 or 1, so
@@ -35,6 +37,10 @@ char	bflg, eflg, nflg, sflg, tflg, uflg, vflg;
 char	spaced, inline;
 int	lno;
 
+
+/* prototypes for functions defined below */
+int copyopt(FILE *);
+int fastcat(int);
 main(argc, argv)
 char **argv;
 {
@@ -186,7 +192,6 @@ register int fd;
 {
 	register int	n, nwritten, offset;
 	register char	*buff;
-	char		*malloc();
 
 	if ((buff = malloc(BUFSIZ)) == NULL) {
 		perror("cat: no memory");

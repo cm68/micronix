@@ -25,11 +25,13 @@
 #include	<types.h>
 #include	<stdio.h>
 #include	<grp.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define	NGMEM	32		/* member slots in the static vector */
 
-static char *	fld();
-int		setgrent();
+static char *	fld(char *);
+int		setgrent(void);
 
 static FILE *		grf;		/* the open stream */
 static char		grline[256];	/* one line of it */
@@ -42,6 +44,9 @@ static char *		grmem[NGMEM];	/* the member vector */
  * has the same function and the same note; the separators are
  * ":\n\r".
  */
+
+/* prototypes for functions defined below */
+int rewind(FILE *);
 static char *
 fld(p)
 char *p;

@@ -29,11 +29,11 @@
 #include <sys/signal.h>
 #include <sys/con.h>
 #include <sys/pty.h>
-extern void send();
-extern void wakeup();
+extern void send(struct proc *, UINT8);
+extern void wakeup(INT16);
 
 extern UINT8 map0[];
-extern void drainques();
+extern void drainques(struct tty *);
 extern INT16 selectchan;          /* select(2): a hung-up tty reads EOF */
 
 /*

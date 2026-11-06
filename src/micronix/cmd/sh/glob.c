@@ -41,6 +41,8 @@
 #include <stdio.h>
 #include <sys/dir.h>
 #include "sh.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define DIRSIZ  14              /* sys/dir.h: char name[14] */
 #define NAMESZ  (DIRSIZ + 1)    /* and room to terminate it */
@@ -59,6 +61,9 @@ static char path[MAXPATH];
  * to match - "echo plain" is the word plain whether or not any such
  * file exists.
  */
+
+/* prototypes for functions defined below */
+int rewind(FILE *);
 int
 ispattern(s)
 char *s;

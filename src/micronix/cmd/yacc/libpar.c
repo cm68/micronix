@@ -1,6 +1,8 @@
 #define _maxdepth 150
 
 /*	parser for yacc output	*/
+#include <stdio.h>
+int yyactr(int);
 extern int yyval; /* defined in the table file */
 extern int yylval; /* defined in the table file */
 extern int *yypv; /* defined in the table file */
@@ -13,6 +15,9 @@ int yynerrs = 0;  /* number of errors */
 int yyerrflag = 0;  /* error recovery flag */
 
 
+
+/* prototypes for functions defined below */
+int yyerror(char *);
 yyparse() {
 
    extern int yygo[], yypgo[], yyr1[], yyr2[], yyact[], yypact[];

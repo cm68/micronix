@@ -38,6 +38,9 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 char	*modestring, *ms;
 int	status;
@@ -46,6 +49,15 @@ char	fflag;
 char	rflag;
 long	telldir();
 
+
+/* prototypes for functions defined below */
+void seekdir(DIR *, long);
+long telldir(DIR *);
+int Perror(char *);
+int chmodr(char *);
+int error(char *, char *);
+int newmode(unsigned);
+int where(int);
 main(argc, argv)
 	int argc;
 	char *argv[];

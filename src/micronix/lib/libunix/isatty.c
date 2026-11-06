@@ -13,6 +13,7 @@
  * to pull the system's type vocabulary in to ask.
  */
 
+#include <unistd.h>
 isatty(fd)
 int fd;
 {

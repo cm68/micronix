@@ -49,13 +49,14 @@
 
 #include <types.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /*
  * puts is in libunix.a - lib/libunix/puts.c, with fputs beside it - and in no
  * header.  Declared here so the call below is a call and not an implicit
  * int.
  */
-int	puts();
+int	puts(char *);
 
 /*
  * The line buffer, and the longest line that fits in it.  v7's number; the
@@ -66,6 +67,12 @@ int	puts();
 int	linec;			/* how many lines the run being printed ran */
 char	mode;			/* 'n' when the counts are wanted, 0 when not */
 
+
+/* prototypes for functions defined below */
+int equal(char [], char []);
+int fatal(char *);
+int gline(char []);
+int pline(char []);
 main(argc, argv)
 int argc;
 char **argv;

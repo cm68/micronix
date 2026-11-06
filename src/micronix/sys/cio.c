@@ -14,13 +14,16 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern UINT8 valid();
+extern UINT8 valid(UINT16, UINT16);
 
-extern struct file *falloc();   /* open.c */
+extern struct file *falloc(void);   /* open.c */
 
 /*
  * Access ciosw to open a character device
  */
+
+/* prototypes for functions defined below */
+INT16 cmajor(UINT16);
 void
 copen(dev, mode)
     INT16 dev;

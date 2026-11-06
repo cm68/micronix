@@ -3,8 +3,12 @@
  *
  */
 
+
+/* prototypes for functions defined below */
+void bmove(char *, char *, int);
 #ifdef debug
 #define ASSERT(p) if(!(p))botch("p");else
+#include <unistd.h>
 botch(s)
 char *s;
 {
@@ -46,7 +50,7 @@ static struct store	allocs[2];	/*initial arena*/
 static struct store *	allocp;		/*search ptr*/
 static struct store *	alloct;		/*arena top*/
 static struct store	allocx;		/* for realloc */
-char *			sbrk();
+char *			sbrk(int incr);
 
 /*
  * __malloc is the allocator: it returns 0 when it cannot find the

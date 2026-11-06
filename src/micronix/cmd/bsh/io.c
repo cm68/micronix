@@ -9,10 +9,17 @@
 
 #include	"defs.h"
 #include	"dup.h"
+#include <fcntl.h>
+#include <unistd.h>
 
 
 /* ========	input output and file copying ======== */
 
+
+/* prototypes for functions defined below */
+INT cf(REG STRING, REG STRING);
+INT length(STRING);
+int itos(int);
 initf(fd)
 	UFD		fd;
 {

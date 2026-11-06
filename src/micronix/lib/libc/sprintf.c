@@ -2,7 +2,7 @@
  * formatted output to string
  *
  */
-extern int	_doprnt();
+extern int	_doprnt(void (*)(), char *, int *);
 
 static char *	sptr;
 

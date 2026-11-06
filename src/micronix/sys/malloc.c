@@ -15,17 +15,17 @@
 #include <sys/ovl.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern void pr();
-extern void panic();
-extern void mwake();
-extern void wakeup();
-extern void newmap();
-extern void send();
-extern void sleep();
-extern void ovlremap();
-extern void bopen();
-extern void lshift();
-extern void rshift();
+extern void pr(UINT8 *, INT16);
+extern void panic(UINT8 *);
+extern void mwake(void);
+extern void wakeup(INT16);
+extern void newmap(struct proc *);
+extern void send(struct proc *, UINT8);
+extern void sleep(INT16, UINT8);
+extern void ovlremap(void);
+extern void bopen(UINT16, UINT16);
+extern void lshift(struct map *);
+extern void rshift(struct map *);
 
 #define NONE    0               /* Decision cpu memory-access bits */
 #define FULL    3
@@ -71,6 +71,13 @@ extern UINT16 taskmap;            /* uhdr.s's _taskmap: the task bitmap */
  * pool segments above that, all under MAXSEG.  It fits a byte, so it
  * comes back in A and the callers' checks stay byte comparisons.
  */
+
+/* prototypes for functions defined below */
+INT16 getbyte(char *);
+INT16 putbyte(int, char *);
+void copy(char *, char *, int);
+void segcopy(int, int);
+void zero(char *, int);
 UINT8
 segalloc()
 {

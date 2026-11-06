@@ -13,14 +13,14 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern void ilock();
-extern void irelse();
-extern void sleep();
-extern void panic();
-extern void pr();
-extern void brelse();
-extern void bdwrite();
-extern void wakeup();
+extern void ilock(struct inode *);
+extern void irelse(struct inode *);
+extern void sleep(INT16, UINT8);
+extern void panic(UINT8 *);
+extern void pr(UINT8 *, INT16);
+extern void brelse(struct buf *);
+extern void bdwrite(struct buf *);
+extern void wakeup(INT16);
 
 struct inode ilist[];
 
@@ -30,6 +30,13 @@ extern UINT8 iio(UINT8, struct inode *);	/* below; flag is a byte */
  * Return a pointer to a locked inode.
  * Errors: bad inumber, ilist is full.
  */
+
+/* prototypes for functions defined below */
+struct buf * bread(UINT16, UINT16);
+void copy(char *, char *, int);
+void x3to4(char *, char *);
+void x4to3(char *, char *);
+void zero(char *, int);
 struct inode *
 iget(num, dev)
     INT16 num, dev;

@@ -25,6 +25,9 @@ BYTPTR		end;			/*arena base (the break)*/
 
 
 
+
+/* prototypes for functions defined below */
+VOID addblok(POS);
 ADDRESS	alloc(nbytes)
 	POS		nbytes;
 {

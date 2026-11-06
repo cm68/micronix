@@ -39,6 +39,11 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #define A_DAY	86400L	/* a day full of seconds */
 #define EQ(x, y)	(strcmp(x, y)==0)
@@ -47,7 +52,7 @@ int	Randlast;
 char	Pathname[256];
 
 struct anode {
-	int (*F)();
+	int (*F)(struct anode *);
 	struct anode *L, *R;
 } Node[100];
 int Nn;		/* number of nodes */
@@ -67,8 +72,19 @@ struct	anode	*exp(),
 		*e2(),
 		*e3(),
 		*mk();
-char	*nxtarg();
-char *rindex();
+char	*nxtarg(void);
+char *rindex(char *, int);
+
+/* prototypes for functions defined below */
+struct anode * mk(int *(*)(), struct anode *, struct anode *);
+int amatch(char *, char *);
+int descend(char *, struct anode *);
+int doex(int);
+int getunum(char *, char *);
+int gmatch(char *, char *);
+int pr(char *);
+int scomp(int, int, char);
+int umatch(char *, char *);
 main(argc, argv) char *argv[];
 {
 	struct anode *exlist;

@@ -7,6 +7,8 @@
  */
 
 #include "upm.h"
+#include <fcntl.h>
+#include <unistd.h>
 
 
 /*
@@ -76,8 +78,8 @@ char	pending_valid;		/* 1 when pending holds a record */
 struct fcb *pending_fcb;	/* the FCB the deferred record belongs to */
 ushort	pending_rec;		/* its record number */
 
-void	flushpending();
-void	flushbyte();
+void	flushpending(void);
+void	flushbyte(struct fcb *);
 
 /*
  * The CCP's own.  loadfile is the program the CCP decided to run, or 0
@@ -101,6 +103,15 @@ char	*loadfile;		/* ee61 */
  * object.  The frame-using handlers take the argument; the small ones
  * read arg2.
  */
+
+/* prototypes for functions defined below */
+int init(int, char **);
+int copen(struct fcb *);
+int delete(struct fcb *);
+int name(struct fcb *, char *);
+int search(int, struct fcb *, char *);
+int setatt(struct fcb *);
+int setrc(struct fcb *);
 cpm(func, arg)
 int func;
 int arg;

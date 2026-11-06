@@ -17,8 +17,8 @@
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-static void krw();
-static void iorw();
+static void krw(INT16, UINT8);
+static void iorw(INT16, UINT8);
 
 /*
  * memread() and memwrite() comprise the memory and port devices.
@@ -62,6 +62,13 @@ static void iorw();
 
 #define ZSIZE	512
 
+
+/* prototypes for functions defined below */
+INT16 getbyte(char *);
+INT16 putbyte(int, char *);
+int in(int);
+int out(int, int);
+void memrw(char *, long, int, int);
 void
 memread(dev)
     INT16 dev;
@@ -146,7 +153,7 @@ krw(dev, rw)
  * major 2 and major 3, so the same vector serves both headers; each
  * module page gets its own copy because memdev.o is linked into each.
  */
-extern void nulldev(), nodev(), noioctl();
+extern void nulldev(void), nodev(), noioctl();
 
 struct ciovec memcvec = {
     &nulldev, &nulldev, &memread, &memwrite, &noioctl

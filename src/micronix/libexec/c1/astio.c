@@ -40,7 +40,7 @@ static long nid2off = -1;	/* file offset of c0's statics section */
  * either.
  */
 #ifdef CCC
-extern long seekraw();
+extern long seekraw(int, unsigned, int);
 #define NSEEK(fd, off) seekraw(fd, (int)(off), 0)
 #define NTELL(fd) seekraw(fd, 0, 1)
 #else
@@ -48,6 +48,8 @@ extern long seekraw();
 #define NTELL(fd) lseek(fd, (long)0, 1)
 #endif
 
+
+/* prototypes for functions defined below */
 void
 nidopen(char *f1)
 {

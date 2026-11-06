@@ -4,6 +4,9 @@
  */
 
 #include "upm.h"
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
 
 char	*farg1;		/* 0100 - the first CP/M file argument, or 0 */
 char	*farg2;		/* 0102 - the second */
@@ -21,6 +24,36 @@ int	pip[2];		/* 13b8 - the pipe devop forks */
  * a CP/M program to load and run.  strcmp returns 0 on equal, so every
  * test here reads "== 0" for a match.
  */
+
+/* prototypes for functions defined below */
+char * buildpref(struct fcb *, char *);
+int _signal(int, int);
+int save(char *);
+int Lower(char *);
+int argname(struct fcb *, char *);
+int bfree(struct node *, ushort);
+int devop(uchar *, char *, char **);
+int dir(char *);
+int dodes(char *);
+int dodev(char *);
+int dosel(char *);
+int dostat(char *);
+int era(char *);
+int free(char *);
+int getword(char *, char *);
+int global(struct fcb *, char *);
+int intrep(char *, int *);
+int isarg(char *);
+int isdes(char *);
+int isdev(char *);
+int isplain(char *);
+int issel(char *);
+int itob(char *, ushort, ushort);
+int ren(char *);
+int signal(int, int);
+int suffix(char *, char *);
+int system(char *);
+int type(char *);
 ccp()
 {
 	char *p;
@@ -999,7 +1032,7 @@ statone(name)
 char *name;
 {
 	char st[36];
-	int recs, bytes, ext, access;
+	int recs, bytes, ext, acc;
 
 	cpystr(buf, disktab[statdriv], "/", name, 0);
 
@@ -1025,13 +1058,13 @@ char *name;
 	if (st[10] | (st[11] & 0x3F))
 		ext++;
 
-	access = access(buf, 2) >= 0;
+	acc = access(buf, 2) >= 0;
 
 	rnum(recs); puts(" ");
 	rnum(bytes); puts("k ");
 	puts("R/");
 	rnum(ext); puts(" ");
-	puts(access ? "W" : "O");
+	puts(acc ? "W" : "O");
 	puts(" ");
 
 printname:

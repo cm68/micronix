@@ -22,6 +22,10 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/signal.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 
 /* Making putcp a macro sped things up by 14%. */
 #define putcp(c)  if (page >= fpage) putchar(c)
@@ -55,14 +59,22 @@ unsigned char	ntflg;
 unsigned char	fflg;
 unsigned char	mflg;
 unsigned char	tabc;	/* the column separator character, or 0 */
-char	*ctime();
-long	time();
+char	*ctime(time_t *);
+long	time(long *);
 
+
+/* prototypes for functions defined below */
+int mopen(char **);
+int numeric(char *);
+int pgetc(int);
+int print(char *, char **);
+int put(int);
+int tpgetc(int);
 main(argc, argv)
 char **argv;
 {
 	int nfdone;
-	int onintr();
+	int onintr(void);
 
 	setbuf(stdout, obuf);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)

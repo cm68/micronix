@@ -13,6 +13,9 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 char dot[] = ".";
 char dotdot[] = "..";

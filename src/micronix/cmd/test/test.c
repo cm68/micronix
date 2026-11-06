@@ -149,7 +149,7 @@ extern char *andor_op[];
 extern int op_priority[];
 extern int op_argflag[];
 
-extern int isatty();
+extern int isatty(int fd);
 
 /* the two failure reports the library's err(3) would provide */
 static void
@@ -168,14 +168,14 @@ badint(s)
 	exit(2);
 }
 
-int expr_is_false();
-void expr_operator();
-int lookup_op();
-int pos_unary();
-int pos_binary();
-void get_int();
-void syntax();
-void overflow();
+int expr_is_false(struct value *);
+void expr_operator(int, struct value *, struct filestat *);
+int lookup_op(char *, char **);
+int pos_unary(char **);
+int pos_binary(char **);
+void get_int(char *, long *);
+void syntax(void);
+void overflow(void);
 
 main(argc, argv)
 	int argc;

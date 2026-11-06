@@ -19,6 +19,8 @@
 /*
  * set by calling windinit
  */
+#include <stdio.h>
+#include <string.h>
 int Rows INIT;
 int Columns INIT;
 
@@ -152,6 +154,14 @@ int Undelchars INIT;
 
 char *Insptr = NULL;
 
+
+/* prototypes for functions defined below */
+int filemess(char *);
+int message(char *);
+int readfile(char *, char *, int);
+int windexit(int);
+int windgoto(int, int);
+int windputc(int);
 main(argc, argv)
     int argc;
     char **argv;

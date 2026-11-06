@@ -136,7 +136,7 @@ extern FILE *fdefine;		/* file for # defines */
 extern FILE * ftable;		/* y.tab.c file */
 extern FILE * ftemp;		/* tempfile to pass 2 */
 extern FILE * foutput;		/* y.output file */
-extern FILE *fopen();
+extern FILE *fopen(char *, char *);
 
 extern struct wset *zzcwp;
 extern int zzgoent ;
@@ -181,9 +181,6 @@ extern char *writem();
 extern int *yalloc();
 
 /* the two-pass table sizing */
-extern char *malloc();
-extern char *calloc();
-extern int free();
 
 /* y5.c aliases into the tables, filled once the tables are malloc'd */
 extern int *ggreed, *pgo, *yypgo, *pmem;
@@ -194,6 +191,7 @@ extern int oflags[];
 extern char *excfb[], *excfsb[], *excfc[], *excfse[], *excfe[];
 extern char *parser[];
 extern int carray(), rarray(), earray();
-extern int (*warray[])();
+extern int (*warray[])(char *, int, int);
 extern char *ndefs[];
 extern char *acts[], *acte[], *dollar[];
+extern int error(char *, ...);

@@ -32,6 +32,10 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/dj.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /*
  * The fdj format blob.  The board's whole-track formatter is downloaded as a

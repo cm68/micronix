@@ -18,7 +18,7 @@ unsigned char	isprint(unsigned char);
 unsigned char	isalpha(unsigned char);		/* libc */
 unsigned char	islower(unsigned char);
 unsigned char	isupper(unsigned char);
-char	k_lastcmd();
+char	k_lastcmd(void);
 
 #define CR		'\r'    /* sent by <return> key */
 #define ctrl(x)		(x & 037)       /* control character 'x' */
@@ -56,3 +56,20 @@ char	k_lastcmd();
 extern int nrows;
 extern int ncols;
 #endif
+
+/* cross-file entry points */
+int b_setcur(int, int);
+int b_gets(int, char *);
+int b_getcur(int *, int *);
+int b_getmark(int *, int *);
+int b_insert(int, char *);
+int b_setline(int);
+int b_delete(int, int);
+int b_lineid(int);
+int b_newcmd(int);
+int s_savemsg(char *, int);
+int s_errmsg(char *, int);
+char * ckalloc(int);
+int s_keyboard(int);
+int scr_move(int, int);
+int k_donext(char *);

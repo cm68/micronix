@@ -19,8 +19,8 @@
 #include <sys/ovl.h>
 #include <sys/pic.h>
 #include <sys/pic8259.h>
-extern UINT8 ovlcall();
-extern UINT8 pic_eoi();
+extern UINT8 ovlcall(INT16 (*)(), UINT16);
+extern UINT8 pic_eoi(UINT16);
 
 extern INT16 in(), out();
 
@@ -43,6 +43,10 @@ struct ovlintr ovlint[MAXNOVLINE]; /* not static: probe_init.c's attach writes i
  * it.  A line nothing claimed returns without doing anything - the
  * interrupt from a card that never attached, or a spurious one.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
 UINT8
 ovlntr(line)
     UINT16 line;

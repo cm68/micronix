@@ -1,3 +1,6 @@
+#ifndef _SYS_DIR_H
+#define _SYS_DIR_H
+
 /*
  * on disk directory format
  *
@@ -19,3 +22,5 @@ struct dir {
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+
+#endif

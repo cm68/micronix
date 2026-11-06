@@ -1,4 +1,21 @@
 #include "ldefs.c"
+
+/* prototypes for functions defined below */
+int acompute(int);
+int bprint(char *, char *, int);
+int error(int, int, int);
+int first(int);
+int follow(int);
+int member(int, char *);
+int nextstate(int, int);
+int notin(int);
+int packtrans(int, char *, int *, int, int);
+int padd(int **, int);
+int printable(int);
+int rprint(int *, char *, int);
+int shiftr(int *, int);
+int upone(int *, int);
+int warning(int, int, int);
 cfoll(v)
 int v;
 	{

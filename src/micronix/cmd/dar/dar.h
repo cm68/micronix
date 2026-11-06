@@ -47,10 +47,10 @@ typedef unsigned long ULONG;
 #define cfree(p)	free(p)
 #define alloc(n)	malloc(n)
 
-char *cpystr();
-int itob();
-void sort();
-void putstr();
+char *cpystr(char *, char *, char *);
+int itob(char *, int, int);
+void sort(unsigned, int (*)(), int (*)(), char **);
+void putstr(int, char *, char *, char *);
 extern int errno;
 
 /*
@@ -260,7 +260,7 @@ extern struct entry thedir [MAXENT];
 
 extern unsigned char fat [];
 
-unsigned long entsize ();
+unsigned long entsize(struct entry *);
 
 extern struct disk *d;
 

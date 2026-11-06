@@ -41,6 +41,10 @@
 
 extern INT16 in(), out();
 
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
 INT16
 ncrinit(seg)
     UINT16 seg;

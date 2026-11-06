@@ -8,10 +8,14 @@
 
 static uchar	ival;
 static char *	x;
-static int	(*emit)();
+static int	(*emit)(int);
 extern int	atoi(char *);
 extern int	strlen(char *);
 
+
+/* prototypes for functions defined below */
+int _fnum(char *, char, unsigned char, unsigned char, void (*)(int));
+int _pnum(unsigned long, char, char, unsigned char, unsigned char, void (*)(int));
 static
 pputc(c)
 int	c;
@@ -44,7 +48,7 @@ register char *	cp;
 #endif
 
 _doprnt(emitfn, f, a)
-void	(*emitfn)();
+void	(*emitfn)(int);
 register char *		f;
 int *		a;
 {
@@ -53,7 +57,6 @@ int *		a;
 	int	i;
 	uchar	base, width, sign, len;
 	uchar	ftype;
-	extern	short _pnum(), _fnum();
 
 	emit = emitfn;
 	while(c = *f++)

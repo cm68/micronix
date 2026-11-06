@@ -12,16 +12,16 @@
 #include <sys/ovl.h>
 #include <errno.h>
 #include <sys/pic8259.h>
-extern void mumcontrol();
-extern void mumstatus();
-extern void muenable();
-extern void sleep();
-extern void ttyopen();
-extern void wakeup();
-extern void ttyclose();
-extern void ttywrite();
-extern void ttymode();
-extern void ttyhangup();
+extern void mumcontrol(INT16);
+extern void mumstatus(INT16);
+extern void muenable(INT16, INT16);
+extern void sleep(INT16, UINT8);
+extern void ttyopen(struct tty *);
+extern void wakeup(INT16);
+extern void ttyclose(struct tty *);
+extern void ttywrite(struct tty *);
+extern void ttymode(struct tty *, UINT8);
+extern void ttyhangup(struct tty *);
 
 /*
  * The static routines below, declared before anything calls them.
@@ -31,7 +31,7 @@ extern void ttyhangup();
  * name.  The complaint lands on the definition rather than on the
  * call that caused it.
  */
-extern void ttinit();
+extern void ttinit(struct tty *, INT16);
 
 #define NMIO    TTY_SLOTS       /* struct tty slots, not minors (see tty.h) */
 #define MBASE 0x48
@@ -107,11 +107,11 @@ extern void ttinit();
  * Hardware fiddlers in mio.s, and the SS1's 2651 in ss1_uart.c
  */
 extern INT16 ace_start(), ace_stop(), ace_putc(), ace_set();
-extern INT16 ss1_start(), ss1_stop(), ss1_set();
-extern void ss1_putc();
-extern void ss1_uart_open();
-extern UINT8 ttypub();            /* publish the page's doors (sys/ttyres.c) */
-extern void ttyconnect(), cstart();  /* shared helpers, sys/ttyres.c */
+extern INT16 ss1_start(struct tty *), ss1_stop(), ss1_set();
+extern void ss1_putc(struct tty *, UINT8);
+extern void ss1_uart_open(INT16, INT16);
+extern UINT8 ttypub(UINT16, INT16 (*) (UINT8, struct tty *), INT16 (*) (struct tty *), INT16 (*) (struct tty *));            /* publish the page's doors (sys/ttyres.c) */
+extern void ttyconnect(struct tty *), cstart();  /* shared helpers, sys/ttyres.c */
 extern void ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
 extern void outwait(struct tty *, INT16);  /* drain the output queue (sys/ttysys.c) */
 extern void mumint();                   /* below, and an entry point the resident half calls */
@@ -137,6 +137,12 @@ extern struct tty mttys[];
  * every time, so /dev/console follows the routing without a second
  * structure and without a stale dev in the opened file.
  */
+
+/* prototypes for functions defined below */
+INT16 ttyread(struct tty *);
+int in(int);
+int out(int, int);
+void cstart(struct tty *);
 struct tty *
 ttdev(dev)
     INT16 dev;

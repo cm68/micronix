@@ -7,11 +7,11 @@
 #include <types.h>
 #include <sys/sys.h>
 #include <sys/proc.h>
-extern UINT8 next();
-extern void run();
-extern void panic();
-extern void abort();
-extern void newmap();
+extern UINT8 next(INT16);
+extern void run(struct proc *);
+extern void panic(UINT8 *);
+extern void abort(INT16);
+extern void newmap(struct proc *);
 
 extern UINT8 memwant, swapping;
 extern struct proc *swapproc;
@@ -42,6 +42,10 @@ UINT8 resched = 0;
 /*
  * Broadcast a wakeup to all processes waiting on event.
  */
+
+/* prototypes for functions defined below */
+void saveframe(char *, char *);
+void setframe(char *, char *);
 void
 wakeup(event)
     INT16 event;

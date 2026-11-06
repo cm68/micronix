@@ -137,23 +137,23 @@
 #include <sys/ide.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern void wakeup();
-extern void sleep();
-extern void brelse();
-extern void iodone();
-static INT8 idefinish();
-static INT8 idestart();
-static UINT8 idewait();
-extern UINT8 dlslice();
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
+extern void brelse(struct buf *);
+extern void iodone(struct buf *);
+static INT8 idefinish(struct ideif *, UINT8 *, INT16);
+static INT8 idestart(struct ideif *, UINT8, UINT32, INT16);
+static UINT8 idewait(struct ideif *);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
 
 /*
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static INT16 idebsy();
-static UINT8 idewait();
-static INT8 idestart(), idefinish();
-static INT16 idereset();
+static INT16 idebsy(struct ideif *);
+static UINT8 idewait(struct ideif *);
+static INT8 idestart(struct ideif *, UINT8, UINT32, INT16), idefinish();
+static INT16 idereset(struct ideif *, UINT8);
 
 #define NDRIVES 2               /* the board's two drives */
 
@@ -298,10 +298,10 @@ struct ideif
      */
     INT16 (*rd)(UINT8);           /* rd(reg) -> byte */
     INT16 (*wr)(UINT8, UINT8);    /* wr(reg, byte) */
-    INT16 (*xfer)();              /* xfer(p, nbytes, read) */
-    INT16 (*reset)();             /* reset() */
+    INT16 (*xfer)(UINT8 *, UINT16, INT16);  /* xfer(p, nbytes, read) */
+    INT16 (*reset)(void);         /* reset() */
     INT16 (*sel)(UINT8);          /* sel(unit) */
-    INT16 (*intr)();              /* intr(on): connect or cut the drive's INTRQ */
+    INT16 (*intr)(INT16);         /* intr(on): connect or cut the drive's INTRQ */
 
     INT16 busy;                   /* a command is out and not yet finished */
     INT16 done;                   /* ... and the drive has interrupted for it */
@@ -313,6 +313,11 @@ struct ideif
  * off port A, let both go again.  This runs with the 8255 in read mode,
  * which myreset() establishes and mywr()/myxfer() put back.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
 static INT16
 myrd(reg)
     UINT8 reg;

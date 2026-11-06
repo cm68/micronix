@@ -75,6 +75,9 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 #define	DTAB		"/etc/dtab"
@@ -110,15 +113,19 @@ char	*iobuf;			/* the copy buffer, from the heap: it is
 int	bufsz = BUFSZ;
 char	walkpath[PATHSZ];	/* the path the walk is at  (55ae) */
 
-char	*strchr(), *strrchr();
+char	*strchr(char *, int), *strrchr(char *, int);
 
-int	catch();
+int	catch(void);
 
 /*
  * Signals.  They are all ignored while a disk is changed, and are
  * otherwise caught and made to clean up, if they were not ignored to
  * begin with.  (1058, 10b4)
  */
+
+/* prototypes for functions defined below */
+char * gets(char *);
+int cleanup(int);
 sigoff()
 {
 	register int i;

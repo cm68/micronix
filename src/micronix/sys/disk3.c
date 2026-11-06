@@ -29,31 +29,31 @@
 #include <sys/ovl.h>
 #include <sys/dlabel.h>
 #include <errno.h>
-extern void brelse();
-extern void iodone();
-extern void bsort();
-extern void d3start();
-extern void reset();
-extern void advque();
-extern void newdrv();
-extern void rwint();
-extern void issue();
-extern void newrw();
-extern void panic();
-extern UINT8 inton();
-extern UINT8 dlslice();
-extern UINT8 d3wait();
-extern UINT8 busgive();
-extern UINT8 busget();
+extern void brelse(struct buf *);
+extern void iodone(struct buf *);
+extern void bsort(struct buf *, struct buf *);
+extern void d3start(void);
+extern void reset(void);
+extern void advque(void);
+extern void newdrv(void);
+extern void rwint(void);
+extern void issue(void);
+extern void newrw(void);
+extern void panic(UINT8 *);
+extern UINT8 inton(UINT16);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
+extern UINT8 d3wait(void);
+extern UINT8 busgive(INT16 (*)());
+extern UINT8 busget(INT16 (*)());
 
 /*
  * Declared before anything calls them: an undeclared call is extern int by
  * default and the definition says static.
  */
-static void d3error();
-static void d3link();
+static void d3error(void);
+static void d3link(void);
 static UINT8 d3specify(UINT8);    /* drive is curdrv: dev & 3 */
-static UINT32 d3addr();
+static UINT32 d3addr(UINT8 *);
 
 #define NDRIVES 4               /* Number of drives */
 #define RETRIES 10              /* no. of retries on r/w error */
@@ -136,6 +136,11 @@ static UINT8 retry = 0,         /* number of retries so far */
  * timing both - comes from sys/dlabel.c through the first thirteen fields
  * of struct info.
  */
+
+/* prototypes for functions defined below */
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
+INT16 d3cyl(UINT16, UINT16, UINT16, UINT16, UINT16);
 INT16
 disk3open(dev, mode)
     UINT16 dev, mode;

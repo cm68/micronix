@@ -10,6 +10,9 @@
  */
 
 #include "upm.h"
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
 
 /*
  * seek is upm's own syscall stub (upmsys.s), not libunix's: its
@@ -24,6 +27,24 @@
  * letters after it into the type field, both uppercased and space-padded.
  * The drive byte is left alone - search writes it after this returns.
  */
+
+/* prototypes for functions defined below */
+int advance(int, struct fcb *);
+int closefile(int);
+int closename(char *);
+char * cpystr(char *, char *);
+int cseek(int, struct fcb *);
+int erase(int);
+int fsize(char *);
+int isdir(char *);
+int openfile(char *);
+int putb(char *, int);
+int puts(char *);
+int rbecho(int);
+int save(char *);
+int selerr(int);
+int uc(int);
+int uniqize(struct fcb *);
 cname(src, dst)
 char *src;
 char *dst;

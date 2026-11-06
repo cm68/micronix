@@ -53,6 +53,11 @@ long poolsaved;
 long poolmerged;
 
 /* the id when the line is exactly "strN:", else -1 */
+
+/* prototypes for functions defined below */
+#ifndef __GNUC__
+int rewind(FILE *);
+#endif
 int
 strlabel(char *line)
 {

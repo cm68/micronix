@@ -29,8 +29,11 @@
 #ifdef CCC
 #define O_RDONLY 0
 #define SEEK_SET 0
-extern int open();
 extern long lseek(unsigned char, long, int);
+extern int read(int, char *, int);
+extern int write(int, char *, int);
+extern int close(int);
+extern int open(char *, int, ...);
 #else
 #include <fcntl.h>
 #include <unistd.h>

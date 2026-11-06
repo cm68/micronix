@@ -35,6 +35,7 @@
 
 #include	"defs.h"
 #include	<sys/sgtty.h>
+#include <unistd.h>
 
 #define	EDMAX	128
 

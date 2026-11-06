@@ -56,6 +56,9 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <crypt.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 struct	passwd *pwd;
 char	*argvec[2];

@@ -18,9 +18,9 @@
 #include <sys/tty.h>
 #include <sys/pic8259.h>
 
-extern struct tty *ttdev();     /* minor -> slot (sys/multio.c) */
-extern void ttinit(), ttyopen();
-extern void ss1_txline(), ss1_uart_init();
+extern struct tty *ttdev(INT16);     /* minor -> slot (sys/multio.c) */
+extern void ttinit(struct tty *, INT16), ttyopen();
+extern void ss1_txline(INT16), ss1_uart_init();
 
 #define SS1_UART_DATA   0x7c
 #define SS1_UART_STAT   0x7d
@@ -39,6 +39,10 @@ extern INT16 in(), out();
  * caller (the tty output path) already holds interrupts off, so the
  * write is the whole of it.
  */
+
+/* prototypes for functions defined below */
+int out(int, int);
+void ttyopen(struct tty *);
 void
 ss1_putc(tty, c)
     struct tty *tty;

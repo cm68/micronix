@@ -3,9 +3,12 @@
  *
  */
 
-extern char * malloc();
+extern char * malloc(unsigned);
 extern void	free(void *);
 
+
+/* prototypes for functions defined below */
+void bmove(char *, char *, int);
 char *
 calloc(n, s)
 register int n, s;

@@ -66,6 +66,12 @@
 #include <pwd.h>
 #include <crypt.h>
 #include <sys/signal.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 char	passwd[] = "/etc/passwd";
 char	temp[]	 = "/etc/ptmp";

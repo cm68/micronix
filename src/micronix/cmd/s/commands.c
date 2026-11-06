@@ -44,9 +44,33 @@
 #include "s.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+char *s_getmsg(char *);
 
 char cur_file[MAXTEXT];     /* remembers name of the current file */
 
+
+/* prototypes for functions defined below */
+char * s_getmsg(char *);
+int address(int, char, char);
+int adjust(int);
+int b_delete(int, int);
+int b_getcur(int *, int *);
+int b_getmark(int *, int *);
+int b_gets(int, char *);
+int b_insert(int, char *);
+int b_setcur(int, int);
+int b_setline(int);
+int do_put(int);
+int k_donext(char *);
+int rewind(FILE *);
+int s_putmsg(char *);
+int s_savemsg(char *, int);
+int strsame(char *, char *);
+int do_read(char *, int);
+int do_write(char *);
+int write_lines(int, int, char *);
 int
 simp_cmd(n, c)
     int n;
@@ -282,7 +306,7 @@ do_star()
 do_io()
 {
     int cur_line, cur_pos, size;
-    char *file, *s_getmsg(), msg[80], *reply;
+    char *file, msg[80], *reply;
 
     /*
      * get the remainder of the command 
@@ -363,7 +387,6 @@ do_read(file, line)
     int line;
 {
     FILE *fp;
-    FILE *fopen();
     int i, c;
     char text[MAXTEXT];
 
@@ -483,7 +506,7 @@ write_lines(from, to, file)
     int from, to;
     char *file;
 {
-    FILE *fopen(), *fp;
+    FILE *fp;
     int count = to - from + 1;
     char text[MAXTEXT - 1];
 

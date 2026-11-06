@@ -14,6 +14,11 @@
  * 'curr' char.  Return NULL if there is no next line.
  */
 
+#include <stdlib.h>
+#include <string.h>
+
+/* prototypes for functions defined below */
+int message(char *);
 char *
 nextline(curr)
     char *curr;

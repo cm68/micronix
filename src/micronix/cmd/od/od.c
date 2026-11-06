@@ -52,6 +52,9 @@
 #include <stdio.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define DBUF_SIZE	BUFSIZ
 #define BIG_DBUF	32
@@ -64,13 +67,13 @@
 #define PADDR		1
 #define MIN_SLEN	3
 
-int	a_put();
-int	b_put();
-int	c_put();
-int	s_put();
-int	us_put();
-int	l_put();
-int	st_put();
+int	a_put(unsigned char *, struct dfmt *);
+int	b_put(unsigned char *, struct dfmt *);
+int	c_put(unsigned char *, struct dfmt *);
+int	s_put(short *, struct dfmt *);
+int	us_put(unsigned short *, struct dfmt *);
+int	l_put(long *, struct dfmt *);
+int	st_put(unsigned char *, struct dfmt *);
 
 struct dfmt {
 	/*
@@ -84,7 +87,7 @@ struct dfmt {
 	char	df_radix;	/* conversion radix */
 	char	df_signed;	/* signed? flag */
 	char	df_paddr;	/* "put address on each line?" flag */
-	int	(*df_put)();	/* function to output object */
+	int	(*df_put)(unsigned char *, struct dfmt *);	/* function to output object */
 	char	*df_fmt;	/* output string format */
 } *conv_vec[32];		/* vector of conversions to be done */
 
@@ -111,11 +114,11 @@ long	label		= -1L;		/* current label; -1 is "off" */
 int	dbuf_size	= 16;		/* file bytes / display line */
 char	_parity		= NO;		/* NO, EVEN (-1) or ODD (1) */
 char	fmt[]	= "            %s";	/* 12 blanks */
-char	*icvt();
-char	*scvt();
-char	*underline();
+char	*icvt(long, int, int, int);
+char	*scvt(int, struct dfmt *);
+char	*underline(char *);
 char	*pad();
-long	get_addr();
+long	get_addr(char *);
 
 
 /*
@@ -169,6 +172,16 @@ char	_ctype[256] = {
 };
 
 
+
+/* prototypes for functions defined below */
+int canseek(FILE *);
+int dumbseek(FILE *, long);
+int line(int);
+int offset(long);
+int parity(int);
+int pr_sbuf(struct dfmt *, int);
+int put_addr(long, long, char);
+int put_sbuf(int, struct dfmt *);
 main(argc, argv)
 int	argc;
 char	**argv;

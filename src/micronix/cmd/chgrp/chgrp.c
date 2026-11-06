@@ -49,6 +49,9 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 struct	stat stbuf;
 int	gid;
@@ -57,6 +60,15 @@ int	status;
 char	fflag, rflag;
 long	telldir();
 
+
+/* prototypes for functions defined below */
+void seekdir(DIR *, long);
+long telldir(DIR *);
+int Perror(char *);
+int chgrpr(char *);
+int error(char *, char *);
+int fatal(int, char *, char *);
+int isnumber(char *);
 main(argc, argv)
 	int argc;
 	char *argv[];

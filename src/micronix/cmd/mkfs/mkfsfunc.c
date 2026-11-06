@@ -27,7 +27,7 @@
  * long comes back in the shadow bank, so every caller in the tree,
  * this one included, reads the value from the *tp store instead.
  */
-int time(long *);
+long time(long *);
 
 char *pname;
 

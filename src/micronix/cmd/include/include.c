@@ -42,6 +42,10 @@
  */
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define	LINESZ	512
 #define	MAXOPEN	13

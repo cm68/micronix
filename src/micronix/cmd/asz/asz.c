@@ -25,6 +25,10 @@
 #include <signal.h>
 #else
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <signal.h>
 #endif
 
 #include "asm.h"
@@ -151,7 +155,7 @@ char saw_eof;  /* set when CP/M EOF (^Z) encountered */
 
 extern char pass;
 
-void gripe();
+void gripe(char *);
 
 int
 fillbuf()

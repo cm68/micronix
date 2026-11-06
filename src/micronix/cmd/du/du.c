@@ -38,6 +38,9 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define	fsize(sp)	(((long)(sp)->d.d_size0 << 16) + (sp)->d.d_size1)
 
@@ -56,10 +59,14 @@ struct {
 } ml[ML];
 unsigned char	mlx;		/* 0..ML, and ML is 200 */
 
-long	descend();
+long	descend(char *, char *);
 long	telldir();
-char	*rindex(), *strcpy();
+char	*rindex(char *, int), *strcpy(char *, char *);
 
+
+/* prototypes for functions defined below */
+void seekdir(DIR *, long);
+long telldir(DIR *);
 main(argc, argv)
 	int argc;
 	char **argv;

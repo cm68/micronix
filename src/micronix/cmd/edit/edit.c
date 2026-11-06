@@ -25,12 +25,14 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 /*
- * The raw system calls edit drives, declared the way ed.c does rather
- * than by pulling in unistd.h: that header also declares a seek(), and
- * edit has an io primitive of its own by that name (below), which the
- * redeclaration would collide with.
+ * The raw system calls edit drives come from the tree's headers now.
+ * edit's own io primitive is seekto(), not seek(): unistd.h declares a
+ * seek() for the kernel's three-argument call, and the two would
+ * collide.
  */
-extern int read(), write(), open(), close(), creat(), unlink();
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 extern long lseek(unsigned char, long, int);	/* fd is a byte, in A */
 
 #define	EOS	'\0'
@@ -102,6 +104,13 @@ char	**_argv_;
 
 /* ---- the io library ---- */
 
+
+/* prototypes for functions defined below */
+int docmd(char *, int, int, int *);
+int maklin(char *, int, int *);
+int optpat(char *, int *);
+int ptscan(int, int *);
+void relink(int, int, int, int);
 int
 getc(fd)
 int fd;
@@ -309,7 +318,7 @@ char *name;
 }
 
 void
-seek(offset, fd)
+seekto(offset, fd)
 int offset, fd;
 {
 	lseek(fd, (long)offset, 0);
@@ -542,7 +551,7 @@ int k, m, *j, max;
 
 /* ---- the editor ---- */
 
-void	relink();	/* called by setbuf before its definition below */
+void	relink(int, int, int, int);	/* called by setbuf before its definition below */
 
 void
 setbuf()
@@ -625,7 +634,7 @@ int i, *newind;
 	}
 	if (addset(EOS, txt, &txtend, MAXLINE) == NO)
 		return ERR;
-	seek(scrend, scr);
+	seekto(scrend, scr);
 	buf[lastbf + SEEKADR] = scrend;
 	buf[lastbf + LENG] = length(txt);
 	putlin(txt, scr);
@@ -663,7 +672,7 @@ int line;
 	int j, k;
 
 	k = getind(line);
-	seek(buf[k + SEEKADR], scr);
+	seekto(buf[k + SEEKADR], scr);
 	readf(txt, buf[k + LENG], scr);
 	j = buf[k + LENG] + 1;
 	txt[j] = EOS;

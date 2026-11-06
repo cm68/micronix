@@ -3,6 +3,8 @@
  */
 
 #include "less.h"
+#include <string.h>
+#include <unistd.h>
 
 public int errmsgs;	/* Count of messages displayed by error() */
 
@@ -20,6 +22,9 @@ extern char *first_cmd;
 /*
  * Display the line which is in the line buffer.
  */
+
+/* prototypes for functions defined below */
+public void lputc(int);
 	public void
 put_line()
 {
@@ -71,7 +76,7 @@ put_line()
 		case '\t':
 			do
 			{
-				putc(' ');
+				lputc(' ');
 				column++;
 			} while ((column % tabstop) != 0);
 			break;
@@ -82,18 +87,18 @@ put_line()
 		default:
 			if (c & 0200)
 			{
-				putc('^');
-				putc(c & 0177);
+				lputc('^');
+				lputc(c & 0177);
 				column += 2;
 			} else
 			{
-				putc(c);
+				lputc(c);
 				column++;
 			}
 		}
 	}
 	if (column < sc_width || !auto_wrap || ignaw)
-		putc('\n');
+		lputc('\n');
 }
 
 /*
@@ -150,7 +155,7 @@ dropout()
  * one place every character passes through, so this is the place.
  */
 	public void
-putc(c)
+lputc(c)
 	int c;
 {
 	extern int in_raw_mode;
@@ -170,11 +175,11 @@ putc(c)
  * Output a string.
  */
 	public void
-puts(s)
+lputs(s)
 	register char *s;
 {
 	while (*s != '\0')
-		putc(*s++);
+		lputc(*s++);
 }
 
 /*
@@ -221,15 +226,15 @@ error(s)
 	lower_left();
 	clear_eol();
 	so_enter();
-	puts(s);
-	puts(press_return);
+	lputs(s);
+	lputs(press_return);
 	so_exit();
 
 #if ONLY_RETURN
-	while ((c = getc()) != '\n' && c != '\r')
+	while ((c = lgetc()) != '\n' && c != '\r')
 		bell();
 #else
-	c = getc();
+	c = lgetc();
 	if (c != '\n' && c != '\r' && c != ' ')
 	{
 		buf[0] = c;

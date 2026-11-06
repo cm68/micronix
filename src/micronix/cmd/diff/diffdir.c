@@ -19,11 +19,13 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
 
-struct	direct *readdir();
-DIR	*opendir();
-int	execv();
+struct	direct *readdir(DIR *);
+DIR	*opendir(char *);
+int	execv(char *, char **);
 
 #define	ONLY	1		/* Only in this directory */
 #define	SAME	2		/* Both places and same */
@@ -35,10 +37,19 @@ struct dent {
 	char	*d_entry;
 };
 
-struct	dent *setupdir();
+struct	dent *setupdir(char *);
 char	header;		/* 0 or 1; see diff.h on the flags */
 char	title[2*BUFSIZ], *etitle;
 
+
+/* prototypes for functions defined below */
+int ascii(int);
+int calldiff(char *);
+int compare(struct dent *);
+int only(struct dent *, int);
+int scanpr(struct dent *, int, char *, char *, char *, char *, char *);
+int setfile(char **, char **, char *);
+int useless(char *);
 diffdir(argv)
 	char **argv;
 {
@@ -180,7 +191,7 @@ only(dp, which)
 	printf("Only in %.*s: %s\n", efile - file - 1, file, dp->d_entry);
 }
 
-int	entcmp();
+int	entcmp(struct dent *, struct dent *);
 
 struct dent *
 setupdir(cp)

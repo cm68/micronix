@@ -12,6 +12,17 @@ int	swlevel	= -1;
 int	swexit[5];
 int	nextcase[5];
 
+
+/* prototypes for functions defined below */
+int error(char *);
+int genlab(int);
+int gnbtok(char *);
+int gtok(char *);
+int outcode(char *);
+int outcont(int);
+int outgoto(int);
+int outnum(int);
+int putcom(char *);
 swcode() {
 	transfer = 0;
 	putcom("switch");

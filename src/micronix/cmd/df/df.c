@@ -48,11 +48,11 @@ int nmount;
 int nkmount;			/* entries read from the kernel's table */
 int headed;			/* the column heading has been printed */
 
-int readmtab();
-int readmounts();
-int finddev();
-void report();
-int super();
+int readmtab(void);
+int readmounts(void);
+int finddev(int, UINT *, UINT *, UINT *, UINT *);
+void report(char *);
+int super(char *, UINT *, UINT *, UINT *, UINT *);
 
 main(argc, argv)
     int argc;

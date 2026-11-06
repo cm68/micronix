@@ -25,7 +25,7 @@
 #include <sys/con.h>
 #include <sys/ovl.h>
 #include <sys/signal.h>
-extern void pr();
+extern void pr(UINT8 *, INT16);
 
 /*
  * Kernel configuration, formerly con.c.  These are resident globals:
@@ -59,8 +59,8 @@ UINT8 map0[];
 UINT8 lowbss[];                  /* the freed low memory, 0x260 (uhdr.s) */
 extern UINT8 nbufs;             /* uhdr.s's _nbufs: the published count */
 
-extern UINT8 segalloc();    /* malloc.c: a segment is a byte */
-extern void nodev();             /* con.c */
+extern UINT8 segalloc(void);    /* malloc.c: a segment is a byte */
+extern void nodev(void);             /* con.c */
 
 /*
  * The ceiling on the pool.  expand_bufs() would otherwise mint whatever
@@ -86,6 +86,9 @@ extern void nodev();             /* con.c */
  * The signon report: the machine summary, printed once the buffer cache
  * is at its final size, so the cache-block count is the one that matters.
  */
+
+/* prototypes for functions defined below */
+void zero(char *, int);
 void
 signon()
 {

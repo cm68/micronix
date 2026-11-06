@@ -9,6 +9,7 @@
 
 #include	"defs.h"
 #include	"sym.h"
+#include <unistd.h>
 
 LOCAL CHAR	quote;	/* used locally */
 LOCAL CHAR	quoted;	/* used locally */
@@ -17,6 +18,16 @@ LOCAL INT	getch(CHAR);	/* defined below; copyto calls it first */
 
 
 
+
+/* prototypes for functions defined below */
+LOCAL flush(int);
+VOID tdystak(REG STKPTR);
+int chkpipe(INT *);
+int estabf(REG STRING);
+int execute(TREPTR, int, INT *, INT *);
+int initf(UFD);
+int push(FILE);
+int trim(STRING);
 LOCAL STRING	copyto(endch)
 	REG CHAR	endch;
 {

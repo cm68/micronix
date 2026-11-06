@@ -13,7 +13,7 @@
 struct syscall
 {
     UINT8 nbytes;                /* no. of bytes in arguments */
-    void (*call)();             /* address of system call */
+    void (*call)(UINT16, UINT16, UINT16); /* address of system call */
 };
 
 extern void indir(), exit(), r_fork(), read(), write(), open(), r_close(), wait(), link(), unlink(), exec(), execve(), chdir(), r_time(), mknod(), chmod(), chown(), brake(), stat(), r_seek(), getpid(), mount(), umount(), setuid(), getuid(), stime(), unimp(), alarm(), fstat(), r_ftruncate(), pause(), badcall(), s_stty(), s_gtty(), r_ioctl(), permission(), nice(), snooze(), sync(), reboot(), kill(), dup(), dup2(), r_pipe(), signal(), jobctl(), select();

@@ -2,6 +2,14 @@
 #include <unistd.h>
 
 
+
+/* prototypes for functions defined below */
+int enbint(short);
+int fatal(char *);
+int fatal1(char *, char *);
+int doexec(char *);
+int doshell(char *, int);
+int metas(char *);
 dosys(comstring,nohalt)
 register char *comstring;
 int nohalt;
@@ -53,7 +61,7 @@ return( await() );
 
 await()
 {
-int intrupt();
+int intrupt(void);
 int status;
 register int pid;
 

@@ -8,8 +8,9 @@
  */
 
 #include	"defs.h"
+#include <stdlib.h>
 
-PROC STRING *copyargs();
+PROC STRING *copyargs(STRING [], int);
 LOCAL DOLPTR	dolh;
 
 CHAR	flagadr[10];
@@ -24,6 +25,10 @@ INT	flagval[]  = {
 /* ========	option handling	======== */
 
 
+
+/* prototypes for functions defined below */
+int assnum(STRING *, INT);
+int freeargs(DOLPTR);
 INT	options(argc,argv)
 	STRING		*argv;
 	INT		argc;

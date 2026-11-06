@@ -24,18 +24,18 @@
 #include <sys/net.h>
 #include <sys/ovl.h>
 #include <errno.h>
-extern void iodone();
-extern void sleep();
-extern UINT8 inton();
+extern void iodone(struct buf *);
+extern void sleep(INT16, UINT8);
+extern UINT8 inton(UINT16);
 static INT8 exclude();
 
 extern INT16 in(), out();
-extern UINT8 inton();
+extern UINT8 inton(UINT16);
 
 struct nd ndinfo[NND];
 
 static INT16 ndmutex;		/* the card, 0 = free */
-static INT16 (*ndintr) ();	/* the phase the op-done interrupt resumes */
+static INT16 (*ndintr)(struct nd *);	/* the phase the op-done interrupt resumes */
 static struct nd *ndintarg;
 static UINT8 nddead;		/* seconds the request has been in flight */
 static UINT8 ndstat;		/* the status that raised the interrupt */
@@ -45,6 +45,13 @@ static void phase00(), phase04(), phase09(), phase11(), phase12(), release();
 /*
  * One byte in and out of the card's data area at the current pointer.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+static void phase00(struct nd *);
+static void phase11(struct nd *, INT16);
+static void phase12(struct nd *);
 static UINT8
 ndin()
 {

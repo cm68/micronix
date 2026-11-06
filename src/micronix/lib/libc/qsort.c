@@ -4,12 +4,17 @@
  *
  */
 
+
+/* prototypes for functions defined below */
+char * malloc(unsigned);
+int free(char *);
+void _swap(int, char *, char *);
+void bmove(char *, char *, int);
 qsort(base, nel, width, compar)
-char *base; int (*compar)();
+char *base; int (*compar)(char *, char *);
 unsigned width,nel;
 {
 	register char *	x;
-	extern char *	malloc();
 	register int	i,j,l,r;
 	struct {
 		int	l,r;

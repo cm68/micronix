@@ -14,15 +14,15 @@
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <errno.h>
-extern UINT8 ronly();
-extern UINT8 super();
-extern void idec();
-extern void irelse();
-extern void isync();
-extern void bsync();
-extern void pr();
-extern UINT8 valid();
-extern UINT8 access();
+extern UINT8 ronly(struct inode *);
+extern UINT8 super(void);
+extern void idec(struct inode *);
+extern void irelse(struct inode *);
+extern void isync(void);
+extern void bsync(void);
+extern void pr(UINT8 *, INT16);
+extern UINT8 valid(UINT16, UINT16);
+extern UINT8 access(struct inode *, INT16);
 
 extern INT8 oalloc();       /* open.c: a descriptor or ERROR */
 extern void close(UINT8);    /* open.c */
@@ -30,6 +30,9 @@ extern void close(UINT8);    /* open.c */
 /*
  * Break system call
  */
+
+/* prototypes for functions defined below */
+struct inode * iname(UINT8 *);
 void
 brake(addr)
     INT16 addr;

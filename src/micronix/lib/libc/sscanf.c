@@ -5,7 +5,7 @@
 
 #include	<types.h>
 
-extern int	_doscan();
+extern int	_doscan(int (*)(), int (*)(), char *, int **);
 
 static char *	sptr;
 

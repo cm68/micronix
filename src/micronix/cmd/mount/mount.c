@@ -58,16 +58,16 @@ char fstab_dev[MAXFSTAB][32];
 char fstab_dir[MAXFSTAB][32];
 int nfstab;
 
-void list();
-int checkfs();
-int rootdir();
-void addmtab();
-void readfstab();
-char *devof();
-char *specialpath();
-int ismounted();
-int domount();
-void mountall();
+void list(void);
+int checkfs(char *);
+int rootdir(int);
+void addmtab(char *, char *);
+void readfstab(void);
+char *devof(char *);
+char *specialpath(char *);
+int ismounted(char *);
+int domount(char *, char *, int);
+void mountall(void);
 
 main(argc, argv)
     int argc;

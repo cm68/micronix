@@ -19,6 +19,7 @@
 #define yypact temp1
 #define greed tystate
 
+#include <unistd.h>
 int * ggreed;
 int * pgo;
 int *yypgo;
@@ -70,6 +71,15 @@ int adb = 0;
 
 
 
+
+/* prototypes for functions defined below */
+int error(char *, int, int);
+int arout(char *, int *, int);
+int earout(char *, int *, int);
+int farout(char *, int *, int);
+int gin(int);
+int pcom(char *, int);
+int stin(int);
 #ifdef TWOPASS
 
 char *ofiles[] = {	FILEC,

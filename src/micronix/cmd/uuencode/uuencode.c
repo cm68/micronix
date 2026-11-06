@@ -31,6 +31,8 @@
 
 #define	LEN	45
 
+#include <stdlib.h>
+#include <unistd.h>
 char	buf[LEN];
 
 main(argc, argv)

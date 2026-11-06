@@ -15,6 +15,10 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #define	major(x)	(((x) >> 8) & 0xff)
 #define	minor(x)	((x) & 0xff)
@@ -81,16 +85,23 @@ struct	lbuf	**lastp = flist;
 struct	lbuf	**firstp = flist;
 char	*dotp	= ".";
 
-char	*makename();
-struct	lbuf *gstat();
-char	*ctime();
-long	nblock();
-int	compar();
-int	dodir();
+char	*makename(char *, char *);
+struct	lbuf *gstat(char *, int);
+char	*ctime(time_t *);
+long	nblock(long);
+int	compar(struct lbuf **, struct lbuf **);
+int	dodir(char *);
 
 #define	ISARG	0100000
 
 /* return the number of digits an integer needs to print */
+
+/* prototypes for functions defined below */
+int rewind(FILE *);
+int getname(int, char []);
+int pentry(struct lbuf *);
+int pmode(int);
+int readdir(char *);
 wide(i)
 int i;
 {
@@ -529,7 +540,6 @@ gstat(file, argfl)
 char *file;
 {
 	/* alloc() is what v7 called it; the library here has malloc */
-	extern char *malloc();
 	struct stat statb;
 	register struct lbuf *rep;
 	static int nomocore;

@@ -57,6 +57,8 @@
 #include <dirent.h>
 #include <sys/signal.h>
 
+#include <stdlib.h>
+#include <unistd.h>
 struct utmp {			/* 20 bytes, v7 layout - see login.c */
 	char	ut_line[8];	/* +0  the tty name, e.g. "tty2" */
 	char	ut_name[8];	/* +8  the login name */
@@ -71,12 +73,18 @@ char	*mytty;
 char	histty[32];
 char	*histtya;
 char	*ttyname();
-char	*index();
+char	*index(char *, int);
 int	logcnt;
 int	eof();
 int	timout();
 FILE	*tf;
 
+
+/* prototypes for functions defined below */
+char * ttyname(int);
+int ex(char *);
+int sigs(int);
+void (*signal(int, void (*)(int)))(int);
 main(argc, argv)
 int argc;
 char *argv[];

@@ -13,12 +13,18 @@
 
 #include	"defs.h"
 
-PROC VOID	gsort();
+PROC VOID	gsort(STRING [], STRING []);
 
 #define ARGMK	01
 
 BOOL		nosubst;
 
+
+/* prototypes for functions defined below */
+INT cf(REG STRING, REG STRING);
+INT expand(STRING, int);
+int makearg(REG ARGPTR);
+LOCAL INT split(REG STRING);
 trim(at)
 	STRING		at;
 {

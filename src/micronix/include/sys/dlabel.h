@@ -208,7 +208,7 @@ struct slicemap
  *     -1   the label names no such slice; *g maps nothing, and u.error
  *	    is ENXIO.
  */
-extern INT16 dllabel();
+extern INT16 dllabel(UINT16, UINT16, struct dlgeom *, struct slicemap *, struct dltiming *);
 
 /*
  * Decode one slice of a drive against its cached map: offset in
@@ -216,7 +216,7 @@ extern INT16 dllabel();
  * Returns 0, or ENXIO for a slice that is not carved or runs off the
  * drive.
  */
-extern UINT8 dlslice();
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
 
 /*
  * Reload the label out of the buffer being written to block 0 of 'c',
@@ -224,7 +224,7 @@ extern UINT8 dlslice();
  * "writing the label reloads the partition table" side effect, shared by
  * every block driver.  Returns 1 for a readable label, 0 otherwise.
  */
-extern INT16 dlreload();
+extern INT16 dlreload(struct buf *, struct dlgeom *, struct slicemap *, struct dltiming *);
 
 /*
  * vim: set tabstop=4 shiftwidth=4 expandtab:

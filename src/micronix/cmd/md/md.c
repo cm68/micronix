@@ -36,6 +36,7 @@
 #define MAXROWS  128     /* table data rows */
 #define MAXTBL   4096    /* raw table data rows, flat and NUL-separated */
 
+#include <stdlib.h>
 FILE *out;              /* stdout */
 FILE *inf;              /* the file being read */
 
@@ -107,10 +108,10 @@ int tblused;
 /* htext: where the heading text starts, set by atx(). */
 char *htext;
 
-char *rdline();
-unsigned char *scan();
-char *listmark();
-char *unquote();
+char *rdline(void);
+unsigned char *scan(unsigned char *, int);
+char *listmark(char *);
+char *unquote(char *);
 dolist();
 item();
 
@@ -120,6 +121,12 @@ item();
  */
 int lastc;
 
+
+/* prototypes for functions defined below */
+int dolist(char *);
+int emitverb(char *);
+int flushline(int, int *);
+int stripnl(char *);
 outc(c)
 int c;
 {

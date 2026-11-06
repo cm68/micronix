@@ -41,6 +41,7 @@
 #include <sys/mw.h>
 #include <sys/dlabel.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 
 /*

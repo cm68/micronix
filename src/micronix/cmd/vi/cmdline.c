@@ -7,9 +7,28 @@
 
 #include "stevie.h"
 
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 char cmdbuf[100] INIT;
 char msgbuf[80] INIT;
 
+
+/* prototypes for functions defined below */
+int cntlines(char *, char *);
+int docmdline(char *);
+int dosearch(int, char *);
+int filemess(char *);
+int gotocmd(int, int, int);
+int logmsg(char *);
+int message(char *);
+int readfile(char *, char *, int);
+int windgoto(int, int);
+int windputc(int);
+int windstr(char *);
+int writeit(char *);
 readcmdline(firstc)
     int firstc;                 /* either ':', '/', or '?' */
 {

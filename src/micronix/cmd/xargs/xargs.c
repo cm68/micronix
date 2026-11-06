@@ -30,6 +30,8 @@
 #define MAXARG 64		/* the shell's limit, in words per command */
 #define ARGMAX 2048		/* exec's arg block: NBLKS(4) * 512 bytes */
 
+#include <stdlib.h>
+#include <unistd.h>
 char *pathv[] = { ".", "/bin", "/usr/bin", 0 };
 
 char *cmdv[MAXARG];		/* the command and its accumulated args */
@@ -37,11 +39,15 @@ int nav;			/* how many of cmdv[] are live */
 int nfixed;			/* the command plus its own arguments */
 int nbytes;			/* strlen+1 of every live cmdv[] entry */
 
-char *savestr();
+char *savestr(char *);
 char *findcmd();
 int cmdbytes();
 void run();
 
+
+/* prototypes for functions defined below */
+char * savestr(char *);
+char * findcmd(char *);
 main(argc, argv)
     int argc;
     char **argv;

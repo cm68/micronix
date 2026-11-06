@@ -11,18 +11,24 @@
 #include <sys/inode.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern UINT8 super();
-extern void irelse();
-extern void itrunc();
-extern void ilock();
-extern void ilink();
-extern UINT8 access();
+extern UINT8 super(void);
+extern void irelse(struct inode *);
+extern void itrunc(struct inode *);
+extern void ilock(struct inode *);
+extern void ilink(INT16);
+extern UINT8 access(struct inode *, INT16);
 
 extern INT8 iopen();          /* open.c: a descriptor or ERROR */
 
 /*
  * Creat system call.
  */
+
+/* prototypes for functions defined below */
+INT8 iopen(struct inode *, INT16);
+struct inode * ialloc(INT16);
+struct inode * iname(UINT8 *);
+struct inode * imkfile(INT16, INT16);
 void
 creat(name, mode)
     UINT8 *name;

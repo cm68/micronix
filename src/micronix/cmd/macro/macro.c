@@ -17,6 +17,8 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define	alnum(c) (((c)>='A'&&(c)<='Z')||((c)>='a'&&(c)<='z')||((c)>='0'&&(c)<='9'))
 #define	digit(c) ((c) >= '0' && (c) <= '9')

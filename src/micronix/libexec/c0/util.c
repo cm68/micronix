@@ -6,12 +6,12 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include "libutil.h"
+#include <fcntl.h>
 
 extern char *nameOf(unsigned short id);	/* lexread.c */
-extern int open();
-extern int creat();
 
 #ifndef PSIZE
 #define PSIZE 80
@@ -270,7 +270,6 @@ static unsigned short *iid;
 static unsigned short nicnt;
 static unsigned short inused;
 
-extern void exit(int);
 extern char *galloc(unsigned int size);	/* error.c: calloc, fatal on OOM */
 
 /*

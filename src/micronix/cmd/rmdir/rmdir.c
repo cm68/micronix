@@ -16,9 +16,14 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 extern int errno;
 
+
+/* prototypes for functions defined below */
+int rmdir(char *);
 main(argc, argv)
 int argc;
 char **argv;

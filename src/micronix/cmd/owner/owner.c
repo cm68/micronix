@@ -39,10 +39,17 @@
 #include <pwd.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 struct	stat stbuf;
 int	status;
 
+
+/* prototypes for functions defined below */
+int Perror(char *);
+int fatal(char *, char *);
+int isnumber(char *);
 main(argc, argv)
 	int argc;
 	char *argv[];

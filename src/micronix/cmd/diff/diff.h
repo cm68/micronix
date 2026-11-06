@@ -104,11 +104,11 @@ char	**diffargv;		/* option list to pass to recursive diffs */
 char	*file1, *file2, *efile1, *efile2;
 struct	stat stb1, stb2;
 
-char	*malloc(), *talloc(), *ralloc();
-char	*savestr(), *splice();
-char	*mktemp(), *copytemp(), *rindex();
-char	*calloc(), *realloc(), *ctime();
-int	done();
+char	*malloc(unsigned), *talloc(int), *ralloc(char *, int);
+char	*savestr(char *), *splice(char *, char *);
+char	*mktemp(char *), *copytemp(void), *rindex(char *, int);
+char	*calloc(int, int), *realloc(char *, unsigned short), *ctime(time_t *);
+int	done(void);
 int	execv();
 
 extern	char diffh[], diff[], pr[];

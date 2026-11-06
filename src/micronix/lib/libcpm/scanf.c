@@ -5,7 +5,7 @@
 
 #include	<stdio.h>
 
-extern int	_doscan();
+extern int	_doscan(int (*)(), int (*)(), char *, int **);
 
 static
 gstdin()

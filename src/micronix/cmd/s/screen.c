@@ -67,6 +67,7 @@
 #endif
 
 #include "s.h"
+#include <string.h>
 
 /*
  * screen control commands for ANSI terminals 
@@ -102,6 +103,11 @@ char save = '\0';               /* character in location (nrows, ncols-1) */
 /*
  * scr_clr - clear the current row 
  */
+
+/* prototypes for functions defined below */
+int s_errmsg(char *, int);
+int errmsg(char *, int);
+int pause(int);
 scr_clr()
 {
     SCREEN(CLEAR_ROW);

@@ -47,9 +47,11 @@
  */
 
 #include "s.h"
+#include <stdio.h>
+#include <string.h>
 
-extern scr_puts();
-extern scr_instr();		/* was scr_inst, which is nothing */
+extern scr_puts(char *);
+extern scr_instr(char *);		/* was scr_inst, which is nothing */
 
 /*
  * These three are static and defined at the bottom of this file, but
@@ -60,11 +62,11 @@ extern scr_instr();		/* was scr_inst, which is nothing */
  * link that fails on a symbol defined in the same file.  The compiler
  * accepts the contradiction without a word.
  */
-static int expand();
-static int good_first();
-static int row_of_id();
-extern scr_dlc();
-extern scr_dlr();
+static int expand(char *, char *, int);
+static int good_first(void);
+static int row_of_id(int, int);
+extern scr_dlc(int);
+extern scr_dlr(void);
 
 #define CLEAR		-1      /* "ID" for cleared row */
 #define D_OR_I_COST	3       /* delete/insert cost per character */
@@ -95,6 +97,21 @@ char **text;                /* text of line at row i (subscript 0 unused)
 /*
  * s_errmsg - format and print msg; wait for the user to read it 
  */
+
+/* prototypes for functions defined below */
+int b_getcur(int *, int *);
+int b_gets(int, char *);
+int b_lineid(int);
+int scr_move(int, int);
+int delete(int, int);
+int displ_text(int, int, int, char *);
+int ins_text(int, int, int, char *);
+int insert(int, int);
+int ptoseg(char *, int, int *, int *);
+int repl_text(int, int, int, int, char *);
+int replace(int, int, int);
+int s_putmsg(char *);
+int scroll(int, int);
 s_errmsg(msg, val)
     char *msg;
     int val;
@@ -170,7 +187,6 @@ s_getmsg(msg)
 s_init()
 {
     int row;
-    char *ckalloc();
 
     /*
      * save constants giving terminal characteristics 
@@ -451,7 +467,7 @@ changes()
  * chop_arg - chop a function's argument to a maximum length 
  */
 chop_arg(fcn, arg, maxlen)
-    int (*fcn)();
+    int (*fcn)(char *);
     int maxlen;
     char *arg;
 {

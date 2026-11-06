@@ -13,16 +13,16 @@
 #include <sys/file.h>
 #include <sys/con.h>
 #include <errno.h>
-extern UINT8 next();
-extern void pr();
-extern void bankcopy();
-extern void run();
-extern void wakeup();
-extern void mfree();
-extern void sleep();
-extern UINT8 swapout();
-extern UINT8 mget();
-extern UINT8 procopy();
+extern UINT8 next(INT16);
+extern void pr(UINT8 *, INT16);
+extern void bankcopy(struct proc *);
+extern void run(struct proc *);
+extern void wakeup(INT16);
+extern void mfree(struct proc *);
+extern void sleep(INT16, UINT8);
+extern UINT8 swapout(struct proc *);
+extern UINT8 mget(struct proc *);
+extern UINT8 procopy(struct proc *);
 
 extern void close(UINT8);    /* open.c */
 
@@ -31,6 +31,12 @@ extern struct proc *initproc, *swapproc;
 /*
  * Fork system call.
  */
+
+/* prototypes for functions defined below */
+void copy(char *, char *, int);
+void saveframe(char *, char *);
+void zero(char *, int);
+INT16 procid(struct proc *);
 INT16
 fork()
 {

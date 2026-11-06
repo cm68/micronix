@@ -1,12 +1,13 @@
 #ifndef lint
+#include <stdlib.h>
 static char sccsid[] = "@(#)b.c	4.2 8/11/83";
 #endif
 
 #include <stdio.h>
 #include "awk.h"
 
-extern node *op2();
-extern struct fa *cgotofn();
+extern node *op2(int, node *, node *);
+extern struct fa *cgotofn(void);
 #define MAXLIN 256
 #define NCHARS 128
 #define NSTATES 256
@@ -41,6 +42,15 @@ int	setcnt;
 int	line;
 
 
+
+/* prototypes for functions defined below */
+int * add(int);
+int error(int, int, int, int, int, int, int, int, int);
+int cfoll(node *);
+int follow(node *);
+int freetr(node *);
+int notin(int **, int, int *);
+int penter(node *);
 struct fa *makedfa(p)	/* returns dfa for tree pointed to by p */
 node *p;
 {
@@ -149,7 +159,6 @@ register node *v;
 {
 	register i;
 	int prev;
-	int *add();
 
 	switch(type(v)) {
 		LEAF

@@ -36,6 +36,8 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <pwd.h>
+#include <signal.h>
+#include <stdlib.h>
 
 #define DEV      "/dev/net0"
 #define N_MAXPAY 256

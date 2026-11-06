@@ -1,4 +1,6 @@
 #ifndef lint
+#include <stdlib.h>
+#include <string.h>
 static char sccsid[] = "@(#)main.c	4.4 (Berkeley) 12/8/84";
 #endif
 
@@ -20,6 +22,11 @@ extern	errorflag;	/* non-zero if any syntax errors; set by yyerror */
 int filefd, symnum, ansfd;
 char *filelist;
 extern int maxsym, errno;
+
+/* prototypes for functions defined below */
+int error(int, int, int, int, int, int, int, int, int);
+int freeze(char *);
+int thaw(char *);
 main(argc, argv) int argc; char *argv[]; {
 	if (argc == 1)
 		error(FATAL, "Usage: awk [-f source | 'cmds'] [files]");

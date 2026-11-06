@@ -1,9 +1,11 @@
 #ifndef lint
+#include <stdlib.h>
 static char sccsid[] = "@(#)parse.c	4.2 8/11/83";
 #endif
 
 #include "awk.h"
 #include <stdio.h>
+int error(int, int, int, int, int, int, int, int, int);
 node *ALLOC(n)
 {
 	register node *x;
@@ -12,6 +14,8 @@ node *ALLOC(n)
 		error(FATAL, "out of space in ALLOC");
 	return(x);
 }
+
+/* prototypes for functions defined below */
 node *exptostat(a) node *a;
 {
 	a->ntype = NSTAT;

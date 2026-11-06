@@ -10,7 +10,19 @@
  * is split for c1 - see the comment in yyparse below.
  */
 
+#include <stdio.h>
 extern int transfer;
+/* cross-file entry points (r0.c, r1.c, r2.c, rio.c) */
+int yyerror(char *);
+int outcont(int);
+int untils(int, int);
+int endsw(int, int);
+int whilestat(int);
+int forstat(int);
+int dostat(int);
+int gokcode(int);
+int outcode(char *);
+int elsecode(int);
 extern	int	indent;
 # define IF 257
 # define ELSE 258
@@ -125,6 +137,7 @@ YYSTYPE yyv[YYMAXDEPTH]; /* where the values are stored */
 int yychar = -1; /* current input token number */
 int yynerrs = 0;  /* number of errors */
 short yyerrflag = 0;  /* error recovery flag */
+
 
 yyparse() {
 

@@ -25,6 +25,7 @@
 #include <sys/signal.h>
 #include <errno.h>
 #include <unistd.h>
+#include <signal.h>
 
 
 #define	BUFSIZ	8192
@@ -43,6 +44,10 @@ char out[BUFSIZ];
 
 extern int errno;
 
+
+/* prototypes for functions defined below */
+int puts(char *);
+int stash(int);
 main(argc,argv)
 char **argv;
 {

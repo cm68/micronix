@@ -16,8 +16,8 @@
 #include <sys/ovl.h>
 #include <errno.h>
 
-extern UINT16 bmajor();
-extern void nodev(), iodone();
+extern UINT16 bmajor(UINT16);
+extern void nodev(void), iodone();
 extern struct biovec ovlbvec[];
 
 /*
@@ -35,6 +35,9 @@ extern struct biovec ovlbvec[];
  * answer is not a test of presence.  A driver the kernel still holds has
  * entries and no segment, and then there is nothing to map.
  */
+
+/* prototypes for functions defined below */
+void iodone(struct buf *);
 INT16
 ovlopen(dev, mode)
     UINT16 dev;

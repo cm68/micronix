@@ -53,10 +53,10 @@ extern char Redobuff[], Undobuff[], Insbuff[], msgbuf[], cmdbuf[];
 extern char *Uncurschar, *Insptr;
 extern int Ninsert, Undelchars;
 
-char *malloc(), *strchr(), *strcpy();
+char *malloc(unsigned), *strchr(char *, int), *strcpy();
 
-char *nextline(), *prevline(), *coladvance(), *ssearch();
-char *fwdsearch(), *bcksearch();
+char *nextline(char *), *prevline(char *), *coladvance(char *, int), *ssearch(int, char *);
+char *fwdsearch(char *), *bcksearch(char *);
 
 /* the character tests: a byte in A in, the answer as a byte in A out */
 unsigned char isspace(unsigned char);

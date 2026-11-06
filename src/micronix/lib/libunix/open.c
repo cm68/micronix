@@ -29,7 +29,7 @@
 #include	<unistd.h>
 
 extern int errno;
-extern int sysopen();
+extern int sysopen(char *, int);
 
 int
 open(name, flags, mode)

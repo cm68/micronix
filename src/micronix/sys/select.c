@@ -58,11 +58,11 @@
 #include <sys/pty.h>
 #include <sys/net.h>
 #include <errno.h>
-extern UINT8 inton();
+extern UINT8 inton(UINT16);
 
-extern void sleep(), wakeup();
+extern void sleep(INT16, UINT8), wakeup();
 extern INT16 in();
-extern UINT8 inton();
+extern UINT8 inton(UINT16);
 extern struct tty mttys[];
 extern struct tty *ptyslave[], *ptymaster[];
 extern UINT16 console_minor;
@@ -82,7 +82,10 @@ INT16 selectchan;
  * more pass through select's loop, and the sleep's wakeup comes after
  * the store that counted.
  */
+
+/* prototypes for functions defined below */
 static
+int in(int);
 INT16
 ttyready(t)
     register struct tty *t;

@@ -8,12 +8,12 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
-extern UINT8 next();
-extern void set0();
+extern UINT8 next(INT16);
+extern void set0(void);
 extern void main();
-extern void r_system();
-extern void send();
-extern void fault();
+extern void r_system(void);
+extern void send(struct proc *, UINT8);
+extern void fault(void);
 
 /*
  * Firmware constants, defined in uhdr.s
@@ -23,8 +23,8 @@ extern UINT16 trapvec, trapstack;
 
 extern UINT8 resched;            /* sleep.c defines and initializes it */
 
-extern INT16 fork();
-extern void expand_bufs(), swap();
+extern INT16 fork(void);
+extern void expand_bufs(void), swap();
 
 /*
  * Permission masks.
@@ -62,6 +62,12 @@ extern void expand_bufs(), swap();
  * for tasks 1 and 0 are identical.
  * The stack pointer has been set.
  */
+
+/* prototypes for functions defined below */
+INT16 copyout(char *, char *, int);
+void copy(char *, char *, int);
+void setframe(char *, char *);
+void zero(char *, int);
 void
 start()
 {

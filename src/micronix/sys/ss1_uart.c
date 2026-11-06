@@ -45,6 +45,10 @@ extern INT16 in(), out();
  * what stops the request: the chip must keep sending for the monitor.
  * The driver page calls this through ss1_start/ss1_stop.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
 void
 ss1_txline(on)
     INT16 on;

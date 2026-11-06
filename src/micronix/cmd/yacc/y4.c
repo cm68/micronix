@@ -1,6 +1,19 @@
 #include "dextern"
 #include "files"
 
+
+/* prototypes for functions defined below */
+char * symnam(int);
+char * writem(int *);
+int aryfil(int *, int, int);
+int closure(int);
+int go2gen(int);
+int precftn(int, int, int);
+int putitem(int *, struct looksets *);
+int state(int);
+int wdef(char *, int);
+int wract(int);
+int wrstate(int);
 output(){ /* print the output for the states */
 
 	int i, k, c;

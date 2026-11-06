@@ -9,32 +9,32 @@
 #include <sys/proc.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern void brake();
-extern void chdir();
-extern void chmod();
-extern void chown();
-extern void sync();
-extern void dup();
-extern void dup2();
-extern void getuid();
-extern void nice();
-extern void setuid();
-extern void alarm();
-extern void getpid();
-extern void pause();
-extern void stat();
-extern void stime();
-extern void fstat();
-extern void snooze();
-extern void pr();
-extern void send();
+extern void brake(INT16);
+extern void chdir(UINT8 *);
+extern void chmod(UINT8 *, INT16);
+extern void chown(UINT8 *, UINT16);
+extern void sync(void);
+extern void dup(void);
+extern void dup2(UINT16);
+extern void getuid(void);
+extern void nice(void);
+extern void setuid(void);
+extern void alarm(void);
+extern void getpid(void);
+extern void pause(void);
+extern void stat(UINT8 *, UINT8 *);
+extern void stime(void);
+extern void fstat(UINT8 *);
+extern void snooze(void);
+extern void pr(UINT8 *, INT16);
+extern void send(struct proc *, UINT8);
 
 extern UINT8 resched;
 
 /*
  * extern struct proc * hier; 
  */
-extern void nulldev();
+extern void nulldev(void);
 
 UINT8 trace = 0;                 /* debugging switch */
 
@@ -44,7 +44,7 @@ UINT8 trace = 0;                 /* debugging switch */
 struct syscall
 {
     UINT8 nbytes;                /* no. of bytes in arguments */
-    void (*call)();             /* address of system call */
+    void (*call)(UINT16, UINT16, UINT16); /* address of system call */
 };
 
 #define BADCALL 47              /* index of a bad call entry in syssw */
@@ -64,24 +64,24 @@ struct syscall
  *
  * indir, unimp and badcall are in this file, below the table.
  */
-extern void indir(), unimp(), badcall();
+extern void indir(UINT8 *), unimp(), badcall();
 
-extern void brake(), chdir(), chmod(), chown(), sync(), dup(), dup2(), getuid(), setuid(), nice();            /* sys1.c */
-extern void pause(), stat(), alarm(), getpid(), stime(), fstat(), snooze();                                      /* sys2.c */
-extern void permission();                                    /* access.c */
-extern void mount(), umount();                               /* mount.c */
-extern void link(), unlink();                                /* link.c */
-extern void exec();                                          /* exec.c */
-extern void mknod();
-extern void creat();                               /* create.c */
-extern void open();                                          /* open.c */
-extern void read(), write();                                 /* rdwri.c */
-extern void exit(), wait();                                  /* fork.c */
-extern void kill(), signal();                                /* sig.c */
-extern void s_stty(), s_gtty();                              /* cio.c */
+extern void brake(INT16), chdir(), chmod(), chown(), sync(), dup(), dup2(), getuid(), setuid(), nice();            /* sys1.c */
+extern void pause(void), stat(), alarm(), getpid(), stime(), fstat(), snooze();                                      /* sys2.c */
+extern void permission(UINT8 *, INT16);                                    /* access.c */
+extern void mount(UINT8 *, UINT8 *, UINT8), umount();                               /* mount.c */
+extern void link(UINT8 *, UINT8 *), unlink();                                /* link.c */
+extern void exec(UINT8 *, UINT8 **);                                          /* exec.c */
+extern void mknod(UINT8 *, INT16, INT16);
+extern void creat(UINT8 *, INT16);                               /* create.c */
+extern void open(char *, int, ...);                                          /* open.c */
+extern void read(INT16, INT16), write();                                 /* rdwri.c */
+extern void exit(void), wait();                                  /* fork.c */
+extern void kill(INT16), signal();                                /* sig.c */
+extern void s_stty(UINT8 *), s_gtty();                              /* cio.c */
 
-extern void r_close(), r_fork(), r_ioctl();         /* reg.c */
-extern void r_pipe(), r_seek(), r_ftruncate(), r_time();
+extern void r_close(void), r_fork(), r_ioctl();         /* reg.c */
+extern void r_pipe(void), r_seek(), r_ftruncate(), r_time();
 
 /*
  * These two are entries 49 and 50 and NOTHING DEFINES THEM.  reg.c
@@ -109,7 +109,7 @@ extern INT16 r_lock(), r_unlock();
  */
 extern struct syscall syssw[];
 extern INT16 ncalls;
-extern UINT8 valid();             /* sys/malloc.c: make the page grown */
+extern UINT8 valid(UINT16, UINT16);             /* sys/malloc.c: make the page grown */
 
 /*
  * Entry point for system calls. A typical call:
@@ -117,6 +117,14 @@ extern UINT8 valid();             /* sys/malloc.c: make the page grown */
  * "hlt".
  * See trap() for the stack setup.
  */
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+INT16 getbyte(char *);
+INT16 getword(char *);
+INT16 procid(struct proc *);
+void saveframe(char *, char *);
+INT16 docall(UINT8 *, UINT8);
 void
 system()
 {

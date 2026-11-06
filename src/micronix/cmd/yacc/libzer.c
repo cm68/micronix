@@ -1,3 +1,4 @@
+#include <stdio.h>
 int yyline;
 yyerror(s) char *s; {
 	printf("\n%s", s );

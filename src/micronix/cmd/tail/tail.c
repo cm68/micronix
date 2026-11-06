@@ -75,6 +75,9 @@ extern int	errno;
 struct	stat	statb;
 char	bin[LBIN];
 
+
+/* prototypes for functions defined below */
+int digit(int);
 main(argc, argv)
 int argc;
 char **argv;

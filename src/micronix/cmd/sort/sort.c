@@ -92,6 +92,7 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define	L	512
 #define	N	7
@@ -115,9 +116,9 @@ unsigned	nlines;
 unsigned	ntext;
 int	*lspace;
 char	*tspace;
-int	cmp(), cmpa(), term();
-int	(*compare)() = cmpa;
-char	*eol();
+int	cmp(char *, char *), cmpa(), term();
+int	(*compare)(char *, char *) = cmpa;
+char	*eol(char *);
 int 	mflg;
 int	cflg;
 int	uflg;
@@ -264,8 +265,21 @@ struct field proto = {
 };
 int	nfields;
 int 	error = 1;
-char	*setfil();
+char	*setfil(int);
 
+
+/* prototypes for functions defined below */
+char * skip(char *, struct field *, int);
+int blank(int);
+int cant(char *);
+int cmpa(char *, char *);
+int diag(char *, char *);
+int disorder(char *, char *);
+int field(char *, int);
+int merge(int, int);
+int number(char **);
+int qsort(char **, char **);
+int rline(struct merg *);
 main(argc, argv)
 int argc;
 char **argv;
@@ -674,7 +688,6 @@ cmp(i, j)
 char *i, *j;
 {
 	register char *pa, *pb;
-	char *skip();
 	char *code, *ignore;
 	int a, b;
 	int k;

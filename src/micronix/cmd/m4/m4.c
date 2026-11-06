@@ -14,6 +14,10 @@
  */
 #include <stdio.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define ERROR NULL
 #define	READ	"r"
@@ -112,12 +116,12 @@ char	*dumploc;
 char	*errploc;
 
 char	*tempname;
-struct nlist	*lookup();
-char	*install();
-char	*malloc();
-char	*mktemp();
-char	*copy();
-long	ctol();
+struct nlist	*lookup(char *);
+char	*install(char *, char *);
+char	*malloc(size_t);
+char	*mktemp(char *);
+char	*copy(char *);
+long	ctol(char *);
 int	hshval;
 FILE	*olist[11] = { stdout };
 int	okret;
@@ -126,6 +130,35 @@ FILE	*curfile = { stdout };
 FILE	*infile[10] = { stdin };
 int	infptr	= 0;
 
+
+/* prototypes for functions defined below */
+int ctoi(char *);
+int docq(char **, int);
+int dodef(char **, int);
+int dodiv(char **, int);
+int dodivnum(char **, int);
+int dodnl(char **, int);
+int dodump(char **, int);
+int doerrp(char **, int);
+int doeval(char **, int);
+int doif(char **, int);
+int doifdef(char **, int);
+int doincl(char **, int, int);
+int doincr(char **, int);
+int doindex(char **, int);
+int dolen(char **, int);
+int domake(char **, int);
+int doshift(char **, int);
+int dosubstr(char **, int);
+int dosyscmd(char **, int);
+int dotransl(char **, int);
+int doundef(char **, int);
+int doundiv(char **, int);
+int expand(char **, int);
+int max(int, int);
+int min(int, int);
+int putnum(long);
+int strindex(char *, char *);
 main(argc, argv)
 char **argv;
 {

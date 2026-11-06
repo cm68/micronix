@@ -11,15 +11,15 @@
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern void pr();
-extern void panic();
-extern void bdwrite();
-extern void prdev();
-extern void bawrite();
-extern UINT8 bcheck();
+extern void pr(UINT8 *, INT16);
+extern void panic(UINT8 *);
+extern void bdwrite(struct buf *);
+extern void prdev(UINT8 *, UINT16);
+extern void bawrite(struct buf *);
+extern UINT8 bcheck(UINT16, struct super *, INT16, UINT8 *);
 
 extern UINT8 *swin(UINT8);       /* uio.c: the scratch window */
-extern void srel();
+extern void srel(void);
 
 /*
  * Assert the superblock's free list holds only valid block numbers.
@@ -36,6 +36,13 @@ extern void srel();
  * over it.  sup->s_free is printed raw, so a garbage count shows where
  * the first sane word begins.
  */
+
+/* prototypes for functions defined below */
+struct buf * bget(UINT16, UINT16);
+struct buf * bread(UINT16, UINT16);
+struct buf * getsb(UINT16);
+void copy(char *, char *, int);
+void zero(char *, int);
 #ifdef FREEDEBUG
 INT16
 sbdump(sup, what)

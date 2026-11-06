@@ -22,6 +22,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <mtab.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define NMOUNT 10		/* the kernel's NMOUNT (sys/sys.h) */
 #define MAXFSTAB 8
@@ -32,10 +35,10 @@ char fstab_dev[MAXFSTAB][32];
 char fstab_dir[MAXFSTAB][32];
 int nfstab;
 
-void delmtab();
-char *specialof();
-void readfstab();
-char *specialpath();
+void delmtab(char *);
+char *specialof(char *);
+void readfstab(void);
+char *specialpath(char *);
 
 main(argc, argv)
     int argc;

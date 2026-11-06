@@ -49,6 +49,9 @@
 #define	USERS	50
 #define	MSIZE	3000
 
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 struct utmp {			/* 20 bytes, v7 layout - see login.c */
 	char	ut_line[8];	/* +0  the tty name, e.g. "tty2" */
 	char	ut_name[8];	/* +8  the login name */
@@ -59,6 +62,9 @@ char	mesg[MSIZE];
 int	msize;
 struct	utmp utmp[USERS];
 
+
+/* prototypes for functions defined below */
+int sendmes(char *);
 main(argc, argv)
 int argc;
 char *argv[];

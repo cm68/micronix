@@ -29,6 +29,7 @@
 
 #include <types.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define LB 256
 int	one;
@@ -39,8 +40,14 @@ char	*ldr[3];
 
 FILE *ib1;
 FILE *ib2;
-FILE *openfil();
+FILE *openfil(char *);
 
+
+/* prototypes for functions defined below */
+int compare(char *, char *);
+int copy(FILE *, char *, int);
+int rd(FILE *, char *);
+int wr(char *, int);
 main(argc, argv)
 	int argc;
 	char *argv[];

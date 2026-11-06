@@ -34,16 +34,20 @@ extern char *pe;	/* the expression string, scanned by yylex */
 
 static int tok;		/* the current lookahead token */
 
-static long oror();
-static long andand();
-static long bnot();
-static long cmp();
-static long add();
-static long mul();
-static long power();
-static long unary();
-static long primary();
+static long oror(void);
+static long andand(void);
+static long bnot(void);
+static long cmp(void);
+static long add(void);
+static long mul(void);
+static long power(void);
+static long unary(void);
+static long primary(void);
 
+
+/* prototypes for functions defined below */
+int peek(int, int, int);
+int yyerror(char *);
 static
 advance()
 {

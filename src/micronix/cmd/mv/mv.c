@@ -47,6 +47,10 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define	MAXPATHLEN 512
 #define	MAXBSIZE 512
@@ -60,12 +64,22 @@
 	(((st).st_mode&S_IFMT) == S_IFCHR || ((st).st_mode&S_IFMT) == S_IFBLK)
 
 extern	int errno;
-char	*dname();
+char	*dname(char *);
 struct	stat s1, s2;
 /* truth values, so bytes */
 char	iflag = 0;	/* interactive mode */
 char	fflag = 0;	/* force overwriting */
 
+
+/* prototypes for functions defined below */
+int Perror(char *);
+int Perror2(char *, char *);
+int error(char *, int, int);
+int move(char *, char *);
+int moveshort(char *, char *);
+int parentof(char *, char *);
+int query(int, char *, int);
+int sameparent(char *, char *);
 main(argc, argv)
 	register char *argv[];
 {

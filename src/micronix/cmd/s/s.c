@@ -40,8 +40,15 @@
  * the call is implicitly extern and compiles to "call _get_count",
  * which nothing defines.
  */
-static int get_count();
+static int get_count(char *);
 
+
+/* prototypes for functions defined below */
+int address(int, char, char);
+int b_getcur(int *, int *);
+int fatal(char *);
+int k_donext(char *);
+int simp_cmd(int, char);
 int
 main(argc, argv)
     int argc;

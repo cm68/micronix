@@ -17,13 +17,16 @@
 #include <sys/proc.h>
 #include <sys/dlabel.h>
 #include <errno.h>
-extern void brelse();
+extern void brelse(struct buf *);
 
 /*
  * Decode the label lp points at into *g, *table and *tm.  The buffer it
  * is in is held by the caller.  Returns 1 for a readable label, else 0.
  */
+
+/* prototypes for functions defined below */
 static
+struct buf * bread(UINT16, UINT16);
 UINT8
 dlabel_decode(lp, g, table, tm)
     struct dlabel *lp;

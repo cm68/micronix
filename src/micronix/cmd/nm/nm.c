@@ -14,14 +14,17 @@
 #endif
 
 #include <obj.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #ifdef DO_HITECH
 #include "hiobj.h"
 #endif
 
 FILE *fp;
 unsigned char *filebuf;         /* only ht_report still indexes this */
-unsigned char get_byte();
-int dbyte();
+unsigned char get_byte(long);
+int dbyte(long);
 long filesize;
 int bflag;      /* -b: hex dump segments */
 int dflag;      /* -d: disassemble */
@@ -337,9 +340,9 @@ unsigned short *relrefs = NULL;  /* relative jump targets */
 int nrelrefs = 0;
 
 /* forward declarations */
-struct reloc *find_reloc();
-char *reloc_name();
-char *relocNmByte();
+struct reloc *find_reloc(int);
+char *reloc_name(int, int, char *);
+char *relocNmByte(int, unsigned char, int, char *);
 
 /*
  * find data reference index, returns -1 if not found

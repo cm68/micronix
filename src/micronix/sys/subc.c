@@ -8,16 +8,19 @@
 #include <sys/sys.h>
 #include <sys/con.h>
 #include <sys/ovl.h>
-extern void sync();
-extern void pr();
-extern void prn();
-extern void prs();
+extern void sync(void);
+extern void pr(UINT8 *, INT16);
+extern void prn(UINT16, UINT16);
+extern void prs(UINT8 *);
 
 /*
  * panic stop
  */
-void
+/* prototypes for functions defined below */
+int console(void);
+void prs(UINT8 *);
 
+void
 panic(s)
     UINT8 *s;
 {

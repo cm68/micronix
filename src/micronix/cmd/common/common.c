@@ -59,6 +59,10 @@
  */
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define	LINESZ	512
 #define	USAGE	"usage: common [-1] [-2] [-3] [-wN] file1 [file2]\n"

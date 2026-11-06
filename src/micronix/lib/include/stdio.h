@@ -102,7 +102,8 @@ long		ftell(FILE *);
  */
 int		fseek(FILE *, long, int);
 char *		fgets(char *, int, FILE *);
-char *		_bufallo();
+char *		_bufallo(void);
+int		_buffree(char *);
 int _flsbuf(unsigned char, FILE *);
 /*
  * int, not char: both return the character read or written, or EOF,
@@ -121,11 +122,17 @@ int fputc(int, FILE *);
 int fclose(FILE *);
 int fflush(FILE *);
 int fputs(char *, FILE *);
+int puts(char *);
 int fread(char *, int, int, FILE *);
 int fwrite(char *, int, int, FILE *);
+int ungetc(int, FILE *);
+int setbuf(FILE *, char *);
 void perror(char *);
 int printf(char *, ...);
 int fprintf(FILE *, char *, ...);
 int sprintf(char *, char *, ...);
+int scanf(char *, ...);
+int fscanf(FILE *, char *, ...);
+int sscanf(char *, char *, ...);
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

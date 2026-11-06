@@ -10,6 +10,14 @@
 
 #ifdef linux
 #include <termios.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 struct termios save_term;
 #else
 #ifdef CPM
@@ -19,6 +27,10 @@ struct termios save_term;
 struct sgtty save_sbuf INIT;
 #endif
 #endif
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 char controlbuf[30] INIT;
 

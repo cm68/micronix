@@ -19,13 +19,13 @@
 #include <sys/ioctl.h>
 #include <sys/ovl.h>
 #include <sys/proc.h>
-extern void timeout();
-extern INT8 intrset();
+extern void timeout(INT16 (*)(), int, int);
+extern INT8 intrset(INT16 (*)(), INT16 (*)(), UINT16);
 
 extern UINT16 nbdev, ncdev;
 extern UINT8 map0[];
-extern UINT16 bmajor(), cmajor();
-extern void nodev(), noioctl();
+extern UINT16 bmajor(UINT16), cmajor();
+extern void nodev(void), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
 
@@ -47,7 +47,7 @@ static struct ciovec ovlcvec[OVLMAJ];
  */
 #define	NTICK	12
 static struct tickrec {
-    INT16 (*fn) ();
+    INT16 (*fn)(INT16);
     UINT8 seg;          /* a segment number: 0..15 */
 } ovlticks[NTICK];
 static UINT16 novltick;
@@ -97,9 +97,12 @@ UINT16 busheirseg = 0;		/* the segment busheir lives in */
  * really in.  The caller's goes back with its page, so a driver that
  * returns from here and sleeps later in its own code is still right.
  */
+
+/* prototypes for functions defined below */
+INT16 cmajor(UINT16);
 UINT8
 ovlcall(fn, seg)
-    INT16 (*fn) ();
+    INT16 (*fn)(INT16);
     UINT16 seg;
 {
     UINT8 drv;
@@ -132,7 +135,7 @@ ovlcall(fn, seg)
  */
 INT16
 ovlcall1(fn, seg, arg)
-    INT16 (*fn) ();
+    INT16 (*fn)(INT16);
     UINT16 seg;
     INT16 arg;
 {
@@ -432,7 +435,7 @@ ovlarm()
 static
 INT8
 tickset(fn, seg)
-    INT16 (*fn) ();
+    INT16 (*fn)(INT16);
     UINT16 seg;
 {
     if (fn == 0)

@@ -48,6 +48,7 @@
 #include <sys/fs.h>
 #include <sys/dir.h>
 #include <obj.h>
+#include <string.h>
 
 int conout(UINT8);		/* below; the character rides in A */
 
@@ -132,6 +133,12 @@ int found = 0;
  * Print the message and reset: a jump through a null pointer to 0000.
  * Not exit(): stdio comes in behind it.
  */
+
+/* prototypes for functions defined below */
+int in(int);
+int out(int, int);
+int readblock(int, char *);
+int outstr(char *);
 bail(s)
 register char *s;
 {

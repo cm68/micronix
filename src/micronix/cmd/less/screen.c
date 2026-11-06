@@ -20,6 +20,9 @@
 #include "less.h"
 #include <types.h>		/* sgtty.h speaks in UINT8s */
 #include <sys/sgtty.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
 
 public char auto_wrap = 1;	/* Terminal does \r\n when write past margin */
 public char ignaw = 1;		/* Terminal ignores \n immediately after wrap */
@@ -54,6 +57,9 @@ static char sc_lower_left[16];	/* built by get_term: row is sc_height */
  * keystroke, nothing echoes, and nothing on output is cooked -
  * which is why in_raw_mode is public, see the header comment.
  */
+
+/* prototypes for functions defined below */
+public void lputs(char *);
 	public void
 raw_mode(on)
 	int on;
@@ -121,7 +127,7 @@ probe_size()
 	s.mode &= ~(ECHO|CRMOD);
 	stty(2, &s);
 
-	puts("\033[9999;9999H\033[6n");
+	lputs("\033[9999;9999H\033[6n");
 	flush();
 
 	signal(14, probe_alarm);
@@ -164,7 +170,7 @@ probe_size()
 		sc_height = rows;
 		sc_width = cols;
 	}
-	puts("\033[H");
+	lputs("\033[H");
 	flush();
 }
 
@@ -224,7 +230,7 @@ deinit()
 	public void
 home()
 {
-	puts(sc_home);
+	lputs(sc_home);
 }
 
 /*
@@ -234,7 +240,7 @@ home()
 	public void
 add_line()
 {
-	puts(sc_addline);
+	lputs(sc_addline);
 }
 
 /*
@@ -243,7 +249,7 @@ add_line()
 	public void
 lower_left()
 {
-	puts(sc_lower_left);
+	lputs(sc_lower_left);
 }
 
 /*
@@ -255,7 +261,7 @@ bell()
 	if (quiet == VERY_QUIET)
 		vbell();
 	else
-		putc('\7');
+		lputc('\7');
 }
 
 /*
@@ -272,7 +278,7 @@ vbell()
 	public void
 clear()
 {
-	puts(sc_clear);
+	lputs(sc_clear);
 }
 
 /*
@@ -282,7 +288,7 @@ clear()
 	public void
 clear_eol()
 {
-	puts(sc_eol_clear);
+	lputs(sc_eol_clear);
 }
 
 /*
@@ -291,7 +297,7 @@ clear_eol()
 	public void
 so_enter()
 {
-	puts(sc_s_in);
+	lputs(sc_s_in);
 }
 
 /*
@@ -300,7 +306,7 @@ so_enter()
 	public void
 so_exit()
 {
-	puts(sc_s_out);
+	lputs(sc_s_out);
 }
 
 /*
@@ -310,7 +316,7 @@ so_exit()
 	public void
 ul_enter()
 {
-	puts(sc_u_in);
+	lputs(sc_u_in);
 }
 
 /*
@@ -319,7 +325,7 @@ ul_enter()
 	public void
 ul_exit()
 {
-	puts(sc_u_out);
+	lputs(sc_u_out);
 }
 
 /*
@@ -328,7 +334,7 @@ ul_exit()
 	public void
 bo_enter()
 {
-	puts(sc_b_in);
+	lputs(sc_b_in);
 }
 
 /*
@@ -337,7 +343,7 @@ bo_enter()
 	public void
 bo_exit()
 {
-	puts(sc_b_out);
+	lputs(sc_b_out);
 }
 
 /*
@@ -350,9 +356,9 @@ backspace()
 	/*
 	 * Try to erase the previous character by overstriking with a space.
 	 */
-	putc('\b');
-	putc(' ');
-	putc('\b');
+	lputc('\b');
+	lputc(' ');
+	lputc('\b');
 }
 
 /*
@@ -361,5 +367,5 @@ backspace()
 	public void
 putbs()
 {
-	putc('\b');
+	lputc('\b');
 }

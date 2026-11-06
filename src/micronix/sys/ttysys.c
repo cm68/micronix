@@ -23,17 +23,17 @@
 #include <sys/proc.h>
 #include <errno.h>
 #include <sys/signal.h>
-extern void cstart();
-extern void drain();
-extern void fillque();
-extern void killfg();
-extern void sendque();
-extern void sleep();
-extern void wakeup();
-extern void outwait();
+extern void cstart(struct tty *);
+extern void drain(struct que *);
+extern void fillque(struct que *);
+extern void killfg(struct tty *, UINT8);
+extern void sendque(struct que *);
+extern void sleep(INT16, UINT8);
+extern void wakeup(INT16);
+extern void outwait(struct tty *, INT16);
 
-extern void fillque(), cstart(), sendque(), killfg(), drain(), sleep(), wakeup();
-extern INT16 cookin();
+extern void fillque(struct que *), cstart(struct tty *), sendque(struct que *), killfg(struct tty *, UINT8), drain(struct que *), sleep(INT16, UINT8), wakeup(INT16);
+extern INT16 cookin(struct tty *);
 extern void iomove(UINT8, UINT8 *, INT16);	/* fio.c: flag is a byte */
 extern INT16 selectchan;          /* select(2)'s event, sys/select.c */
 

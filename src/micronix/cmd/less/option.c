@@ -6,6 +6,8 @@
  */
 
 #include "less.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #define	toupper(c)	((c)-'a'+'A')
 
@@ -51,7 +53,7 @@ public char twiddle;		/* Display "~" for lines after EOF */
  * the first call declares it extern int and the static definition
  * then disagrees.
  */
-static int getnum();
+static int getnum(char **, int);
 
 extern char *prproto[];
 extern int nbufs;

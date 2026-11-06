@@ -13,6 +13,10 @@
 #include <stdio.h>
 /* #include <ctype.h> */
 #include <sys/signal.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /* cc command */
 
@@ -52,10 +56,10 @@ char *xopt;
 
 int err;
 
-int idexit();
-char *setsuf();
-char *strcat();
-char *strcpy();
+int idexit(void);
+char *setsuf(char *, char);
+char *strcat(char *, char *);
+char *strcpy(char *, char *);
 char *pname;
 
 #define	PASS_CPP	0
@@ -85,6 +89,12 @@ struct pass {
 
 char *execpath = "/bin/";
 
+
+/* prototypes for functions defined below */
+int cunlink(char *);
+int getsuf(char *);
+int nodup(char **, char *);
+int run(int, char **);
 usage()
 {
 	fprintf(stderr, "usage: %s [options] [sources] [objects] [-l<lib> ...]\n",

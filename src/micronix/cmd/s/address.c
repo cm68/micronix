@@ -55,6 +55,7 @@
 
 #include "s.h"
 #include <stdio.h>
+#include <string.h>
 
 int loc_char(char, int);	/* below; ch is byte-wide and rides in A */
 int loc_string(char);
@@ -65,6 +66,20 @@ int loc_string(char);
 #define ident_char(x) (isalnum(x) || x == '_')
 #define special_char(x) (!ident_char(x) && !isspace(x))
 
+
+/* prototypes for functions defined below */
+char * s_getmsg(char *);
+int b_getcur(int *, int *);
+int b_getmark(int *, int *);
+int b_gets(int, char *);
+int b_setcur(int, int);
+int b_setline(int);
+int col_to_pos(int, int);
+int do_up_down(int);
+int loc_word(int);
+int locate(char *, char *, int);
+int ptocol(int, int);
+int word_start(char *, char *);
 address(n, c, op)
     int n;
     char c, op;

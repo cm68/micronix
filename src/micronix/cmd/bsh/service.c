@@ -28,6 +28,18 @@ STRING		sysmsg[];
 
 /* service routines for `execute' */
 
+
+/* prototypes for functions defined below */
+LOCAL VOID jobreaped(INT);
+INT cf(REG STRING, REG STRING);
+int chkopen(STRING);
+int create(STRING);
+int namscan(VOID *(*)());
+int prn(INT);
+int stoi(STRING);
+int trim(STRING);
+STRING catpath(REG STRING, STRING);
+LOCAL STRING execs(STRING, REG STRING []);
 VOID	initio(iop)
 	IOPTR		iop;
 {

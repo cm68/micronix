@@ -33,9 +33,10 @@
 
 #include "mkfs.h"
 #include <unistd.h>
+#include <stdlib.h>
 
 
-extern int mknod(), unlink();
+extern int mknod(char *path, int mode, int dev);
 
 int dev = -1;
 

@@ -155,39 +155,39 @@ extern struct label label;
  * here with their real types so a void or pointer result is not truncated
  * in the caller.
  */
-unsigned short sum();
-long fsize();
-long tabread();
-unsigned balloc();
-char xor();
+unsigned short sum(unsigned short *, int);
+long fsize(struct stat *);
+long tabread(int, int);
+unsigned balloc(unsigned);
+char xor(char *, int);
 
-char *lookup();
-char *parent();
-struct entry *tapestat();
-struct entry *ealloc();
+char *lookup(char *, struct stat *);
+char *parent(char *);
+struct entry *tapestat(char *);
+struct entry *ealloc(void);
 
-void fatal();
-void usage();
-void prs();
-void db();
-void display();
-void ptime();
-void plength();
-void ppart();
-void pvol();
-void space();
-void missing();
-void entdone();
-void change();
-void closedev();
-void writedir();
-void writesuper();
-void doformat();
-void tabwrite();
-void readlabel();
-void writelabel();
-void getlabel();
-void setchecksum();
+void fatal(char *);
+void usage(void);
+void prs(char *);
+void db(char *);
+void display(char *, struct entry *);
+void ptime(unsigned long);
+void plength(long);
+void ppart(struct entry *);
+void pvol(void);
+void space(void);
+void missing(void);
+void entdone(struct entry *);
+void change(int);
+void closedev(void);
+void writedir(void);
+void writesuper(void);
+void doformat(void);
+void tabwrite(struct dtab *);
+void readlabel(void);
+void writelabel(void);
+void getlabel(void);
+void setchecksum(struct entry *);
 void mkdir();
 
 /* vim: tabstop=4 shiftwidth=4 noexpandtab:

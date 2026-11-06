@@ -2,8 +2,12 @@
  * initialize random number generator by prompting input
  *
  */
-extern int	kbhit();
+#include <stdio.h>
+extern int	kbhit(void);
 
+
+/* prototypes for functions defined below */
+int srand(unsigned);
 srand1(s)
 char *	s;
 {

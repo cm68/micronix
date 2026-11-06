@@ -67,6 +67,12 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <sys/signal.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 /* the fd is byte-wide and rides in A; no unistd.h here because its
  * other declarations disagree with this file's older ones */
 extern long lseek(unsigned char, long, int);
@@ -207,9 +213,9 @@ unsigned char	first;
 unsigned char	prtlinkerr;
 unsigned char	freemem = 1;
 int	nblock = 0;
-int	onintr();
-int	onquit();
-int	onhup();
+int	onintr(void);
+int	onquit(void);
+int	onhup(void);
 
 /*
  * stdout here is a variable the startup code fills in, not a
@@ -220,16 +226,38 @@ int	onhup();
 FILE	*vfile;
 char	*usefile;
 char	magtape[] = "/dev/mt0";
-char	*malloc();
-long	time();
 long	telldir();
-char	*ctime();
-char	*rindex();
+char	*rindex(char *, int);
 #ifndef	linux
-char	*getcwd();
+char	*getcwd(char *);
 #endif
-char	*getmem();
+char	*getmem(int);
 
+
+/* prototypes for functions defined below */
+void seekdir(DIR *, long);
+long telldir(DIR *);
+int bread(int, char *, int);
+int checkdir(char *);
+int checkf(char *, int, int);
+int checkw(int, char *);
+int done(int);
+int dorep(char *[]);
+int dotable(char *[]);
+int doxtract(char *[]);
+int longt(struct stat *);
+int mterr(char *, int, int);
+int openmt(char *, int);
+int pmode(struct stat *);
+int prefix(char *, char *);
+int putfile(char *, char *, char *);
+int readtape(char *);
+int readtbuf(char **, int);
+int selectbits(int *, struct stat *);
+int startfilter(int, int);
+int tomodes(struct stat *);
+int wantit(char *[]);
+int writetbuf(char *, int);
 main(argc, argv)
 int	argc;
 char	*argv[];

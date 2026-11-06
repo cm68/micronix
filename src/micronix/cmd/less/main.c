@@ -6,6 +6,8 @@
 #include "position.h"
 #include <setjmp.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 public char	ispipe;
@@ -43,6 +45,9 @@ extern int errmsgs;
  * Filename "-" means standard input.
  * No filename means the "current" file, from the command line.
  */
+
+/* prototypes for functions defined below */
+int strtcpy(char *, char *, int);
 	public void
 edit(filename)
 	char *filename;
@@ -145,9 +150,9 @@ edit(filename)
 		case 'q':
 			quit();
 		default:
-			puts("\n  Overwrite, Append, or Don't log? ");
-			answer = getc();
-			puts("\n");
+			lputs("\n  Overwrite, Append, or Don't log? ");
+			answer = lgetc();
+			lputs("\n");
 			flush();
 			goto loop;
 		}
@@ -239,7 +244,7 @@ cat_file()
 	register int c;
 
 	while ((c = ch_forw_get()) != EOF)
-		putc(c);
+		lputc(c);
 	flush();
 }
 
@@ -250,7 +255,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	char *getenv();
 
 
 	/*

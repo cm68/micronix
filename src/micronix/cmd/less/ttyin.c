@@ -3,6 +3,7 @@
  */
 
 #include "less.h"
+#include <unistd.h>
 
 /*
  * The boolean "reading" is set true or false according to whether
@@ -29,7 +30,7 @@ open_getc()
  * Get a character from the keyboard.
  */
 	public int
-getc()
+lgetc()
 {
 	char c;
 	int result;

@@ -19,8 +19,8 @@ UINT8 npics, nlines;
 
 /* the clock and RTC, chosen by the same probe (sys/pic_init.c) */
 INT16 (*clockinit)();
-INT16 (*rtcinit)();
-INT16 (*rtcwrite)();
+INT16 (*rtcinit)(INT32);
+INT16 (*rtcwrite)(INT32);
 
 /* the console, chosen by the same probe */
 INT16 (*console_putc)();

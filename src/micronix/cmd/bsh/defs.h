@@ -89,47 +89,47 @@
 
 /* result type declarations */
 #define alloc malloc
-void *alloc();
-VOID		addblok();
-STRING		make();
-STRING		movstr();
-TREPTR		cmd();
-TREPTR		makefork();
-NAMPTR		lookup();
-VOID		setname();
-VOID		setargs();
-DOLPTR		useargs();
+void *alloc(POS);
+VOID		addblok(POS);
+STRING		make(STRING);
+STRING		movstr(REG STRING, REG STRING);
+TREPTR		cmd(REG INT, INT);
+TREPTR		makefork(INT, TREPTR);
+NAMPTR		lookup(REG STRING);
+VOID		setname(STRING, INT);
+VOID		setargs(STRING []);
+DOLPTR		useargs(void);
 REAL		expr();
-STRING		catpath();
-STRING		getpath();
-STRING		*scan();
-STRING		mactrim();
-STRING		macro();
-STRING		execs();
-VOID		await();
-VOID		post();
-VOID		exname();
-VOID		printnam();
-VOID		printflg();
-VOID		prs();
+STRING		catpath(REG STRING, STRING);
+STRING		getpath(STRING);
+STRING		*scan(INT);
+STRING		mactrim(STRING);
+STRING		macro(STRING);
+STRING		execs(STRING, REG STRING []);
+VOID		await(INT);
+VOID		post(INT);
+VOID		exname(REG NAMPTR);
+VOID		printnam(NAMPTR);
+VOID		printflg(REG NAMPTR);
+VOID		prs(STRING);
 VOID		chkpr(char);		/* main.c: the character is byte-wide */
 INT		nextc(CHAR);		/* word.c: one character, byte-wide */
 INT		any(CHAR, STRING);	/* string.c: c in s */
-INT		histread();		/* history.c: read and expand one line */
-INT		histedit();		/* edit.c: edit one terminal line */
-INT		histcount();		/* history.c: the ring, for the editor */
-INT		histfirst();
-STRING		histevent();
+INT		histread(FILE);		/* history.c: read and expand one line */
+INT		histedit(FILE, char *, int);		/* edit.c: edit one terminal line */
+INT		histcount(void);		/* history.c: the ring, for the editor */
+INT		histfirst(void);
+STRING		histevent(int);
 extern STRING	histsrc;		/* the line readc is to serve */
 VOID		prc(CHAR);
 VOID		getenv();
-STRING		*setenv();
+STRING		*setenv(void);
 #ifdef	MICRONIX1
-VOID		dup2();
+VOID		dup2(REG INT, REG INT);
 #else
-INT		dup2();
+INT		dup2(REG INT, REG INT);
 #endif
-INT		umask();
+INT		umask(INT);
 char		*sbrk();
 
 #define attrib(n,f)	(n->namflg |= f)
@@ -264,7 +264,7 @@ extern BLKPTR		bloktop;
 #define SIGSET	4
 #define SIGMOD	8
 
-VOID		fault();
+VOID		fault(REG INT);
 extern BOOL		trapnote;
 extern BOOL		backnote;
 extern STRING		trapcom[];
@@ -281,9 +281,9 @@ extern CHAR		jobline[JOBNM];
 extern INT		joblinep;
 extern BOOL		jobsnap;
 
-extern VOID		joblist();
-extern VOID		jobfg();
-extern VOID		jobbg();
+extern VOID		joblist(void);
+extern VOID		jobfg(INT);
+extern VOID		jobbg(INT);
 extern INT		kill();
 
 /* name tree and words */
@@ -327,3 +327,20 @@ extern INT	shmask;
 
 #include	"ctype.h"
 
+/* cross-file entry points */
+int failed(STRING, STRING);
+int error(STRING);
+int setlist(REG ARGPTR, INT);
+int execexp(STRING, UFD);
+int prn(INT);
+int assnum(STRING *, INT);
+int namscan(VOID *(*)());
+int clrsig(INT);
+int getsig(int);
+int ignsig(int);
+int assign(NAMPTR, STRING);
+int estabf(REG STRING);
+int initf(UFD);
+int exitsh(INT);
+int jobctl(int, int);
+int subst(INT, INT);

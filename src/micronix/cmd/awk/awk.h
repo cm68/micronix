@@ -45,7 +45,7 @@ typedef	AWKFLOAT	awkfloat;
  * 32-bit struct fields (relop) - the same sign-extension loss the
  * README warns about.  if/else is the workaround (CODEGENGAPS 23).
  */
-awkfloat fcmp();
+awkfloat fcmp(AWKFLOAT, AWKFLOAT);
 #define fatof(s)  atol(s)
 
 /* b.c: the first parameter is a character, so it rides in A. */
@@ -56,7 +56,7 @@ AWKFLOAT isqrt(AWKFLOAT);
 AWKFLOAT ilog(AWKFLOAT);
 AWKFLOAT iexp(AWKFLOAT);
 char *ftoa(char *, AWKFLOAT, int);
-extern long atol();	/* fatof: string -> number, must return the 32-bit long */
+extern long atol(char *);	/* fatof: string -> number, must return the 32-bit long */
 
 extern char	**FS;
 extern char	**RS;
@@ -83,7 +83,7 @@ typedef struct val {	/* general value during processing */
 	struct val	*nextval;	/* ptr to next if chained */
 } cell;
 extern cell *symtab[];
-cell	*setsymtab(), *lookup(), **makesymtab();
+cell	*setsymtab(char *, char *, awkfloat, unsigned, cell **), *lookup(char *, cell **, int), **makesymtab(void);
 
 extern cell	*recloc;	/* location of input record */
 extern cell	*nrloc;		/* NR */
@@ -95,9 +95,10 @@ extern cell	*nfloc;		/* NF */
 #define	CON	010	/* this is a constant */
 #define	ARR	020	/* this is an array */
 
-awkfloat setfval(), getfval();
-char	*setsval(), *getsval();
-char	*tostring(), *tokname(), *malloc();
+awkfloat setfval(cell *, awkfloat), getfval(cell *);
+char	*setsval(cell *, char *), *getsval(cell *);
+char	*tostring(char *), *tokname(int), *malloc(unsigned);
+
 
 /* function types */
 #define	FLENGTH	1
@@ -130,6 +131,22 @@ struct nd {
 	struct nd *narg[BOTCH];	/* C won't take a zero length array */
 };
 typedef struct nd node;
+
+/* the parser and the tree builders, in parse.c and b.c */
+node * op1(int, node *);
+node * op2(int, node *, node *);
+node * op3(int, node *, node *, node *);
+node * valtonode(cell *, int);
+node * stat1(int, node *);
+node * stat2(int, node *, node *);
+node * stat3(int, node *, node *, node *);
+node * stat4(int, node *, node *, node *, node *);
+node * linkum(node *, node *);
+int yyerror(char *);
+struct fa * makedfa(node *);
+node * pa2stat(node *, node *, node *);
+char * cclenter(char *);
+node * exptostat(node *);
 extern node	*winner;
 extern node	*nullstat;
 
@@ -178,8 +195,8 @@ extern int	pairstack[], paircnt;
 #define istemp(n)	(objtype(n) == OCELL && objsub(n) == CTEMP)
 #define isfld(n)	(!donefld && objsub(n)==CFLD && objtype(n)==OCELL && objptr(n)->nval==EMPTY)
 #define isrec(n)	(donefld && objsub(n)==CFLD && objtype(n)==OCELL && objptr(n)->nval!=EMPTY)
-obj	nullproc();
-obj	relop();
+obj	nullproc(void);
+obj	relop(node **, int);
 
 #define MAXSYM	32
 #define	HAT	0177	/* matches ^ in regular expr */

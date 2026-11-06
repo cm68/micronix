@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include "sed.h"
+#include <stdlib.h>
 
 /*
  * the globals, declared in sed.h and living here - see the note
@@ -98,6 +99,17 @@ char	bittab[]  = {
 		128
 	};
 
+
+/* prototypes for functions defined below */
+char	* address(char *);
+int execute(char *);
+int cmp(char *, char *);
+char * compile(char *);
+char	* compsub(char *);
+int rline(char *);
+struct label	* search(struct label *);
+char	* text(char *);
+char * ycomp(char *);
 main(argc, argv)
 char	*argv[];
 {
@@ -196,7 +208,6 @@ fcomp()
 {
 
 	register char	*p, *op, *tp;
-	char	*address();
 	struct reptr	*pt, *pt1;
 	int	i;
 	struct label	*lpt;

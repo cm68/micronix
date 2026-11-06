@@ -1,4 +1,5 @@
 #include  "less.h"
+#include <stdio.h>
 
 /*
  * Display some help.

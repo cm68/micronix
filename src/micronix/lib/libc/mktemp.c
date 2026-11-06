@@ -14,7 +14,8 @@
  * why mkstemp exists.
  */
 
-extern int getpid();
+#include <unistd.h>
+extern int getpid(void);
 
 static int counter;
 static char hexc[] = "0123456789abcdef";

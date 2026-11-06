@@ -9,7 +9,7 @@
 _pnum(i, f, w, s, base, pputch)
 unsigned long	i;
 unsigned char	base;
-void	(*pputch)();
+void	(*pputch)(int);
 unsigned char	s;
 char	f, w;
 {

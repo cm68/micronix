@@ -12,8 +12,8 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern void bdwrite();
-extern void brelse();
+extern void bdwrite(struct buf *);
+extern void brelse(struct buf *);
 
 /*
  * Return the physical block number for logical block log,
@@ -28,6 +28,16 @@ extern void brelse();
  * Bugs: should check validity of block numbers,
  * in case the disk goes bad.
  */
+
+/* prototypes for functions defined below */
+UINT16 balloc(INT16);
+struct buf * bget(UINT16, UINT16);
+struct buf * bread(UINT16, UINT16);
+void copy(char *, char *, int);
+void zero(char *, int);
+UINT16 imapb(UINT16, INT16, INT16, UINT16 *, UINT8);
+UINT16 imapi(struct inode *, INT16, UINT16 *, UINT8);
+UINT16 plug(INT16);
 UINT16
 imap(ip, log, rap, rw)
     register struct inode *ip;

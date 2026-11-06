@@ -13,6 +13,7 @@
 #include	"timeout.h"
 #include	<sys/fs.h>
 #include	<sys/stat.h>
+#include <unistd.h>
 
 UFD		output = 2;
 LOCAL BOOL	beenhere = FALSE;
@@ -26,6 +27,20 @@ PROC VOID	exfile(BOOL);
 
 
 
+
+/* prototypes for functions defined below */
+VOID tdystak(REG STKPTR);
+int dfault(NAMPTR, STRING);
+int Ldup(REG INT, REG INT);
+INT options(INT, STRING *);
+INT pathopen(REG STRING, REG STRING);
+int assnum(STRING *, INT);
+int chkopen(STRING);
+int execute(TREPTR, int, INT *, INT *);
+int ignsig(int);
+int initf(UFD);
+int itos(int);
+int setbrk(int);
 main(c, v)
 	INT		c;
 	STRING		v[];
@@ -34,7 +49,7 @@ main(c, v)
 	stdsigs();
 	end=sbrk(0);
 	/* the arena keeps its busy bit in the low address bit */
-	IF (UINT)end&1 THEN end=sbrk(1)+1 FI
+	IF (UINT)end&1 THEN end=(STRING)sbrk(1)+1 FI
 	bloktop=BLK(end);
 	setbrk(BRKINCR);
 	addblok((POS)0);

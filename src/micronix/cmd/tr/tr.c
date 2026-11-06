@@ -11,6 +11,7 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 #include <stdio.h>
+#include <stdlib.h>
 
 /* tr - transliterate data stream */
 int	dflag	= 0;
@@ -22,6 +23,10 @@ char	squeez[256];
 char	vect[256];
 struct string { int last, max; char *p; } string1, string2;
 
+
+/* prototypes for functions defined below */
+int next(struct string *);
+int nextc(struct string *);
 main(argc,argv)
 char **argv;
 {

@@ -1,4 +1,5 @@
 #ifndef lint
+#include <stdlib.h>
 static char sccsid[] = "@(#)lib.c	4.4 9/17/84";
 #endif
 
@@ -32,6 +33,11 @@ cell fldtab[MAXFLD] = {	/*room for fields */
 int	maxfld	= 0;	/* last used field */
 
 
+
+/* prototypes for functions defined below */
+int error(int, int, int, int, int, int, int, int, int);
+int isnumber(char *);
+int setclvar(char *);
 getrec()
 {
 	register char *rr;

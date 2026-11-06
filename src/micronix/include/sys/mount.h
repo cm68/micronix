@@ -22,8 +22,8 @@ struct mount {
     UINT16 ifree;                 /* live free-inode count */
 } mlist[];
 
-struct mount *mlook();          /* find a mount entry by device number */
-void syncsuper();               /* copy the live counts into the superblocks */
+struct mount *mlook(INT16);          /* find a mount entry by device number */
+void syncsuper(void);               /* copy the live counts into the superblocks */
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

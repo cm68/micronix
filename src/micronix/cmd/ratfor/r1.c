@@ -7,6 +7,7 @@
  */
 
 #include "r.h"
+#include <stdlib.h>
 
 #define	wasbreak	brkused[brkptr]==1 || brkused[brkptr]==3
 #define	wasnext	brkused[brkptr]==2 || brkused[brkptr]==3
@@ -24,6 +25,19 @@ int	brkused[10];	/* loop contains BREAK or NEXT */
 int	forptr	= 0;
 char	*forstk[10];
 
+
+/* prototypes for functions defined below */
+int gnbtok(char *);
+int gtok(char *);
+int outcode(char *);
+int outcont(int);
+int outgoto(int);
+int outnum(int);
+int pbstr(char *);
+int putcom(char *);
+int error(char *);
+int genlab(int);
+int nonblank(char *);
 repcode() {
 	transfer = 0;
 	outcont(0);

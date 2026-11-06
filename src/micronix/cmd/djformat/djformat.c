@@ -30,6 +30,9 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define SETMP    0x31           /* set media parameters, sys/dj.h */
 #define WRITETRK 0x2a           /* the board's opcode, sys/dj.h */

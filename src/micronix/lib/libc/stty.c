@@ -8,6 +8,7 @@
  */
 #include <types.h>
 #include <sys/sgtty.h>
+#include <unistd.h>
 
 stty(fd, vec)
     int fd;

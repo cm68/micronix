@@ -42,6 +42,9 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /*
  * what tzfile.h said, for the arithmetic gtime does
@@ -64,8 +67,11 @@ static char	retval;		/* 0 or 1 */
 static char	dmsize[] =
 	{ -1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
-long	time();
+long	time(long *);
 
+
+/* prototypes for functions defined below */
+int gtime(char *);
 main(argc, argv)
 	int	argc;
 	char	**argv;

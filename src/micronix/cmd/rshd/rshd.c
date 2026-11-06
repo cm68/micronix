@@ -39,6 +39,7 @@
 #include <pwd.h>
 #include <sys/ioctl.h>
 #include <sys/signal.h>
+#include <signal.h>
 
 /* the socket face, include/sys/net.h, duplicated as the other commands do */
 #define NETBIND    0x7410
@@ -51,7 +52,7 @@
 
 #define JOBCONT  02		/* job-control op bits (sys/sys.h) */
 #define JOBTTYIN 010
-extern int jobctl();
+extern int jobctl(int, int);
 
 #define DEVNET	"/dev/net0"
 #define RSH_PORT 514
@@ -80,6 +81,9 @@ static char luser[32], ruser[32], command[REQMAX];
 
 static struct passwd *pw;
 
+
+/* prototypes for functions defined below */
+int jobctl(int);
 onalarm()
 {
     signal(SIGALRM, onalarm);   /* V7 semantics: re-arm the handler */

@@ -13,6 +13,21 @@ p->done = 3   file make failed
  * The stem of a name: everything before its last '.' extension, which
  * is what $* means for an explicit prerequisite - "abs.o" -> "abs".
  */
+
+/* prototypes for functions defined below */
+char * mkqlist(struct chain *);
+struct varblock * varptr(char *);
+int dosys(char *, int);
+int fatal(char *);
+int fatal1(char *, char *);
+int setvar(char *, char *);
+int suffix(char *, char *, char *);
+int touch(int, char *);
+struct chain * appendq(struct chain *, char *);
+struct depblock * srchdir(char *, int, struct depblock *);
+int docom(struct shblock *);
+int docom1(char *, int, int);
+int expand(struct depblock *);
 static
 stemof(name, buf)
 char *name, *buf;
@@ -63,7 +78,7 @@ int okdel1;
 int didwork;
 TIMETYPE td, td1, tdep, ptime, ptime1, prestime();
 register struct depblock *q;
-struct depblock *qtemp, *srchdir(), *suffp, *suffp1;
+struct depblock *qtemp, *suffp, *suffp1;
 struct nameblock *p1, *p2, *dn;
 struct shblock *implcom, *explcom;
 register struct lineblock *lp;
@@ -71,8 +86,7 @@ struct lineblock *lp1, *lp2;
 char sourcename[100], prefix[100], temp[100], concsuff[20];
 char stem[100], depbuf[100];
 char *pnamep, *p1namep;
-char *mkqlist();
-struct chain *qchain, *appendq();
+struct chain *qchain;
 
 if(p == 0)
 	{
@@ -261,7 +275,6 @@ docom(q)
 struct shblock *q;
 {
 char *s;
-struct varblock *varptr();
 int ign, nopr;
 char string[OUTMAX];
 
@@ -339,7 +352,7 @@ register struct depblock *q;
 {
 register char *s;
 char *s1;
-struct depblock *p, *srchdir();
+struct depblock *p;
 
 s1 = q->depname->namep;
 for(s=s1 ; ;) switch(*s++)

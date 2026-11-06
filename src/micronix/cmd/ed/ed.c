@@ -27,6 +27,8 @@
 #include <sys/signal.h>
 #include <setjmp.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
 
 #define	NULL	0
 #define	FNSIZE	64
@@ -105,20 +107,38 @@ int	fchange;
 int	wrapp;
 unsigned nlall = 128;
 
-int	*address();
-char	*getline();
-char	*getblock();
-char	*place();
-char	*mktemp();
-char	*malloc();
-char	*realloc();
+int	*address(void);
+char	*getline(int);
+char	*getblock(int, int);
+char	*place(char *, char *, char *);
+char	*mktemp(char *);
+char	*malloc(size_t);
+char	*realloc(void *, size_t);
 jmp_buf	savej;
 
+
+/* prototypes for functions defined below */
+int advance(char *, char *);
+int append(int (*)(), int *);
+int backref(int, char *);
+int blkio(int, char *, int (*)());
+int cclass(char *, char, int);
+int compile(int);
+int error(char *);
+int execute(int, int *);
+int filename(int);
+int global(int);
+int move(int);
+int putchr(int);
+int puts(char *);
+int rdelete(int *, int *);
+int reverse(int *, int *);
+int substitute(int);
 main(argc, argv)
 char **argv;
 {
 	register char *p1, *p2;
-	extern int onintr(), quit(), onhup();
+	extern int onintr(void), quit(), onhup();
 	int (*oldintr)();
 
 	oldquit = signal(SIGQUIT, SIG_IGN);
@@ -919,9 +939,10 @@ getblock(atl, iof)
 	return(obuff+off);
 }
 
+int (*iofcn)(char *, char *, int);
 blkio(b, buf, iofcn)
 char *buf;
-int (*iofcn)();
+int (*iofcn)(char *, char *, int);
 {
 	lseek(tfile, (long)b<<9, 0);
 	if ((*iofcn)(tfile, buf, 512) != 512) {

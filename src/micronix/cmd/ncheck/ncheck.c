@@ -22,7 +22,7 @@ int aflg;
 #define	NI	20
 #define	NDIRS	787
 
-void pass1(), pass2(), pass3();
+void pass1(struct dsknod *dp), pass2(), pass3();
 
 int iilist[NI] = { -1 };
 
@@ -33,13 +33,13 @@ struct htab {
 } htab[NDIRS];
 
 int nhent = 10;
-void (*pass[])() = { pass1, pass2, pass3 };
+void (*pass[])(struct dsknod *) = { pass1, pass2, pass3 };
 
 char *lasts;
 int ino;
 int nerror;
 int nfiles;
-struct htab *hlookup();
+struct htab *hlookup(int i, int ef);
 
 void
 check(file)

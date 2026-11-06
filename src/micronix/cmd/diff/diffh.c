@@ -16,6 +16,8 @@
 #include <types.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define C 3
 #define RANGE 30
@@ -31,11 +33,20 @@ int debug = 0;
 FILE *file[2];
 
 	/* return pointer to line n of file f*/
+
+/* prototypes for functions defined below */
+FILE * dopen(char *, char *);
+int change(long, int, long, int, char *);
+int cmp(char *, char *);
+int error(char *, char *);
+int movstr(char *, char *);
+int output(int, int);
+int progerr(char *);
+int range(long, int);
 char *getl(f,n)
 long n;
 {
 	register char *t;
-	char *malloc();
 	register delta, nt;
 again:
 	delta = n - lineno[f];
@@ -88,7 +99,6 @@ main(argc,argv)
 char **argv;
 {
 	char *s0,*s1;
-	FILE *dopen();
 	register int status = 0;
 
 	while(*argv[1]=='-') {

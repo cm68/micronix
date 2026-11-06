@@ -128,6 +128,12 @@
 #include <sys/stat.h>
 #include <sys/signal.h>
 #include <setjmp.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 /*copylet flags */
 	/*remote mail, add rmtmsg */
@@ -206,13 +212,13 @@ int	flgp;
 int	delflg = 1;
 jmp_buf	sjbuf;
 
-char	*getarg();
-char	*index();
-char	*ctime();
-char	*mktemp();
-char	*strncpy();
-long	time();
-int	system();
+char	*getarg(char *, char *);
+char	*index(char *, int);
+char	*ctime(time_t *);
+char	*mktemp(char *);
+char	*strncpy(char *, char *, size_t);
+long	time(long *);
+int	system(char *);
 
 /*
  * Forward declarations.  ccc wants to know a name is a function before
@@ -221,21 +227,21 @@ int	system();
  * fopenw is called from copyback above it.  v7's compiler did not ask;
  * ed.c declares its handlers for the same reason.
  */
-int	cat();
-int	copyback();
-int	copylet();
-int	copymt();
-int	done();
-FILE	*fopenw();
-int	isfrom();
-int	lock();
-int	onintr();
-int	printmail();
-int	send();
-int	sendmail();
-int	sendrmt();
-int	setsig();
-int	unlock();
+int	cat(char *, char *, char *);
+int	copyback(void);
+int	copylet(int, FILE *, int);
+int	copymt(FILE *, FILE *);
+int	done(void);
+FILE	*fopenw(char *, int);
+int	isfrom(char *);
+int	lock(char *);
+int	onintr(void);
+int	printmail(int, char **);
+int	send(int, char *);
+int	sendmail(int, char **);
+int	sendrmt(int, char *);
+int	setsig(int, int (*)());
+int	unlock(void);
 
 main(argc, argv)
 int argc;

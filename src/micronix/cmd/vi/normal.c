@@ -13,6 +13,24 @@
  * Execute a command in normal mode.
  */
 
+#include <stdio.h>
+
+/* prototypes for functions defined below */
+int addtobuff(char *, char, char, char, char, char, char);
+int delline(int);
+int delword(int);
+int downblock(int);
+int gotoline(int);
+int inschar(int);
+int onedown(int);
+int oneup(int);
+int putline(int);
+int readcmdline(int);
+int startinsert(char *);
+int stuffin(char *);
+int tabinout(int, int);
+int upblock(int);
+int yankline(int);
 normal(c)
     int c;
 {

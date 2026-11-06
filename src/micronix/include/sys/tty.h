@@ -87,10 +87,10 @@ struct tty {
     UINT8 col;                  /* printhead waiting */
     UINT16 dev;                   /* device number, tty + 8 */
     UINT8 line;                 /* first line after a return is 0 */
-    INT16 (*start) ();            /* enable output interrupt */
-    INT16 (*stop) ();             /* disable output interrupt */
-    INT16 (*put) ();              /* print a character */
-    INT16 (*set) ();              /* set new baud rate */
+    INT16 (*start) (struct tty *); /* enable output interrupt */
+    INT16 (*stop) (struct tty *, INT16); /* disable output interrupt */
+    INT16 (*put) (struct tty *, INT16); /* print a character */
+    INT16 (*set) (struct tty *);  /* set new baud rate */
     UINT8 nextc;                /* for tab and newline expansion */
     UINT8 nbreak;
     struct que rawque;          /* raw input queue */
@@ -138,3 +138,4 @@ struct tty {
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:
  */
+

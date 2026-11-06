@@ -8,10 +8,18 @@
  */
 
 #include	"defs.h"
+#include <stdlib.h>
+#include <unistd.h>
 
 
 /* ========	error handling	======== */
 
+
+/* prototypes for functions defined below */
+int exitsh(INT);
+int assnum(STRING *, INT);
+int execexp(STRING, UFD);
+int rmtemp(IOPTR);
 exitset()
 {
 	assnum(&exitadr,exitval);

@@ -17,6 +17,9 @@
  */
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define DEV	"/dev/mediachg"
 #define MAXL	128			/* longest command, '@' and '\n' included */

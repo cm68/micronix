@@ -33,6 +33,16 @@
  * grammar needs; setup() reads it a second time and fills them.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+/* prototypes for functions defined below */
+int error(int, int);
+char * symnam(int);
+int aryfil(int *, int, int);
+int outc(int);
+int setup(int, char *[]);
 allocgrammar() {
 	mem0 = (int *)calloc( memsiz, sizeof(int) );
 	mem = mem0;

@@ -15,7 +15,7 @@
  */
 #include <types.h>
 #include <sys/pic.h>
-extern UINT8 intoff();
+extern UINT8 intoff(UINT16);
 extern UINT8 pic_init();
 
 extern INT16 in(), out();

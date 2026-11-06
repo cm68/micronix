@@ -9,6 +9,8 @@
 
 #include "less.h"
 #include "position.h"
+#include <stdio.h>
+#include <string.h>
 
 extern char pr_type;
 extern char ispipe;
@@ -33,6 +35,9 @@ char *prproto[] = {
 static char message[200];
 static char *mp;
 
+
+/* prototypes for functions defined below */
+int strtcpy(char *, char *, int);
 	static void
 setmp()
 {

@@ -18,6 +18,7 @@
  */
 
 #include	"defs.h"
+#include <unistd.h>
 
 #define	HISTSIZE	16		/* memorable lines */
 #define	HISTLEN		128		/* longest line kept, with NUL */

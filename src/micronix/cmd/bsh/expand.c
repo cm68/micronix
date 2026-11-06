@@ -12,6 +12,8 @@
 #define DIRSIZ 15
 #include	<sys/stat.h>
 #include	<sys/dir.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 
 
@@ -24,9 +26,13 @@
  *
  */
 
-PROC VOID	addg();
+PROC VOID	addg(STRING, STRING, STRING);
 
 
+
+/* prototypes for functions defined below */
+int gmatch(REG STRING, REG STRING);
+int makearg(REG ARGPTR);
 INT	expand(as,rflg)
 	STRING		as;
 {

@@ -33,6 +33,8 @@ extern void *	memset(void *, int, size_t);
 extern char *	strerror(int);
 extern size_t	strlen(char *);
 extern char *	strchr(char *, int);
+extern char *	index(char *, int);
+extern char *	rindex(char *, int);
 extern char *	strrchr(char *, int);
 extern char *	strdup(char *);
 

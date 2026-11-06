@@ -28,18 +28,28 @@
 #define	ENOMEM	12
 #define	EACCES	13
 #define	ETXTBSY	26
+#include <fcntl.h>
+#include <unistd.h>
 extern int errno;
 char	pathstr[128];	/* directory sequence */
 char	shellnam[16];	/* name of shell */
 
-extern int getuid();
-extern int execv();
-extern int sleep();
-extern int open();
-extern int read();
-extern int close();
-extern int write();
+extern int getuid(void);
+extern int execv(char *, char **);
+extern int sleep(unsigned int seconds);
+extern int open(char *, int, ...);
+extern int read(int, char *, int);
+extern int close(int fd);
+extern int write(int, char *, int);
 
+
+/* prototypes for functions defined below */
+int pexany(int, char *);
+int pexcat(char *, char *, char *);
+int pexcopy(char *, char *);
+int pexerr(char *, char *);
+int pexline(char *, char *, int, char **, char **);
+int pexprs(char *);
 char *
 logdir()
 {

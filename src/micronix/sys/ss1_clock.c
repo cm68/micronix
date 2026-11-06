@@ -40,6 +40,12 @@ extern void unixtobcd();        /* unixtobcd.s, unix -> BCD */
  * tens.  Read one: Hold|Read|digit to the command port, then the data
  * port's low nibble.  Write one: Hold|Write|digit, then the nibble.
  */
+
+/* prototypes for functions defined below */
+INT32 bcd2unix(char *);
+int in(int);
+int out(int, int);
+void unixtobcd(long, char *);
 static INT16
 rdigit(INT16 d)
 {

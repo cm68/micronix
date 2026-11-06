@@ -6,6 +6,8 @@
  */
 
 #include "s.h"
+#include <stdlib.h>
+#include <string.h>
 
 struct y_line
 {
@@ -21,6 +23,13 @@ struct y_line *start = NULL;
  *              Copy the yank buffer to the main buffer.  If way = 1, the lines
  *              go after the current line; otherwise, they go before it.
  */
+
+/* prototypes for functions defined below */
+int b_getcur(int *, int *);
+int b_gets(int, char *);
+int b_insert(int, char *);
+int b_setline(int);
+int s_savemsg(char *, int);
 do_put(way)
     int way;
 {

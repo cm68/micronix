@@ -14,23 +14,23 @@
 #include <sys/signal.h>
 #include <obj.h>
 #include <errno.h>
-extern void sleep();
-extern void mrelse();
-extern void arginstall();
-extern void setusr();
-extern void readin();
-extern void send();
-extern void argfree();
-extern void irelse();
-extern void wakeup();
-extern UINT8 valid();
-extern UINT8 argbuild();
-extern UINT8 argalloc();
-extern UINT8 argscan();
-extern UINT8 fit();
-extern UINT8 rdhdr();
-extern UINT8 xchk();
-extern UINT8 access();
+extern void sleep(INT16, UINT8);
+extern void mrelse(void);
+extern void arginstall(void);
+extern void setusr(void);
+extern void readin(void);
+extern void send(struct proc *, UINT8);
+extern void argfree(void);
+extern void irelse(struct inode *);
+extern void wakeup(INT16);
+extern UINT8 valid(UINT16, UINT16);
+extern UINT8 argbuild(UINT8 **, UINT8 **);
+extern UINT8 argalloc(void);
+extern UINT8 argscan(UINT8 **, UINT8 **);
+extern UINT8 fit(void);
+extern UINT8 rdhdr(void);
+extern UINT8 xchk(UINT8 *);
+extern UINT8 access(struct inode *, INT16);
 
 #define HALT	0x76            /* system call trap */
 
@@ -86,9 +86,9 @@ static struct buf argbuf;
 extern INT16 zerouser();
 extern INT16 out();
 extern INT16 getbyte(), getword();
-extern UINT8 segalloc();
+extern UINT8 segalloc(void);
 extern void segfree(UINT16);
-extern void newmap(), taskload();
+extern void newmap(struct proc *), taskload();
 extern UINT16 nsegs;              /* free 4K segments (malloc.c) */
 
 static struct obj hdr = 0;
@@ -104,6 +104,18 @@ UINT8 zpage[512] = 0;   /* zero page for clearing bss */
  * therefore starts with no variables; through call 56, with the ones
  * its caller handed over.
  */
+
+/* prototypes for functions defined below */
+INT16 getbyte(char *);
+INT16 getword(char *);
+INT16 nread(struct inode *, UINT8 *, UINT16);
+INT16 putbyte(int, char *);
+INT16 zerouser(char *, int);
+int out(int, int);
+struct inode * iname(UINT8 *);
+void copy(char *, char *, int);
+void taskload(struct proc *);
+void zero(char *, int);
 void
 doexec(name, args, env)
     UINT8 *name, **args, **env;

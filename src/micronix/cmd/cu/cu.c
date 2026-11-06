@@ -89,6 +89,8 @@
 #include <sys/signal.h>
 #include <sys/sgtty.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
 
 
 #define CRLF "\r\n"
@@ -106,6 +108,16 @@ char	c;
  *	side is the wrc macro above, since it is one statement.
  */
 
+
+/* prototypes for functions defined below */
+int dopercen(char *);
+int echo(char *);
+int equal(char *, char *);
+int exists(char *);
+int mode(int);
+int prf(char *, char *);
+int wrln(char *);
+int xalarm(int);
 rdc(ds)
 {
 

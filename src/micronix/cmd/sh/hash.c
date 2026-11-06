@@ -57,6 +57,9 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include "sh.h"
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define DIRSIZ  14
 

@@ -5,6 +5,7 @@
  * plain decimal number.
  */
 #include "awk.h"
+#include <stdio.h>
 
 /*
  * compare two awkfloats: -1, 0, +1.  A function, not a macro, because

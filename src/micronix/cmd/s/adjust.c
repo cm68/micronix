@@ -3,9 +3,18 @@
  */
 
 #include "s.h"
+#include <string.h>
 
 #define LENGTH 78
 
+
+/* prototypes for functions defined below */
+int b_delete(int, int);
+int b_getcur(int *, int *);
+int b_getmark(int *, int *);
+int b_gets(int, char *);
+int b_insert(int, char *);
+int b_setcur(int, int);
 adjust(n)
     int n;                      /* line length */
 {

@@ -28,13 +28,13 @@ extern char *pname;
 
 /* K&R declarations: ccc predates prototypes, and the definitions are
  * K&R too, so the arguments get the default promotion on both sides. */
-void die();
-void domkfs();
+void die(char *);
+void domkfs(UINT, UINT, UINT, int);
 /* declared because mnix calls it directly: a diskette's label lives in
  * device block 0, which the worker's wrblk cannot reach, so the driver
  * writes that one block itself through this. */
-void putlabel();
+void putlabel(char *);
 
 /* the block i/o, defined by the driver (raw device) or by mnix (image) */
-void rdblk();
-void wrblk();
+void rdblk(UINT, char *);
+void wrblk(UINT, char *);

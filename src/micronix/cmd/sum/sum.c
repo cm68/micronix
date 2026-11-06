@@ -55,6 +55,8 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 #include <dirent.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 int	errflg;
 int	rflg;
@@ -66,10 +68,17 @@ int	rflg;
  */
 char	namebuf[BUFSIZ];
 
-DIR	*opendir();
-struct	direct *readdir();
+DIR	*opendir(char *);
+struct	direct *readdir(DIR *);
 long	telldir();
 
+
+/* prototypes for functions defined below */
+void seekdir(DIR *, long);
+long telldir(DIR *);
+int cantopen(char *);
+int sumfile(char *);
+int sumstream(FILE *, char *);
 main(argc, argv)
 	int argc;
 	char **argv;

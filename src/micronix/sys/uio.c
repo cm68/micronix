@@ -15,24 +15,24 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-extern UINT8 block();
-extern void bwrite();
-extern void sleep();
-extern void strat();
-extern void bwait();
-extern void brelse();
-extern void wakeup();
-extern void perror();
-extern void pr();
-extern void prdev();
-extern void bzero();
-extern void panic();
+extern UINT8 block(struct buf *);
+extern void bwrite(struct buf *);
+extern void sleep(INT16, UINT8);
+extern void strat(struct buf *);
+extern void bwait(struct buf *);
+extern void brelse(struct buf *);
+extern void wakeup(INT16);
+extern void perror(struct buf *);
+extern void pr(UINT8 *, INT16);
+extern void prdev(UINT8 *, UINT16);
+extern void bzero(struct buf *);
+extern void panic(UINT8 *);
 
 extern INT32 seconds;            /* see clock.c */
 extern UINT16 nbuf;                /* initialized in binit(), main.c */
 extern struct buf *btop;            /* ditto */
 extern UINT8 map0[];   /* MMU map registers (uhdr.s) */
-extern INT16 copy();               /* leaf mem.s: kernel-to-kernel copy */
+extern void copy(char *, char *, int);              /* leaf sub8.s: kernel-to-kernel copy */
 
 UINT8 bufseg = BUFSEG;          /* the buffer window's current segment */
 extern INT16 copyin(), copyout();  /* leaf mem.s: the user side of it */
@@ -46,6 +46,14 @@ extern INT16 copyin(), copyout();  /* leaf mem.s: the user side of it */
 
 static struct buf *bhash[NHASH];
 
+
+/* prototypes for functions defined below */
+void zero(char *, int);
+INT16 copyin(char *, char *, int);
+INT16 copyout(char *, char *, int);
+UINT8 * bhold(struct buf *);
+UINT16 bmajor(UINT16);
+INT16 geterror(struct buf *);
 static INT16
 hash(blk, dev)
     UINT16 blk, dev;

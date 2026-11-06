@@ -10,11 +10,17 @@
  */
 
 #include "diff.h"
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 char	diff[] = "/bin/diff";
 char	diffh[] = "/bin/diffh";
 char	pr[] = "/bin/pr";
 
+
+/* prototypes for functions defined below */
+int diffdir(char **);
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -192,7 +198,6 @@ ralloc(p,n)
 char *p;
 {
 	register char *q;
-	char *realloc();
 
 	if ((q = realloc(p, (unsigned)n)) == NULL)
 		noroom();

@@ -19,7 +19,12 @@
  */
 #include <sys/reboot.h>
 #include <sys/signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
+
+/* prototypes for functions defined below */
+void reboot(INT16);
 main(argc, argv)
     int argc;
     char **argv;

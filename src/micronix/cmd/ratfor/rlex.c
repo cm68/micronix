@@ -10,6 +10,7 @@
  */
 
 #include "r.h"
+#include <stdlib.h>
 
 char *keyword [] = {
 	"do",
@@ -68,6 +69,10 @@ char	*bwkmeter	".           bwkmeter    ";
 int	bcdbwk[5];
 #endif
 
+
+/* prototypes for functions defined below */
+int error(char *);
+int gtok(char *);
 main(argc,argv) int argc; char **argv; {
 	int i;
 	while(argc>1 && argv[1][0]=='-') {

@@ -32,6 +32,9 @@
 #include <types.h>
 #include <stdio.h>
 #include <sys/sgtty.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 int outc(char);			/* the character is byte-wide, passed in A */
 
@@ -48,6 +51,11 @@ int	ocnt;
 char	prompt[] = "--More--";
 char	eraser[] = "\r        \r";
 
+
+/* prototypes for functions defined below */
+int banner(char *);
+int outstr(char *);
+int page(int);
 main(argc, argv)
 int	argc;
 char	*argv[];

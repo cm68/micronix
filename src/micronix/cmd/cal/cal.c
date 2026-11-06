@@ -50,6 +50,7 @@
 #include <types.h>
 #include <stdio.h>
 #include <time.h>
+#include <stdlib.h>
 
 char	dayw[] = " S  M Tu  W Th  F  S";
 char	*smon[]= {
@@ -59,6 +60,15 @@ char	*smon[]= {
 };
 char	string[432];
 
+
+/* prototypes for functions defined below */
+int cal(int, int, char *, int);
+int jan1(int);
+int lower(int);
+int month(char *);
+int number(char *);
+int prefix(char *, char *);
+int pstr(char *, int);
 main(argc, argv)
 	int argc;
 	char *argv[];

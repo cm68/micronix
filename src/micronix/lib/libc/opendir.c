@@ -1,8 +1,11 @@
 #include <types.h>
+#include <stdlib.h>
 #include <sys/dir.h>
 #include <dirent.h>
 #include <unistd.h>	/* seek, lseek: the fd is a byte, passed in A */
 
+
+/* prototypes for functions defined below */
 DIR *
 opendir(dirname)
 char *dirname;
@@ -37,7 +40,7 @@ DIR *dirp;
 	seek(dirp->fd, 0, 0);
 }
 
-struct dirent *
+struct dir *
 readdir(dirp)
 DIR *dirp;
 {
@@ -65,6 +68,7 @@ DIR *dirp;
 	return lseek(dirp->fd, 0L, 1);
 }
 
+void
 seekdir(dirp, pos)
 DIR *dirp;
 long pos;

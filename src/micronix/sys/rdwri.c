@@ -13,11 +13,11 @@
 #include <sys/proc.h>
 #include <sys/signal.h>
 #include <errno.h>
-extern void ilock();
-extern void irelse();
-extern void send();
-extern void sleep();
-extern UINT8 valid();
+extern void ilock(struct inode *);
+extern void irelse(struct inode *);
+extern void send(struct proc *, UINT8);
+extern void sleep(INT16, UINT8);
+extern UINT8 valid(UINT16, UINT16);
 
 extern INT16 rdwri(UINT8, UINT8, INT16, INT16);	/* below; rw and fd are bytes */
 
@@ -29,6 +29,12 @@ extern INT16 rdwri(UINT8, UINT8, INT16, INT16);	/* below; rw and fd are bytes */
 /*
  * Read system call
  */
+
+/* prototypes for functions defined below */
+INT16 iread(struct inode *, INT16);
+INT16 iwrite(struct inode *, INT16);
+INT16 pread(struct inode *, INT16);
+INT16 pwrite(struct inode *, INT16);
 void
 read(buf, count)
     INT16 buf, count;

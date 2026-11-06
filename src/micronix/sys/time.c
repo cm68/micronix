@@ -8,11 +8,11 @@
 #include <sys/sys.h>
 #include <sys/proc.h>
 #include <sys/signal.h>
-extern void timein();
-extern void wakeup();
-extern void run();
-extern void send();
-extern void panic();
+extern void timein(void);
+extern void wakeup(INT16);
+extern void run(struct proc *);
+extern void send(struct proc *, UINT8);
+extern void panic(UINT8 *);
 
 INT32 seconds = 0;               /* system time */
 INT16 revel = 0;                  /* seconds to revelie for sleep system call */
@@ -87,12 +87,13 @@ clock()
 
 struct tmout
 {
-    INT16 (*func)();
+    INT16 (*func)(INT16);
     INT16 arg;
     UINT16 ticks;
 };
 
 struct tmout tlist[NTMOUTS] = 0;        /* timeout list */
+static INT16 (*f)(INT16);               /* the timer being run */
 
 /*
  * Called from the clock interrupt HERTZ times per second
@@ -105,7 +106,6 @@ timein()
 {
     static UINT8 tmbusy = 0;
     register struct tmout *t;
-    INT16 (*f)();
 
     if (tmbusy)
         return;
@@ -134,7 +134,7 @@ timein()
  */
 void
 timeout(func, arg, ticks)
-    INT16 (*func)(), arg, ticks;
+    INT16 (*func)(INT16), arg, ticks;
 {
     register struct tmout *t;
 

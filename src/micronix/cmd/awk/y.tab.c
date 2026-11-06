@@ -413,6 +413,7 @@ int yychar = -1; /* current input token number */
 int yynerrs = 0;  /* number of errors */
 short yyerrflag = 0;  /* error recovery flag */
 
+
 yyparse() {
 
 	short yys[YYMAXDEPTH];

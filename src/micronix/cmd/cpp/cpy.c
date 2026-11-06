@@ -36,20 +36,23 @@ int yylval;		/* a number token's value, set by yylex */
 
 static int tok;		/* the current lookahead token */
 
-static int comma();
-static int ternary();
-static int oror();
-static int andand();
-static int bitor();
-static int bitand();
-static int equality();
-static int relational();
-static int shift();
-static int additive();
-static int multiplicative();
-static int unary();
-static int primary();
+static int comma(void);
+static int ternary(void);
+static int oror(void);
+static int andand(void);
+static int bitor(void);
+static int bitand(void);
+static int equality(void);
+static int relational(void);
+static int shift(void);
+static int additive(void);
+static int multiplicative(void);
+static int unary(void);
+static int primary(void);
 
+
+/* prototypes for functions defined below */
+int yyerror(char *, int, int);
 static
 advance()
 {

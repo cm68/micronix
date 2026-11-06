@@ -6,6 +6,7 @@
  */
 
 #include "far.h"
+#include <unistd.h>
 
 int cflag = NO, dflag = NO,    /* delete */
     pflag = NO,                 /* print */

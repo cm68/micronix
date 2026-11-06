@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <string.h>
 #define NAME 257
 #define SHELLINE 258
 #define START 259
@@ -19,7 +20,7 @@ typedef union YYSTYPE {
 	struct nameblock *ynameblock;
 	
 } YYSTYPE;
-extern void *memcpy();
+extern void *memcpy(void *, void *, size_t);
 #define YYVCOPY(x,y) memcpy((char *)&(x),(char *)&(y),sizeof(YYSTYPE))
 #define YYVALINT(x) (*(int *)&(x))
 YYSTYPE yylval, yyval;
@@ -40,6 +41,13 @@ char *zznextc;	/* zero if need another line; otherwise points to next char */
 int yylineno;
 extern FILE * fin;
 
+
+/* prototypes for functions defined below */
+int eqsign(char *);
+int fatal(char *);
+int fatal1(char *, char *);
+int yyerror(char *);
+int retsh(char *);
 yylex()
 {
 register char *p;
@@ -106,7 +114,6 @@ char *q;
 {
 register char *p;
 struct shblock *sp;
-char *copys();
 
 for(p=q+1 ; *p==' '||*p=='\t' ; ++p)  ;
 

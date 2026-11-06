@@ -20,6 +20,8 @@
 #include <sys/stat.h>
 #include "sh.h"
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 char login;                 /* argv[0] began with '-'   (0x9004) */
@@ -118,6 +120,11 @@ struct builtin builtins[] = {
     0,          0
 };
 
+
+/* prototypes for functions defined below */
+void popredir(int *);
+void runline(char *);
+int sourcefile(char *, int);
 void
 warn(s, a)
 char *s;

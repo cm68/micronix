@@ -40,6 +40,8 @@
  */
 
 #include "s.h"
+#include <stdlib.h>
+#include <string.h>
 
 struct b_line
 {
@@ -58,6 +60,9 @@ int ref_nbr;                /* number of recently referenced line */
 /*
  * buf_delete - delete buffer lines 
  */
+
+/* prototypes for functions defined below */
+int reference(int);
 buf_delete(from, to)
     int from, to;
 {

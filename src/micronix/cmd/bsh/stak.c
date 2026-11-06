@@ -19,6 +19,11 @@ STKPTR		staktop;
 
 /* ========	storage allocation	======== */
 
+
+/* prototypes for functions defined below */
+VOID free(BLKPTR);
+int setbrk(int);
+int rmtemp(IOPTR);
 STKPTR	getstak(asize)
 	INT		asize;
 {	/* allocate requested stack */

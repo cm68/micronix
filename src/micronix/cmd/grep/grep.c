@@ -22,6 +22,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 #define	CBRA	1
 #define	CCHR	2
@@ -80,6 +81,14 @@ char	bittab[] = {
 	128
 };
 
+
+/* prototypes for functions defined below */
+int advance(char *, char *);
+int compile(char *);
+int ecmp(char *, char *, int);
+int errexit(char *, char *);
+int execute(char *);
+int succeed(char *);
 main(argc, argv)
 char **argv;
 {

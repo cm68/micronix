@@ -24,11 +24,11 @@ struct group {
  * lib/libc/getgrent.c.  The record returned is in a static area the
  * next call overwrites - copy anything to be kept.
  */
-struct group *getgrent();
-struct group *getgrgid();
-struct group *getgrnam();
-int setgrent();
-int endgrent();
+struct group *getgrent(void);
+struct group *getgrgid(int);
+struct group *getgrnam(char *);
+int setgrent(void);
+int endgrent(void);
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

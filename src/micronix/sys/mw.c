@@ -17,32 +17,32 @@
 #include <sys/dlabel.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-extern void brelse();
-extern void bzero();
-extern void iodone();
-extern void bsort();
-extern void mwstart();
-extern void reset();
-extern void issue();
-extern void mwwait();
-extern void rwint();
-extern void newdrv();
-extern void advque();
-extern void newrw();
-extern void rwcmd();
-extern void panic();
-extern void wakeup();
-extern void sleep();
-extern UINT8 dlslice();
-extern UINT8 busgive();
-extern UINT8 busget();
+extern void brelse(struct buf *);
+extern void bzero(struct buf *);
+extern void iodone(struct buf *);
+extern void bsort(struct buf *, struct buf *);
+extern void mwstart(void);
+extern void reset(void);
+extern void issue(void);
+extern void mwwait(void);
+extern void rwint(void);
+extern void newdrv(void);
+extern void advque(void);
+extern void newrw(void);
+extern void rwcmd(void);
+extern void panic(UINT8 *);
+extern void wakeup(INT16);
+extern void sleep(INT16, UINT8);
+extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
+extern UINT8 busgive(INT16 (*)());
+extern UINT8 busget(INT16 (*)());
 
 /*
  * Declared before anything calls it: an undeclared call is extern int
  * by default and the definition says static.
  */
-static void error();
-static void mwlink();
+static void error(void);
+static void mwlink(void);
 
 #define NDRIVES 4               /* Number of drives. See mws[] below. */
 #define SECSIZE 3               /* Sector size (512 bytes) */
@@ -200,6 +200,11 @@ static UINT8 retry = 0,         /* number of retries so far */
  * which knows nothing about this controller; what is here is the handling
  * of a disk that has no label.
  */
+
+/* prototypes for functions defined below */
+int out(int, int);
+struct buf * bread(UINT16, UINT16);
+INT16 mwcyl(UINT16, UINT16, UINT16, UINT16, UINT16);
 INT16
 mwopen(dev, mode)
     UINT16 dev, mode;

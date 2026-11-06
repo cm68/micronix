@@ -156,8 +156,8 @@ STATIC	int	fins[MAXINC];
 STATIC	int	lineno[MAXINC];
 
 STATIC	char	*dirs[10];	/* -I and <> directories */
-char *strdex(), *copy(), *subst(), *trmdir();
-struct symtab *stsym();
+char *strdex(char *, char), *copy(struct blk *, int), *subst(char *, char *), *trmdir();
+struct symtab *stsym(char *);
 STATIC	int	fin	= STDIN;
 STATIC	FILE	*fout	= stdout;
 STATIC	int	nd	= 1;
@@ -195,6 +195,14 @@ STATIC	struct symtab *uflloc;
 STATIC	int	trulvl;
 STATIC	int	flslvl;
 
+
+/* prototypes for functions defined below */
+STATIC char * copy(char *);
+int pperror(char *, int, int);
+int ppwarn(char *, int);
+struct symtab * slookup(char *, char *, int);
+char * subst(char *, struct symtab *);
+char * trmdir(char *);
 sayline() {
 	if (pflag==0) fprintf(fout,"# %d \"%s\"\n", lineno[ifno], fnames[ifno]);
 }

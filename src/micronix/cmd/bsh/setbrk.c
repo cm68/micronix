@@ -8,6 +8,7 @@
  */
 
 #include	"defs.h"
+#include <unistd.h>
 
 setbrk(incr)
 {

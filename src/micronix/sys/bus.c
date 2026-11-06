@@ -89,7 +89,7 @@
 #include <sys/sys.h>
 #include <sys/ovl.h>
 #include <sys/proc.h>
-extern UINT8 ovlcall();
+extern UINT8 ovlcall(INT16 (*)(), UINT16);
 
 extern INT16 (*busmaster) ();	/* the words are in sys/ovl.c: one per machine */
 extern UINT16 busmasterseg;

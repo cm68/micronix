@@ -9,6 +9,8 @@
 
 #include	"defs.h"
 #include	"sym.h"
+#include <signal.h>
+#include <unistd.h>
 
 LOCAL INT	parent;
 
@@ -19,6 +21,28 @@ struct sysnod	commands[];
 /* ========	command execution	========*/
 
 
+
+/* prototypes for functions defined below */
+int replace(REG STRING *, STRING);
+int execexp(STRING, UFD);
+INT cf(REG STRING, REG STRING);
+INT getarg(COMPTR);
+INT options(INT, STRING *);
+INT pathopen(REG STRING, REG STRING);
+INT readvar(STRING *);
+VOID execa(STRING []);
+VOID initio(IOPTR);
+VOID tdystak(REG STKPTR);
+int builtin(void);
+int chkopen(STRING);
+int chkpipe(INT *);
+int exitsh(INT);
+int freeargs(DOLPTR);
+int gmatch(REG STRING, REG STRING);
+int push(FILE);
+int stoi(STRING);
+int syslook(STRING, SYSTAB);
+int trim(STRING);
 execute(argt, execflg, pf1, pf2)
 	TREPTR		argt;
 	INT		*pf1, *pf2;

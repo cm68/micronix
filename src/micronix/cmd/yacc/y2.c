@@ -15,9 +15,17 @@
 #define START 269
 #define ENDFILE 0
 
+#include <stdio.h>
+#include <string.h>
 char *gettype();	/* field name in <...>, cstashed */
 char *getunion();	/* body of a %union, between its braces */
 
+
+/* prototypes for functions defined below */
+char * cstash(char *);
+int chfind(int, char *);
+int cpyact(int, int);
+int defin(int, char *);
 char *
 gettype() { /* the '<' has been consumed */
 	static char tb[_namesize];

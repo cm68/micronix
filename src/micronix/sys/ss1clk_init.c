@@ -27,6 +27,9 @@ extern INT16 in(), out();
  * generator) reloads and repeats.  Its OUT is the slave 8259's IR1; the
  * unmask is the PIC's, so this only programs the timer.
  */
+
+/* prototypes for functions defined below */
+int out(int, int);
 void
 ss1_clockinit(void)
 {

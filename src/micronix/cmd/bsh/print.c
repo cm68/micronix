@@ -8,12 +8,18 @@
  */
 
 #include	"defs.h"
+#include <unistd.h>
 
 CHAR		numbuf[6];
 
 
 /* printing and io conversion */
 
+
+/* prototypes for functions defined below */
+int prn(INT);
+INT length(STRING);
+int itos(int);
 newline()
 {	prc(NL);
 }

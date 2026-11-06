@@ -13,6 +13,7 @@
 
 #include <obj.h>
 
+#include <stdlib.h>
 char *progname;
 int verbose;
 

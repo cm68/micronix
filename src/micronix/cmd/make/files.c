@@ -93,6 +93,9 @@ char *builtin[] =
 	0 };
 
 
+
+/* prototypes for functions defined below */
+int fatal(char *);
 TIMETYPE exists(filename)
 char *filename;
 {
@@ -134,8 +137,8 @@ return(t);
 FSTATIC char n15[15];
 FSTATIC char *n15end	= &n15[14];
 
-static amatch();
-static umatch();
+static amatch(char *, char *);
+static umatch(char *, char *);
 
 
 

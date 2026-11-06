@@ -144,8 +144,8 @@ char tries INIT;
  * Declared before anything calls them: an undeclared call is extern int
  * by default and the definitions say static.
  */
-static int idesect(), rdstat(), waitrdy(), waitdrq();
-static putreg();
+static int idesect(UINT, char *), rdstat(), waitrdy(), waitdrq();
+static putreg(int, int);
 
 /*
  * reset the drive, and read the label that says how the disk is laid
@@ -158,6 +158,12 @@ static putreg();
  * state, a wait for it to come out of that, and then the one read that
  * everything else depends on.
  */
+
+/* prototypes for functions defined below */
+int bail(char *);
+int in(int);
+int out(int, int);
+int outstr(char *);
 reset()
 {
 	register struct dlabel *lp;

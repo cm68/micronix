@@ -1,4 +1,5 @@
 #include "far.h"
+#include <unistd.h>
 
 /*
  * How many 512 byte blocks the drive has.

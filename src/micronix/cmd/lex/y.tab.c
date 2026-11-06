@@ -9,6 +9,7 @@
 #define NULLS 265
 #define CAT 266
 #include "ldefs.c"
+int yyerror(char *);
 #define yyclearin yychar = -1
 #define yyerrok yyerrflag = 0
 extern int yychar, yyerrflag;
@@ -28,6 +29,31 @@ int g;
 char *p;
 #define YYERRCODE 256
 
+
+/* prototypes for functions defined below */
+char * lxalloc(int, int);
+int alpha(int);
+int cclinter(int);
+int cfree(void *);
+int ctrans(char **);
+int digit(int);
+int dupl(int);
+int error(int, int, int);
+int getl(char *);
+int index(int, char *);
+int lookup(char *, char **);
+int mn0(int);
+int mn1(int, int);
+int mn2(int, int, int);
+int munput(int, char *);
+int printable(int);
+int scomp(char *, char *);
+int scopy(char *, char *);
+int siconv(char *);
+int slength(char *);
+int space(int);
+int usescape(int);
+int warning(int, int, int);
 yylex(){
 	register char *p;
 	register int c, i;

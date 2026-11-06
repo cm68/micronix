@@ -41,6 +41,19 @@ char *prompt	= "";	/* other systems -- pick what you want */
 char junkname[20];
 char funny[128];
 
+
+/* prototypes for functions defined below */
+struct varblock * varptr(char *);
+int doname(struct nameblock *, int, TIMETYPE *);
+int eqsign(char *);
+int fatal(char *);
+int fatal1(char *, char *);
+int setvar(char *, char *);
+int enbint(short);
+int isprecious(char *);
+int printdesc(int);
+int rdd1(FILE *);
+int rddescf(char *);
 main(argc,argv)
 int argc;
 char *argv[];
@@ -179,9 +192,7 @@ exit(0);
 
 intrupt()
 {
-struct varblock *varptr();
 char *p;
-TIMETYPE exists();
 
 if(okdel && !noexflag && !touchflag &&
 	(p = varptr("@")->varval) && exists(p)>0 && !isprecious(p) )

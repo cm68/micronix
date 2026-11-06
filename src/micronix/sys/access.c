@@ -12,8 +12,8 @@
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <errno.h>
-extern UINT8 ronly();
-extern void irelse();
+extern UINT8 ronly(struct inode *);
+extern void irelse(struct inode *);
 
 #define SUPERID 0               /* Id of superuser */
 
@@ -22,6 +22,9 @@ extern void irelse();
  * IREAD, IWRITE, and/or IEXEC to inode ip.
  */
 
+
+/* prototypes for functions defined below */
+struct inode * iname(UINT8 *);
 UINT8
 access(i, per)
     struct inode *i;

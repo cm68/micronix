@@ -28,6 +28,9 @@
  */
 
 #include <stdio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define	MAXSIZ 1024
 #define QSIZE 1024
@@ -50,6 +53,9 @@ long	tln;
 FILE	*wordf;
 char	*argptr;
 
+
+/* prototypes for functions defined below */
+int execute(char *);
 main(argc, argv)
 char **argv;
 {

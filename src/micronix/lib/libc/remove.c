@@ -2,7 +2,8 @@
  * remove is just unlink
  *
  */
-extern int	unlink();
+#include <unistd.h>
+extern int	unlink(char *pathname);
 
 remove(s)
 char *	s;

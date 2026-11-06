@@ -6,6 +6,8 @@
 
 #include "less.h"
 #include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 
 public char file = -1;	/* File descriptor of the input file */
@@ -192,7 +194,7 @@ end_logfile()
 		lower_left();
 		clear_eol();
 		so_enter();
-		puts("finishing logfile... (interrupt to abort)");
+		lputs("finishing logfile... (interrupt to abort)");
 		so_exit();
 		flush();
 		while (sigs == 0 && ch_forw_get() != EOF)
@@ -360,7 +362,6 @@ ch_init(want_nbufs)
 	int want_nbufs;
 {
 	register struct buf *bp;
-	char *calloc();
 
 	if (nbufs < want_nbufs)
 	{

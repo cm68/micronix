@@ -126,6 +126,11 @@ char *as[] = {
 	"globl","byte","even","text","data","bss","comm",0};
 int	ifile;
 
+
+/* prototypes for functions defined below */
+int english(unsigned char *, int);
+int lookup(char *[]);
+int type(char *);
 main(argc, argv)
 char **argv;
 {

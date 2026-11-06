@@ -27,20 +27,20 @@
 #include <sys/ovl.h>
 
 #include "build.h"
-extern INT8 ovlattach();
-extern void pr();
-extern void brelse();
-extern void cus();
-extern void plogo();
-extern void pinit();
-extern void meminit();
-extern void binit();
-extern void pcon();
-extern void bopen();
-extern void panic();
-extern void irelse();
-extern void ovlplaceall();
-extern UINT8 intr_attach();
+extern INT8 ovlattach(UINT16);
+extern void pr(UINT8 *, INT16);
+extern void brelse(struct buf *);
+extern void cus(void);
+extern void plogo(void);
+extern void pinit(void);
+extern void meminit(void);
+extern void binit(void);
+extern void pcon(void);
+extern void bopen(UINT16, UINT16);
+extern void panic(UINT8 *);
+extern void irelse(struct inode *);
+extern void ovlplaceall(void);
+extern UINT8 intr_attach(void);
 
 /*
  * resident data, defined in main_data.c (and malloc.c / con.c)
@@ -56,9 +56,9 @@ extern UINT8 nmtab;             /* uhdr.s's _nmtab: the published count */
 extern UINT8 segmap[];          /* malloc.c */
 extern UINT16 nsegs;
 extern UINT16 lastseg;            /* uhdr.s's _lastseg: the allocator hint */
-extern UINT8 segalloc();    /* malloc.c: a segment is a byte */
-extern void swapinit();          /* malloc.c */
-extern void nodev();             /* con.c */
+extern UINT8 segalloc(void);    /* malloc.c: a segment is a byte */
+extern void swapinit(void);          /* malloc.c */
+extern void nodev(void);             /* con.c */
 extern UINT16 kino;               /* uhdr.s's _kino: the inode we booted from */
 
 /*
@@ -78,6 +78,15 @@ extern UINT16 kino;               /* uhdr.s's _kino: the inode we booted from */
  * does not answer, and the driver's watchdog turns that silence into an
  * error in a couple of seconds.
  */
+
+/* prototypes for functions defined below */
+INT16 nread(struct inode *, UINT8 *, UINT16);
+INT16 tmount(INT16, struct inode *, UINT8, UINT8 *);
+UINT16 imap(struct inode *, UINT16, UINT16 *, UINT8);
+struct buf * bread(UINT16, UINT16);
+struct inode * iget(INT16, INT16);
+void copy(char *, char *, int);
+void zero(char *, int);
 static void
 drvprobe(major, name, ndrv)
     UINT8 major;        /* < NBDEV (10) and < NCDEV (13) */

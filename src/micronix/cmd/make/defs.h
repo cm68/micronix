@@ -101,7 +101,7 @@ extern int read(int, char *, int);
 extern int write(int, char *, int);
 extern int close(int);
 extern int unlink(char *);
-extern int time(long *);
+extern long time(long *);
 extern int access(char *, int);
 
 extern int sigivalue;
@@ -189,8 +189,8 @@ struct chain
 	char *datap;
 	};
 
-char *copys(), *concat(), *subst();
-int *ckalloc();
-struct nameblock *srchname(), *makename();
-TIMETYPE exists();
-extern int intrupt();
+char *copys(char *), *concat(char *, char *, char *), *subst(char *, char *);
+int *ckalloc(int);
+struct nameblock *srchname(char *), *makename(char *);
+TIMETYPE exists(char *);
+extern int intrupt(void);

@@ -5,6 +5,12 @@ extern int yyprevious , *yyfnd;
 extern char yyextra[];
 extern char yytext[];
 extern int yyleng;
+
+/* prototypes for functions defined below */
+int yyback(int *, int);
+int yyoutput(int);
+int yyracc(int);
+int yyunput(int);
 yyreject ()
 {
 for( ; yylsp < yyolsp; yylsp++)

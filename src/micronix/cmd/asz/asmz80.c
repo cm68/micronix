@@ -197,20 +197,20 @@ struct instruct isr_table[] = {
 
 /* External functions from asm.c */
 extern void need(unsigned char);
-extern unsigned char operand();
+extern unsigned char operand(struct expval *);
 extern void emitbyte(unsigned char);
-extern void emit_exp();
-extern void emit_imm();
+extern void emit_exp(unsigned short, struct expval *);
+extern void emit_imm(struct expval *);
 extern unsigned char tok2reg(unsigned char);
-extern char match();
-extern void gripe();
-extern void gripe2();
+extern char match(char *, char *);
+extern void gripe(char *);
+extern void gripe2(char *, char *);
 extern unsigned short cur_address;
 extern char pass;
 extern char no_relax;
-extern void add_jump();
-extern int is_relaxed();   /* the jump add_jump has just counted */
-extern unsigned char skipwhite();
+extern void add_jump(unsigned short, struct symbol *, unsigned short, unsigned char);
+extern int is_relaxed(void);   /* the jump add_jump has just counted */
+extern unsigned char skipwhite(void);
 
 #define T_NUM   (T_BIAS + 43)
 #define T_C_I   (T_BIAS + 36)
@@ -1069,7 +1069,7 @@ struct instruct *isr;
 	return 0;
 }
 
-static char (*isr_handlers[])() = {
+static char (*isr_handlers[])(struct instruct *) = {
 	0,
 	do_basic,
 	do_basic_ext,

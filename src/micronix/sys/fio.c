@@ -12,12 +12,12 @@
 #include <sys/buf.h>
 #include <sys/con.h>
 #include <sys/proc.h>
-extern void cread();
-extern void aread();
-extern void brelse();
-extern void cwrite();
-extern void bawrite();
-extern void bdwrite();
+extern void cread(INT16);
+extern void aread(UINT16, UINT16);
+extern void brelse(struct buf *);
+extern void cwrite(INT16);
+extern void bawrite(struct buf *);
+extern void bdwrite(struct buf *);
 
 extern INT32 seconds;
 
@@ -31,6 +31,14 @@ extern void iomove(UINT8, UINT8 *, INT16);	/* the flag is a byte */
  * Called by the read system call (including pipes),
  * to read directories, and to load files for execution.
  */
+
+/* prototypes for functions defined below */
+INT16 copyin(char *, char *, int);
+INT16 copyout(char *, char *, int);
+UINT16 imap(struct inode *, UINT16, UINT16 *, UINT8);
+struct buf * bget(UINT16, UINT16);
+struct buf * bread(UINT16, UINT16);
+void copy(char *, char *, int);
 INT16
 iread(ip, dev)
     register struct inode *ip;

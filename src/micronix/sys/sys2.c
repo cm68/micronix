@@ -13,19 +13,25 @@
 #include <sys/file.h>
 #include <errno.h>
 #include <sys/pic8259.h>
-extern UINT8 super();
-extern void istat();
-extern void ilock();
-extern void irelse();
-extern void sleep();
-extern UINT8 valid();
+extern UINT8 super(void);
+extern void istat(struct inode *, INT16 *);
+extern void ilock(struct inode *);
+extern void irelse(struct inode *);
+extern void sleep(INT16, UINT8);
+extern UINT8 valid(UINT16, UINT16);
 
 extern INT32 seconds;
-extern void itruncat();
+extern void itruncat(struct inode *, UINT32);
 
 /*
  * Stat system call
  */
+
+/* prototypes for functions defined below */
+INT16 copyout(char *, char *, int);
+INT16 procid(struct proc *);
+struct inode * iname(UINT8 *);
+void x4to3(char *, char *);
 void
 stat(name, buf)
     UINT8 *name, *buf;

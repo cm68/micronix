@@ -48,6 +48,11 @@
  * block whole, so anything else at 0x1000 means the copy did not happen
  * and the geometry below would be read out of whatever did.
  */
+
+/* prototypes for functions defined below */
+int bail(char *);
+int out(int, int);
+int outstr(char *);
 static int
 hasmagic(lp)
 register struct dlabel *lp;

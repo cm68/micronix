@@ -6,6 +6,9 @@
  * Pass 2: write output with relocations applied
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #ifdef linux
 #include <stdio.h>
@@ -40,6 +43,7 @@
 /*
  * segment names and the relocation writer, both in wsobj.c
  */
+#include <fcntl.h>
 extern char *wsSegNames[];
 extern void wsEncBump();
 extern void wsEncReloc();
@@ -293,6 +297,11 @@ struct lnksym {
     { "__Hbss",  0, 0 },
 };
 
+
+/* prototypes for functions defined below */
+void wsEncBump(FILE *, int);
+void wsEncReloc(FILE *, int, int, int);
+void wsEndReloc(FILE *);
 void
 usage()
 {
@@ -339,7 +348,7 @@ usage()
  * symptom; see xalloc in cpp/util.c.  There is nothing useful to do
  * with a failed allocation, so say so and stop.
  */
-char *permalloc();
+char *permalloc(unsigned);
 
 char *
 xalloc(n)
@@ -776,7 +785,7 @@ has_undefined()
     return 0;
 }
 
-int ar_byindex();
+int ar_byindex(char *, FILE *, int);
 
 /*
  * read object from archive at given offset

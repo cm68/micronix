@@ -54,8 +54,8 @@ extern struct buf blist[];      /* boot headers; textpad.s links blist last */
  * would be borrowed over by swin()/srel() and mem.s.  The superblock
  * needs no window - getsb() keeps it in the kernel's own memory.
  */
-extern UINT8 *bhold();           /* map a buffer's data, return its address */
-extern void brel();             /* put back the segment the hold saved */
+extern UINT8 *bhold(struct buf *);           /* map a buffer's data, return its address */
+extern void brel(void);             /* put back the segment the hold saved */
 extern void bwin(UINT8);         /* the raw mapping, without the stack; seg is a byte */
 
 /*

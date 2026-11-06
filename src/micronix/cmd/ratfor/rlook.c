@@ -11,6 +11,8 @@
 #define NULL 0
 #define EOS 0
 #define	HSHSIZ	101
+#include <stdlib.h>
+#include <string.h>
 struct	nlist {
 	char	*name;
 	char	*def;
@@ -19,10 +21,10 @@ struct	nlist {
 };
 
 struct	nlist	*hshtab[HSHSIZ];
-struct nlist	*lookup();
-char	*install();
-char	*malloc();
-char	*copy();
+struct nlist	*lookup(char *);
+char	*install(char *, char *, int);
+char	*malloc(size_t);
+char	*copy(char *);
 int	hshval;
 
 struct nlist *lookup(str)

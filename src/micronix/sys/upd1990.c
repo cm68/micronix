@@ -44,6 +44,12 @@ extern INT32 bcd2unix();         /* unbcd.s, hangs off the highmem */
 extern void unixtobcd();        /* unixtobcd.s, stays in the u page */
 
 /* stroke a command: cmd, cmd|CSTROBE, cmd (falling edge commits) */
+
+/* prototypes for functions defined below */
+INT32 bcd2unix(char *);
+int in(int);
+int out(int, int);
+void unixtobcd(long, char *);
 static void
 clkcmd(INT16 cmd)
 {

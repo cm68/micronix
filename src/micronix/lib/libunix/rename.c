@@ -28,6 +28,7 @@
  * to compile on a host as well, where rename is the C library's and
  * means something subtly different.
  */
+#include <unistd.h>
 rename(from, to)
 char *from, *to;
 {

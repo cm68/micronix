@@ -44,6 +44,14 @@ extern void	exit(int);
 extern char *	getenv(char *);
 extern int	system(char *);
 extern void	qsort(void *, size_t, size_t, int (*)(void *, void *));
+/*
+ * std.h has an abs() macro.  A file may include it (and then this
+ * header), and the macro would chew up the declaration below into a
+ * ternary.
+ */
+#ifdef abs
+#undef abs
+#endif
 extern int	abs(int);
 extern long	labs(long);
 extern int	mkstemp(char *);

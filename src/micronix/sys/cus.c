@@ -24,10 +24,14 @@
  * down says static - two different linkages for one name.  The error
  * lands on the definition, a page away from the call that caused it.
  */
-static void cinit(), hdinit();
-extern UINT8 pic_init();          /* sys/pic_init.c: probe the PICs at boot */
-extern UINT8 intr_attach();       /* sys/probe_init.c */
+static void cinit(void), hdinit();
+extern UINT8 pic_init(void);          /* sys/pic_init.c: probe the PICs at boot */
+extern UINT8 intr_attach(void);       /* sys/probe_init.c */
 
+
+/* prototypes for functions defined below */
+int out(int, int);
+int in(int);
 void
 cus()
 {

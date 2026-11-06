@@ -13,6 +13,7 @@
  * vim: tabstop=4 shiftwidth=4 noexpandtab:
  */
 
+#include <stdlib.h>
 main()
 {
 	sync();

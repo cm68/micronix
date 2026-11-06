@@ -6,10 +6,10 @@
 #include	<types.h>
 #include 	<ctype.h>
 
-static int	(*gch)();
-static int	(*ungch)();
+static int	(*gch)(void);
+static int	(*ungch)(int);
 static int	eofflag;
-extern int	_atof();	/* stub in atof.c - see math.h */
+extern int	_atof(char *, char *);	/* stub in atof.c - see math.h */
 extern int	atoi(char *);
 
 /*
@@ -60,8 +60,8 @@ wspace()
 }
 
 _doscan(get, unget, fmt, args)
-int	(*get)();
-int	(*unget)();
+int	(*get)(void);
+int	(*unget)(int);
 register char *	fmt;
 int **		args;
 {

@@ -49,6 +49,9 @@
 #include <mtab.h>
 #include <errno.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 extern int errno;
@@ -75,6 +78,35 @@ extern int errno;
  * changes, nothing new is retried, and without the flag the binary is the
  * one that ships.  See "make init.dbg" in the GNUmakefile beside this.
  */
+
+/* prototypes for functions defined below */
+void reboot(INT16);
+int any(int, unsigned char *);
+int catfile(char *);
+int concat(char *, ...);
+int consmsg(char *);
+int cpf(char *, char *);
+int dirf(char *);
+int docmd(int, char **);
+int equal(char *, char *);
+int exists(char *);
+int findpid(int);
+int getword(char *, char *);
+int isnumber(char *);
+int logout(struct ttyent *);
+int lookup(char *);
+int mkdirf(char *);
+int mkempty(char *);
+int mknodf(char **);
+int movblock(char *, char *, int);
+int opentty(char *);
+int print(char *);
+int putstr(int, ...);
+int savestr(char *);
+int setmem(char *, int, int);
+int speedcode(char *);
+int startlogin(struct ttyent *);
+int typef(char *);
 #ifdef INITDBG
 dbgerr(s)
 char *s;
@@ -136,12 +168,12 @@ static char *rcargv[3];			/* sh /etc/rc */
 /*
  * the signal handlers, named before they are defined
  */
-extern reload();
-extern shutdown();
-extern onidle();
-extern onsingle();
-extern idlecheck();		/* cmd/init/idle.c */
-extern killothers();		/* cmd/init/idle.c */
+extern reload(void);
+extern shutdown(void);
+extern onidle(void);
+extern onsingle(void);
+extern idlecheck(int);		/* cmd/init/idle.c */
+extern killothers(void);		/* cmd/init/idle.c */
 
 /*
  * NOPEN is the kernel's per-process open file limit; it lives in a kernel

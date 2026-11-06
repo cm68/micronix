@@ -1,6 +1,17 @@
 #include "dextern"
 #include "files"
 
+#include <stdlib.h>
+
+/* prototypes for functions defined below */
+struct looksets * flset(struct looksets *);
+char * writem(int *);
+int * yalloc(int);
+int apack(int *, int);
+int aryfil(int *, int, int);
+int closure(int);
+int prlook(int *);
+int setunion(int *, int *);
 cpres(){ /* conpute an array with the beginnings of  productions yielding given nonterminals
 	The array pres points to these lists */
 	int i,j,c;
