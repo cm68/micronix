@@ -1,0 +1,181 @@
+set_global_assignment -name FAMILY "Cyclone IV E"
+set_global_assignment -name DEVICE EP4CE10F17C8
+set_global_assignment -name TOP_LEVEL_ENTITY mpz80_top
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
+set_global_assignment -name NUM_PARALLEL_PROCESSORS 8
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS "AS INPUT TRI-STATED"
+set_global_assignment -name SDC_FILE fpga-sbc.sdc
+
+set_global_assignment -name VERILOG_FILE rtl/mpz80_top.v
+set_global_assignment -name VERILOG_FILE rtl/mpz80_seq.v
+set_global_assignment -name VERILOG_FILE rtl/i8259.v
+set_global_assignment -name VERILOG_FILE rtl/mio_pic.v
+set_global_assignment -name VERILOG_FILE rtl/i8250.v
+set_global_assignment -name VERILOG_FILE rtl/upd1990.v
+set_global_assignment -name VERILOG_FILE rtl/ds1305.v
+set_global_assignment -name VERILOG_FILE rtl/im0_call.v
+set_global_assignment -name VERILOG_FILE rtl/vga_console.v
+set_global_assignment -name VERILOG_FILE rtl/uart.v
+set_global_assignment -name VERILOG_FILE rtl/pll_4m.v
+
+set_global_assignment -name VHDL_FILE rtl/spi_16bit_master.vhd
+set_global_assignment -name VHDL_FILE rtl/spi_ds1305.vhd
+set_global_assignment -name VHDL_FILE rtl/vga80x40.vhd
+set_global_assignment -name VHDL_FILE rtl/ctrm.vhd
+set_global_assignment -name VHDL_FILE rtl/losr.vhd
+set_global_assignment -name VHDL_FILE rtl/ps2_keyboard.vhd
+set_global_assignment -name VHDL_FILE rtl/ps2_keyboard_to_ascii.vhd
+set_global_assignment -name VHDL_FILE rtl/debounce.vhd
+
+set_global_assignment -name VHDL_FILE rtl/t80_wrap.vhd
+set_global_assignment -name VHDL_FILE rtl/ram1k.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80_ALU.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80_MCode.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80_Pack.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80_Reg.vhd
+set_global_assignment -name VHDL_FILE rtl/t80/T80s.vhd
+
+# --- clock, reset and front-panel switches ---
+set_location_assignment PIN_E16 -to CLK_50
+set_location_assignment PIN_D15 -to FPGA_IN_BOARD_RESET_n
+set_location_assignment PIN_M6  -to "DIP[7]"
+set_location_assignment PIN_M7  -to "DIP[6]"
+set_location_assignment PIN_L8  -to "DIP[5]"
+set_location_assignment PIN_K9  -to "DIP[4]"
+set_location_assignment PIN_M9  -to "DIP[3]"
+set_location_assignment PIN_R3  -to "DIP[2]"
+set_location_assignment PIN_R4  -to "DIP[1]"
+set_location_assignment PIN_R5  -to "DIP[0]"
+
+# --- S-100 address: A0-A19, plus V1.6 EXT_A20-A23 ---
+set_location_assignment PIN_N8 -to "FPGA_OUT_A[0]"
+set_location_assignment PIN_P6 -to "FPGA_OUT_A[1]"
+set_location_assignment PIN_N5 -to "FPGA_OUT_A[2]"
+set_location_assignment PIN_N3 -to "FPGA_OUT_A[3]"
+set_location_assignment PIN_L3 -to "FPGA_OUT_A[4]"
+set_location_assignment PIN_R1 -to "FPGA_OUT_A[5]"
+set_location_assignment PIN_P1 -to "FPGA_OUT_A[6]"
+set_location_assignment PIN_N1 -to "FPGA_OUT_A[7]"
+set_location_assignment PIN_L1 -to "FPGA_OUT_A[8]"
+set_location_assignment PIN_K1 -to "FPGA_OUT_A[9]"
+set_location_assignment PIN_J1 -to "FPGA_OUT_A[10]"
+set_location_assignment PIN_G1 -to "FPGA_OUT_A[11]"
+set_location_assignment PIN_F1 -to "FPGA_OUT_A[12]"
+set_location_assignment PIN_C2 -to "FPGA_OUT_A[13]"
+set_location_assignment PIN_A2 -to "FPGA_OUT_A[14]"
+set_location_assignment PIN_A3 -to "FPGA_OUT_A[15]"
+set_location_assignment PIN_A4 -to "FPGA_OUT_A[16]"
+set_location_assignment PIN_A5 -to "FPGA_OUT_A[17]"
+set_location_assignment PIN_A6 -to "FPGA_OUT_A[18]"
+set_location_assignment PIN_D3 -to "FPGA_OUT_A[19]"
+set_location_assignment PIN_E6  -to "FPGA_OUT_A_EXT[0]"
+set_location_assignment PIN_F10 -to "FPGA_OUT_A_EXT[1]"
+set_location_assignment PIN_B14 -to "FPGA_OUT_A_EXT[2]"
+set_location_assignment PIN_E11 -to "FPGA_OUT_A_EXT[3]"
+
+# --- S-100 data ---
+set_location_assignment PIN_F15  -to "FPGA_IN_DI[0]"
+set_location_assignment PIN_M10  -to "FPGA_IN_DI[1]"
+set_location_assignment PIN_N13  -to "FPGA_IN_DI[2]"
+set_location_assignment PIN_N14  -to "FPGA_IN_DI[3]"
+set_location_assignment PIN_M12  -to "FPGA_IN_DI[4]"
+set_location_assignment PIN_L14  -to "FPGA_IN_DI[5]"
+set_location_assignment PIN_L11  -to "FPGA_IN_DI[6]"
+set_location_assignment PIN_J12  -to "FPGA_IN_DI[7]"
+set_location_assignment PIN_R12  -to "FPGA_OUT_DO[0]"
+set_location_assignment PIN_R13  -to "FPGA_OUT_DO[1]"
+set_location_assignment PIN_R14  -to "FPGA_OUT_DO[2]"
+set_location_assignment PIN_R16  -to "FPGA_OUT_DO[3]"
+set_location_assignment PIN_P16  -to "FPGA_OUT_DO[4]"
+set_location_assignment PIN_N16  -to "FPGA_OUT_DO[5]"
+set_location_assignment PIN_L16  -to "FPGA_OUT_DO[6]"
+set_location_assignment PIN_K16  -to "FPGA_OUT_DO[7]"
+set_location_assignment PIN_G15  -to FPGA_OUT_DI_OE_n
+set_location_assignment PIN_J16  -to FPGA_OUT_DO_OE_n
+
+# --- JEDEC socket ROM on the RAM bus ---
+set_location_assignment PIN_L6 -to "FPGA_BI_D[0]"
+set_location_assignment PIN_P8 -to "FPGA_BI_D[1]"
+set_location_assignment PIN_N6 -to "FPGA_BI_D[2]"
+set_location_assignment PIN_P3 -to "FPGA_BI_D[3]"
+set_location_assignment PIN_L4 -to "FPGA_BI_D[4]"
+set_location_assignment PIN_T2 -to "FPGA_BI_D[5]"
+set_location_assignment PIN_P2 -to "FPGA_BI_D[6]"
+set_location_assignment PIN_N2 -to "FPGA_BI_D[7]"
+set_location_assignment PIN_J2 -to FPGA_OUT_RAM_A16
+set_location_assignment PIN_K2 -to FPGA_OUT_RAM_A17
+set_location_assignment PIN_L2 -to FPGA_OUT_RAM_A18
+set_location_assignment PIN_G2 -to FPGA_OUT_RAM_OE_n
+set_location_assignment PIN_F2 -to FPGA_OUT_RAM_WR_n
+set_location_assignment PIN_A9 -to FPGA_OUT_RAM_CS_n
+
+# --- Micronix MYIDE: 82C55 + CF at 0x30-0x34 ---
+set_location_assignment PIN_F8  -to FPGA_OUT_8255_SEL_n
+set_location_assignment PIN_E10 -to FPGA_OUT_IDE_WR_n
+set_location_assignment PIN_F9  -to FPGA_OUT_IDE_RD_n
+set_location_assignment PIN_C6  -to FPGA_OUT_5V_IDE_WR_n
+set_location_assignment PIN_E7  -to FPGA_OUT_5V_IDE_RD_n
+# CF INTRQ; the printer ACK pin is repurposed, wire the CF pin here.
+set_location_assignment PIN_C9  -to IDE_INTRQ
+
+# --- DS1305 SPI RTC ---
+set_location_assignment PIN_B5  -to RTC_CS_n
+set_location_assignment PIN_B1  -to RTC_SPI_CLK
+set_location_assignment PIN_F14 -to RTC_SPI_SI
+set_location_assignment PIN_B3  -to RTC_SPI_SO
+set_location_assignment PIN_D1  -to RTC_INT
+
+# --- S-100 control ---
+set_location_assignment PIN_E9  -to FPGA_OUT_pSYNC
+set_location_assignment PIN_D8  -to FPGA_OUT_pSTVAL_n
+set_location_assignment PIN_G11 -to FPGA_OUT_pDBIN
+set_location_assignment PIN_D9  -to FPGA_OUT_pWR_n
+set_location_assignment PIN_D16 -to FPGA_OUT_sMEMR
+set_location_assignment PIN_C16 -to FPGA_OUT_sWO_n
+set_location_assignment PIN_F13 -to FPGA_OUT_sINP
+set_location_assignment PIN_F11 -to FPGA_OUT_sOUT
+set_location_assignment PIN_D14 -to FPGA_OUT_sM1
+set_location_assignment PIN_A15 -to FPGA_OUT_sINTA
+set_location_assignment PIN_J11 -to FPGA_OUT_sHLTA
+set_location_assignment PIN_A13 -to FPGA_OUT_MWRT
+
+# --- S-100 status, DMA and clock ---
+set_location_assignment PIN_D5  -to FPGA_IN_XRDY
+set_location_assignment PIN_D6  -to FPGA_IN_RDY
+set_location_assignment PIN_E8  -to FPGA_IN_pHOLD_n
+set_location_assignment PIN_C14 -to FPGA_OUT_pHLDA
+set_location_assignment PIN_A7  -to FPGA_IN_INT_n
+set_location_assignment PIN_T3  -to FPGA_IN_INT_A_n
+set_location_assignment PIN_T4  -to FPGA_IN_INT_B_n
+set_location_assignment PIN_J13 -to FPGA_IN_INT_C_n
+set_location_assignment PIN_L12 -to FPGA_IN_INT_D_n
+set_location_assignment PIN_M8  -to USB_RX
+set_location_assignment PIN_K8  -to USB_TX
+
+# --- VGA console and PS/2 keyboard (V1.6 board) ---
+set_location_assignment PIN_T6  -to VGA_R
+set_location_assignment PIN_T7  -to VGA_G
+set_location_assignment PIN_T8  -to VGA_B
+set_location_assignment PIN_T9  -to HSync
+set_location_assignment PIN_T10 -to VSync
+set_location_assignment PIN_B12 -to FPGA_IN_PS2_DATA
+set_location_assignment PIN_B13 -to FPGA_IN_PS2_CLK
+set_location_assignment PIN_B11 -to FPGA_OUT_PHI
+set_location_assignment PIN_A12 -to FPGA_OUT_2mHz_CLOCK
+set_location_assignment PIN_K10 -to FPGA_OUT_CPU_CLK
+
+# --- buffer enables ---
+set_location_assignment PIN_F7  -to FPGA_ADD_OE_n
+set_location_assignment PIN_A14 -to FPGA_OUT_CTL_OE_n
+set_location_assignment PIN_K6  -to FPGA_OUT_CTL_DISABLE
+set_location_assignment PIN_J6  -to FPGA_OUT_STATUS_OE_n
+set_location_assignment PIN_C3  -to FPGA_OUT_STATUS_DISABLE
+
+# --- debug LEDs ---
+set_location_assignment PIN_B7  -to LED_1
+set_location_assignment PIN_B10 -to LED_2
+set_location_assignment PIN_C11 -to LED_3
+
+set_global_assignment -name LAST_QUARTUS_VERSION "22.1std.2 Lite Edition"
+set_global_assignment -name RESERVE_ALL_UNUSED_PINS_NO_OUTPUT_GND "AS INPUT TRI-STATED"
