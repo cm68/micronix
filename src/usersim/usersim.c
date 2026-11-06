@@ -6074,6 +6074,13 @@ SystemCall()
          * board would, moving the data phase in and out of the guest's
          * buffer.  opcodes: 0x20 SREAD, 0x21 SWRITE, 0x22 STATUS, 0x23
          * SETDMA, 0x25 HALT, 0xa0 MEMREAD.
+         *
+         * The guest's struct cdb has a 26-byte command block, and the
+         * fields after it are at fixed offsets: len at 26, count at 28,
+         * flags at 30, buf at 32, hole at 34.  The block was sixteen
+         * bytes when the HD-DMA's was the widest; the DJ-DMA's format
+         * program is seventeen, so the structure grew and these offsets
+         * moved with it.
          */
     {
         unsigned short cb;      /* the guest's struct cdb */
@@ -6082,7 +6089,7 @@ SystemCall()
         int pc, cyl, head, sec, slc, n;
         int cyls, heads, spt, secsize;
         unsigned char row[16];
-        char cmdbuf[16];
+        char cmdbuf[26];
         char secbuf[512];
 
         /*
@@ -6140,12 +6147,12 @@ SystemCall()
         }
 
         cb = arg2;
-        copyin(cmdbuf, cb, 16);
-        clen = get_word(cb + 16);
-        ccount = get_word(cb + 18);
-        /* cflags at cb+20, not read here: the opcode says which way */
-        cbuf = get_word(cb + 22);
-        chole = get_word(cb + 24);
+        copyin(cmdbuf, cb, 26);
+        clen = get_word(cb + 26);
+        ccount = get_word(cb + 28);
+        /* cflags at cb+30, not read here: the opcode says which way */
+        cbuf = get_word(cb + 32);
+        chole = get_word(cb + 34);
 
         if (!files[fd].mo ||
             rawgeom(files[fd].mo->fs, &cyls, &heads, &spt, &secsize) < 0) {
@@ -6209,7 +6216,7 @@ SystemCall()
             }
         }
 
-        copyout(cmdbuf, cb, 16);
+        copyout(cmdbuf, cb, 26);
         ret = 0;
         carry_clear();
         break;

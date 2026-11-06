@@ -1,0 +1,162 @@
+.he "format (1)                 11/6/26                  format (1)"
+.fo "                               -#-"
+.in 5
+.rm 65
+.bd
+NAME
+.in +5
+.br
+.bd
+format
+- format a hard disk or floppy diskette
+.sp 2
+.in -5
+.bd
+SYNTAX
+.in +5
+.br
+.bd
+format [ -m model ] [ -c cylinders ] [ -h heads ] [ -s sectors ]
+[ -P precomp ] [ -l lowcur ] [ -d step ] [ -k skew ]
+[ -p ] [ -t track ] [ -e head ] device
+.sp 2
+.in -5
+.bd
+DESCRIPTION
+.in +5
+.br
+Format lays down the low-level shape of a disk and writes the label a
+fresh drive needs.  It is one program for every controller on the
+machine, and it reads which controller from the device node: the high
+byte of the node's device number is the major, sys/consts.c's
+biosw.  The drive and slice come from the low byte, as they do for
+read and write.  The device must be the drive's whole-disk slice,
+the
+.bd
+c
+node, for every controller but the floppy: block 0 of that slice is
+physical cylinder 0 head 0 sector 0, which is where the label goes and
+the only address that can be found before the label has been read.
+.sp
+What the tool does for each controller is what that controller can do:
+.sp
+.in +10
+.ti -10
+HDCA	The port-mapped Winchester controller of the M10, M20 and M26.
+Format writes a sector header for every sector of every head of every
+track, in the controller's own interleave.  The data fields are not
+touched, so a drive that already carries a label keeps its table; a
+fresh drive gets the prototype table.
+.sp
+.ti -10
+HD-DMA	The Morrow disk controller.  Format loads the drive's constants,
+calibrates, and writes a track and a head at a time, filling every data
+field with 0xe5.  The label and its table are written afterwards, because
+the format has just erased the sector they live in.
+.sp
+.ti -10
+SCSI	The target does the work: FORMAT UNIT blanks the drive, and format
+writes the label and the prototype table.
+.sp
+.ti -10
+IDE	The IDE card has no format command.  Format writes the label and
+the prototype table, which is what label -w does for this card.
+.sp
+.ti -10
+DJ-DMA	The 8 inch floppy: 77 tracks, track 0 single density with 26
+sectors of 128 bytes and tracks 1 through 76 double density with 15
+sectors of 512 bytes.  There is no label; mkfs follows.
+.sp
+.in -10
+The geometry comes from a model name, or the disk's own label, or the
+flags, in that order; the flags override a model.  A model name is
+looked up in the table belonging to the controller the device names,
+so
+.bd
+m10
+is the Seagate ST-412 on an HD-DMA and the Discus M10 on an HDCA.
+.sp
+.in +10
+.ti -10
+-m model	The drive model.  On the HD-DMA the names are m5, m10, m16,
+m32 and m40, and the xt, st, ms, tm, q, wren and mp drives.  On the HDCA
+they are m10, m20 and m26.  The SCSI, IDE and floppy controllers have no
+model table.
+.sp
+.ti -10
+-c cylinders	The track count, overriding the model's or the label's.
+.sp
+.ti -10
+-h heads	The head count.
+.sp
+.ti -10
+-s sectors	The sectors (512-byte blocks) per track.
+.sp
+.ti -10
+-P precomp	The cylinder where write precompensation begins (HD-DMA).
+.sp
+.ti -10
+-l lowcur	The cylinder where the write current drops to its low
+setting (HD-DMA).
+.sp
+.ti -10
+-d step	The step pulse delay in 100 microseconds (HD-DMA).
+.sp
+.ti -10
+-k skew	The interleave, the order the sectors are laid down (HD-DMA).
+.sp
+.ti -10
+-p	Probe the drive rather than format it (HDCA).  The probe reads
+the sector headers to find the drive's cylinders, heads and sectors per
+track, and prints its capacity.
+.sp
+.ti -10
+-t track	Format one cylinder (HD-DMA) or one track (DJ-DMA) instead
+of the whole drive.  This is a repair, not a statement about the
+drive's shape.  The HDCA, the 5380 and the IDE card have no partial
+format.
+.sp
+.ti -10
+-e head	Format one head of every cylinder (HD-DMA).
+.sp
+.in -10
+A geometry from no model, no label and no flags is an error.  The label
+cannot hold more than 65535 cylinders, 255 heads or 255 sectors; the
+HD-DMA selects at most sixteen heads, and the HDCA allows 255, 8 and 32.
+An option a controller does not use is an error rather than ignored, so
+a mistaken drive is not formatted with a shape nobody asked for.
+.sp
+The label is written at byte 256 of block 0.  It carries the geometry,
+the first sector number the controller uses - one for the HDCA and zero
+for every other - the drive's timing on the HD-DMA, and the drive's
+manufacturer and model.  A fresh or uncarved label gets the prototype
+table: cylinder 0 for the boot and the label,
+.bd
+a
+for the largest filesystem that fits,
+.bd
+b
+for 1M of swap, and d through h for further filesystems.  A carved
+table is kept when the format did not blank the data fields.
+.sp 2
+.in -5
+.bd
+EXAMPLE
+.in +5
+.br
+.bd
+format -m m40 /dev/hd0c
+.sp
+format -m m26 /dev/hdac
+.sp
+format -c 392 -h 16 -s 63 /dev/scsi0c
+.sp
+format -p /dev/hdac
+.sp 2
+.in -5
+.bd
+SEE ALSO
+.in +5
+.br
+label (1), mkfs (1), mwformat (1), hdformat (1), scsiformat (1),
+djformat (1)

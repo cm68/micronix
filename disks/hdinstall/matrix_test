@@ -30,11 +30,12 @@
 # A pass is two boots, and the volumes are made blank for it each time:
 #
 #   1. install          the DJ-DMA install diskette boots.  On the
-#			controller under test the controller's own
-#			formatter (mwformat, hdformat or scsiformat; label
-#			-w for the IDE card, which has no low-level
-#			format), then label and mkfs, make both hard disks
-#			from nothing.  The diskette's filesystem is copied
+#			controller under test format lays down the drive
+#			(it reads the controller from the device node; the
+#			IDE card has no low-level format, so its format
+#			writes the label), then label and mkfs, make both
+#			hard disks from nothing.  The diskette's
+#			filesystem is copied
 #			to the root volume and its kernel pointed at the
 #			controller; the distribution diskettes are loaded
 #			in turn through /dev/mediachg and cptree'd on,
@@ -152,11 +153,12 @@ say() {
 # the tree's devlist names: slice 'a' is the filesystem, 'c' is the whole
 # disk the formatter and labeler take, and drive 1 is /usr/src.
 #
-# The formatter writes the prototype table - the biggest filesystem that
-# fits in a slice for 'a', a swap slice for 'b', and filesystems for 'd'
+# format writes the prototype table - the biggest filesystem that fits
+# in a slice for 'a', a swap slice for 'b', and filesystems for 'd'
 # through 'h' - and the explicit label after it states the geometry and
-# keeps that table.  The ide card has no formatter of its own, so its
-# "formatter" is the labeler, and it carves the same table there.  Slice
+# keeps that table.  The ide card has no low-level format, so format
+# there writes the same label and table the other controllers' formats
+# leave behind.  Slice
 # 'a' starts at cylinder 1 so the cylinder below it is the boot the
 # host's hardboot writes; the label records that extent (d_bootblks) and
 # mkfs copies it into the filesystem's own label.
@@ -175,8 +177,8 @@ set_controller() {
 		medium=m40; major=3; drive=hdcdma
 		rootwhole=/dev/hd0c; usrwhole=/dev/hd1c
 		rootdev=/dev/hd0a;   usrdev=/dev/hd1a
-		fmtroot="mwformat -m m40 /dev/hd0c"
-		fmtusr="mwformat -m m40 /dev/hd1c"
+		fmtroot="format -m m40 /dev/hd0c"
+		fmtusr="format -m m40 /dev/hd1c"
 		labroot="label -w 512/8/17 /dev/hd0c"
 		labusr="label -w 512/8/17 /dev/hd1c"
 		bootimg=bootimg
@@ -186,8 +188,8 @@ set_controller() {
 		medium=m26; major=1; drive=hdca
 		rootwhole=/dev/hdac; usrwhole=/dev/hdbc
 		rootdev=/dev/hda;   usrdev=/dev/hdb
-		fmtroot="hdformat -m m26 /dev/hdac"
-		fmtusr="hdformat -m m26 /dev/hdbc"
+		fmtroot="format -m m26 /dev/hdac"
+		fmtusr="format -m m26 /dev/hdbc"
 		labroot="label -w 202/8/32 /dev/hdac"
 		labusr="label -w 202/8/32 /dev/hdbc"
 		bootimg=hdcabootimg
@@ -197,8 +199,8 @@ set_controller() {
 		medium=cf1g; major=4; drive=ide
 		rootwhole=/dev/ide0c; usrwhole=/dev/ide1c
 		rootdev=/dev/ide0;    usrdev=/dev/ide1
-		fmtroot="label -w 392/16/63 /dev/ide0c"
-		fmtusr="label -w 392/16/63 /dev/ide1c"
+		fmtroot="format -c 392 -h 16 -s 63 /dev/ide0c"
+		fmtusr="format -c 392 -h 16 -s 63 /dev/ide1c"
 		labroot="label -w 392/16/63 /dev/ide0c"
 		labusr="label -w 392/16/63 /dev/ide1c"
 		bootimg=idebootimg
@@ -208,8 +210,8 @@ set_controller() {
 		medium=mps1g; major=5; drive=scsi
 		rootwhole=/dev/scsi0c; usrwhole=/dev/scsi1c
 		rootdev=/dev/scsi0;    usrdev=/dev/scsi1
-		fmtroot="scsiformat -c 392 -h 16 -s 63 /dev/scsi0c"
-		fmtusr="scsiformat -c 392 -h 16 -s 63 /dev/scsi1c"
+		fmtroot="format -c 392 -h 16 -s 63 /dev/scsi0c"
+		fmtusr="format -c 392 -h 16 -s 63 /dev/scsi1c"
 		labroot="label -w 392/16/63 /dev/scsi0c"
 		labusr="label -w 392/16/63 /dev/scsi1c"
 		bootimg=ncrbootimg
@@ -265,7 +267,7 @@ rm -f /b/dev/root /b/dev/swap
 mknod /b/dev/root b $major 0
 mknod /b/dev/swap b $major 32
 setdev /b/micronix $major/0 $major/32
-rm -f /b/hdinit /b/m5init /b/m10init /b/m16init /b/m40init /b/scsiinit
+rm -f /b/hdcdmainit /b/hdcainit /b/ideinit /b/scsiinit
 rm -f /b/etc/signon
 ln /b/etc/signon2 /b/etc/signon
 rm -f /b/etc/signon2

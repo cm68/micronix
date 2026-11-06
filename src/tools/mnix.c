@@ -1412,7 +1412,7 @@ struct medium {
      * more than 65535 blocks (32MB); the volume is the extent the full
      * complement of slices fills - cylinder 0 for the boot, then a, b,
      * d..h - and no larger.  Nothing is created past the last partition.
-     * The table arithmetic in label -w, mwformat and scsiformat gives
+     * The table arithmetic in label -w and format gives
      * 65 cylinders a slice at this geometry: 1 + 65 + 1 + 5*65 = 392.
      */
     {"cf1g",  "SanDisk",    "CF 1GB",   392, 16, 63, 0},
@@ -1769,7 +1769,7 @@ bad:
  * hardboot <image> <bootfile>: write the boot below a hard disk's
  * filesystem at device block 0, keeping the label the label command put
  * in block 0's second half.  This is mkfs's boot half by itself, for a
- * volume whose filesystem was made natively (mwformat + label + mkfs) and
+ * volume whose filesystem was made natively (format + label + mkfs) and
  * only lacks the boot.
  */
 int

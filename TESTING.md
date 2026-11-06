@@ -175,9 +175,9 @@ Each controller is an independent machine and gets a work directory.
 Each leg is two boots, with blank volumes made for it first:
 
 1. **install** — the DJ-DMA install diskette boots (`-B djdma`), runs
-   the controller's own formatter (`mwformat`, `hdformat`,
-   `scsiformat`; `label -w` for the IDE card, which has no low-level
-   format), then `label`, `mkfs` and `fsck` on both volumes, copies
+   `format` on the controller the device node names (the IDE card has
+   no low-level format, so `format` writes its label), then `label`,
+   `mkfs` and `fsck` on both volumes, copies
    the diskette's filesystem to the root volume, points its kernel at
    the controller, and `cptree`s the distribution diskettes onto it.
    The console ends with `=== PASS-DONE`.

@@ -11,13 +11,14 @@
 #	d8ds	8 inch, double sided	77 cyl, 2 heads, 15 x 512, 2250 blocks
 #	d5ds	5 1/4 inch, double sided 40 cyl, 2 heads, 10 x 512, 760 blocks
 #
-# <target> is the drive type the diskette installs onto - a name from the
-# specs[] table in sys/mw.c, m16 by default.  It picks the init script
-# that does the install, so a diskette is one article for one target and
-# the default is what "make bootdisks" builds.  An install onto any other
-# drive type wants its own:
+# <target> is the controller the diskette installs onto: hdcdma (the
+# Morrow HD-DMA), ide (the 8255/ATA card), scsi (the NCR 5380) or hdca
+# (the Discus M26).  hdcdma by default.  It picks the init script that
+# does the install and the controller's 4k level 2 boot, so a diskette is
+# one article for one controller and the default is what "make
+# bootdisks" builds.  An install onto another controller wants its own:
 #
-#	./create_bootdisk d8ss /tmp/d8ss-m40.img m40
+#	./create_bootdisk d8ss /tmp/d8ss-ide.img ide
 #
 # The image is made as <medium>.img in this directory unless the second
 # argument names another path, and it is truncated if it already exists.
@@ -54,10 +55,21 @@ here=`dirname "$0"`
 here=`cd "$here" && pwd` || exit 1
 root=`cd "$here/../.." && pwd`
 
+# -m makes the maintenance diskette: the same boot and root, with fsck,
+# label and the operator commands, and without the install script.  It
+# is for repairing a hard disk, not for making one, so it is the article
+# that carries the tools the install diskette has no room for and no use
+# for.  The option comes before the medium and the rest of the arguments
+# keep their positions after it.
+maint=0
+case "$1" in
+-m|--maintenance) maint=1; shift ;;
+esac
+
 # The target is read here, before the boot image below can want it, and
 # not with the other two arguments further down.
 target="$3"
-[ -z "$target" ] && target=m16
+[ -z "$target" ] && target=hdcdma
 
 mnix="$root/src/tools/mnix"
 imd="$root/src/tools/imd"
@@ -78,103 +90,105 @@ bootdir="$srcdir/stand/boot"
 # with a zeroed boot area, which mounts and passes fsck and does not boot,
 # so the file is here or the diskette cannot do the one job it has.
 #
-# One image serves every HD-DMA target, because the geometry is not in
-# it.  The label is written by the mkfs the init script runs, on the
-# target machine, out of the drive node - the only thing that knows what
-# the drive is.  So the target names the init script below and not the
-# boot.  The SCSI card is a different controller with its own first
-# level, so a scsi target carries ncrbootimg instead.  3765 bytes, so
-# eight blocks of the five inch diskette's twenty-five free.
+# One image serves every drive on a controller, because the geometry is
+# not in it.  The label is written by the mkfs the init script runs, on
+# the target machine, out of the drive node - the only thing that knows
+# what the drive is.  So the target names the controller's level 2, and
+# each controller has its own: bootimg for the HD-DMA, idebootimg for
+# the IDE card, ncrbootimg for the NCR 5380 and hdcabootimg for the
+# HDCA.  Each is about 4k, eight blocks of the five inch diskette's
+# twenty-five free.
 #
-hdinit="$bootdir/bootimg"
-if [ "$target" = "scsi" ]; then
-	hdinit="$bootdir/ncrbootimg"
-fi
+case "$target" in
+hdcdma)	hdinit="$bootdir/bootimg" ;;
+ide)	hdinit="$bootdir/idebootimg" ;;
+scsi)	hdinit="$bootdir/ncrbootimg" ;;
+hdca)	hdinit="$bootdir/hdcabootimg" ;;
+*)	echo "$0: $target is not a controller this tree builds for" >&2
+	echo "$0: targets: hdcdma ide scsi hdca" >&2
+	exit 1 ;;
+esac
 
 #
 # What goes in /bin.  Not a copy of the tree's bin: this is the list the
 # install runs on, and one command short of it is an install that stops
-# half way - mkfs, fsck, mount, cptree, mknod and setdev are the init
-# script's own steps, and sh, login and init are how a session starts.
+# half way - mkfs, mount, cptree, mknod and setdev are the init
+# script's own steps, and sh and init are how a session starts.
 #
 # era is deliberately absent, and no init script calls it: it is a
 # Whitesmiths command this tree has never built, so a diskette that
 # carried the original text would leave the new hard disk's /dev/root
-# pointing at the floppy.  See rootfiles/m16init.
+# pointing at the floppy.  See rootfiles/hdcdmainit.
 #
 # chg is the way a running diskette reaches the medium in another drive,
 # and fdj the way it formats one, so the two together are what lets a
 # booted system make a diskette set of its own: "chg djdma:1
 # blank:dist-1.img; fdj format djdma:1; mount it; copy; umount" needs no
-# host tool at all.  Neither is an install step, so neither is required
-# for the install to finish - they are here for the loop, not for init.
+# host tool at all.  Neither is an install step, so neither is on the
+# install diskette - they are on the maintenance one.
 #
 # halt is the other end of the install: a diskette that has just written
 # a hard disk stops the machine with "sync; halt", and that is what syncs
 # the new superblock and lets the simulation end cleanly instead of being
-# killed.  scsiformat is the SCSI target's formatter, for a diskette that
-# installs onto the 5380; the other two formatters were already here.
+# killed.  format is the one formatter for every controller - it reads
+# the controller from the device node - so the diskette that installs
+# onto any of them can also lay the drive down first.
 #
-BINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod cptree
-	mknod setdev ln sync echo hdformat mwformat label chg fdj halt
-	scsiformat"
+BINS="sh rm mkfs mount umount chmod cptree mknod setdev ln sync echo
+	format halt"
 
 #
-# What the five inch medium cannot hold.  The list above is 487 blocks of
-# commands, and they are the same commands on both media; what the media
-# do not have in common is room for the kernel's 208.  An eight inch
-# diskette has it with 305 blocks to spare, and a five inch one has none
-# at all, so the medium with no room gives up three.
+# What the install diskette carries is what the install needs and
+# nothing else, and it is the same set on both media.  The init scripts
+# drive mkfs, mount, cptree, mknod, setdev, rm, ln, chmod, sync, echo
+# and halt; format is there because a drive has to be laid down before
+# mkfs can read its label, and the operator runs it with the model or
+# geometry the drive is.  fsck is deliberately absent: an install makes
+# a new filesystem, and checking the one it just made is not a step that
+# can repair anything.  The operator commands, the diskette-to-diskette
+# loop and the repair tools are on the maintenance diskette instead.
 #
-# hdformat and mwformat are two of them because their job is done before
-# this diskette is ever run: they low-level format a hard disk, and the
-# drive a diskette installs onto is formatted and labelled first - see
-# initialize(1) and the label the formatter writes.  The formatting the
-# diskette-to-diskette loop does want is fdj's, and fdj is here.  cat is
-# the third because it is the least missed of the operator commands that
-# are left.  Everything an init script calls is on both media; the
-# knapsack in the README is that list, and this is the only difference
-# between them.
-#
-DROP5="hdformat mwformat cat scsiformat"
+MAINTBINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod
+	cptree mknod setdev ln sync echo format label chg fdj halt"
+# The five inch maintenance set: the repair tools, without the operator
+# login and the diskette-to-diskette loop, which are what will not fit
+# beside the kernel.  fsck, label, format, mount and the file tools are
+# the repair, and they do fit.
+MAINT5="sh rm mkfs fsck mount umount chmod cptree mknod setdev ln
+	sync echo halt format label ls cp mv cat mkdir"
 
 medium="$1"
 image="$2"
 if [ -z "$medium" ]; then
-	echo "usage: $0 <medium> [<image>] [<target>]" >&2
+	echo "usage: $0 [-m] <medium> [<image>] [<target>]" >&2
 	echo "media: d8ss d8ds d5ds d5soft" >&2
-	echo "targets: m5 m10 m16 m40 scsi (m16 by default)" >&2
+	echo "targets: hdcdma ide scsi hdca (hdcdma by default)" >&2
+	echo "-m makes the maintenance diskette, not the install one" >&2
 	exit 1
 fi
 
 #
-# The medium table, and the only place the four answers are written
+# The medium table, and the only place the three answers are written
 # down: which boot image, which minor the diskette's own root node
-# carries, what to call it when saying what was made, and what the
-# medium is too small to carry.
+# carries, and whether the raw image needs repacking into 1K sectors.
 #
 case "$medium" in
-d8ss)	bootimg="djbootimg-d8ss"; rootmin=0; imd2=""; drop="" ;;
-d8ds)	bootimg="djbootimg-d8ds"; rootmin=0; imd2=""; drop="" ;;
-d5ds)	bootimg="djbootimg-d5ds"; rootmin=4; imd2=""; drop="$DROP5" ;;
-d5soft)	bootimg="djbootimg-d5soft"; rootmin=4; imd2="-2"; drop="$DROP5" ;;
+d8ss)	bootimg="djbootimg-d8ss"; rootmin=0; imd2="" ;;
+d8ds)	bootimg="djbootimg-d8ds"; rootmin=0; imd2="" ;;
+d5ds)	bootimg="djbootimg-d5ds"; rootmin=4; imd2="" ;;
+d5soft)	bootimg="djbootimg-d5soft"; rootmin=4; imd2="-2" ;;
 *)	echo "$0: $medium is not a medium this tree builds" >&2
 	echo "$0: media: d8ss d8ds d5ds d5soft" >&2
 	exit 1 ;;
 esac
 bootimg="$bootdir/$bootimg"
 
-# and what the medium dropped is dropped here, in one place, so the two
-# lists above are the whole of the difference between them
-if [ -n "$drop" ]; then
-	keep=
-	for f in $BINS; do
-		for g in $drop; do
-			[ "$f" = "$g" ] && continue 2
-		done
-		keep="$keep $f"
-	done
-	BINS="$keep"
+# The maintenance diskette carries the repair set, not the install one.
+if [ "$maint" = 1 ]; then
+	case "$medium" in
+	d5ds|d5soft)	BINS="$MAINT5" ;;
+	*)		BINS="$MAINTBINS" ;;
+	esac
 fi
 
 if [ -z "$image" ]; then
@@ -201,7 +215,7 @@ if [ ! -f "$hdinit" ]; then
 fi
 if [ ! -f "$rootfiles/${target}init" ]; then
 	echo "$0: $rootfiles/${target}init not found - there is no install" >&2
-	echo "$0: for a $target: the init scripts are m5init, m10init, m16init, m40init, scsiinit" >&2
+	echo "$0: targets: hdcdma ide scsi hdca" >&2
 	exit 1
 fi
 if [ ! -f "$filesystem/etc/init" ]; then
@@ -248,7 +262,11 @@ tar -C "$stripped" -c -f "$tmp" "$@" || exit 1
 tar -C "$filesystem" -c -f "$tmp" etc || exit 1
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
-tar -C "$rootfiles" -c -f "$tmp" "${target}init" .sh || exit 1
+if [ "$maint" = 1 ]; then
+	tar -C "$rootfiles" -c -f "$tmp" .sh || exit 1
+else
+	tar -C "$rootfiles" -c -f "$tmp" "${target}init" .sh || exit 1
+fi
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
 # 3. the device nodes, from the source tree's dev/devlist, and the

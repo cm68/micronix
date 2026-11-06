@@ -1,0 +1,51 @@
+#
+# makefile for format
+#
+# micronix/cmd/format/makefile
+#
+# The native build: this runs inside micronix, under the make in
+# cmd/make, against the compiler in /bin/ccc.  The GNUmakefile beside
+# it cross builds the same program on the host.
+#
+# One object per controller, for the reason the GNUmakefile gives: the
+# union in one translation unit is past c0's heap.
+#
+# vim: tabstop=4 shiftwidth=4 noexpandtab:
+
+CC	= ccc
+CFLAGS	= -O
+BIN	= /bin
+MAN	= format.1
+MANDIR	= /usr/man/man1
+PROG	= format
+HDRS	= format.h
+OBJS	= format.o mw.o hdca.o scsi.o ide.o dj.o
+
+all: $(PROG)
+
+$(PROG): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
+
+$(OBJS): $(HDRS)
+
+install: $(PROG)
+	mkdir -p $(BIN)
+	cp $(PROG) $(BIN)/$(PROG)
+	mkdir -p $(MANDIR)
+	cp $(MAN) $(MANDIR)/$(MAN)
+
+clean:
+	rm -f $(OBJS) *.nam *.tok *.x
+
+clobber: clean
+	rm -f $(PROG)
+
+#
+# verify - the inverse of install: every installed artifact against
+# the one this build just produced.  Run it after a clobber and a
+# second build to prove the rebuild matches what the first
+# generation installed.
+#
+verify: $(PROG)
+	cmp $(PROG) $(BIN)/$(PROG)
+	cmp $(MAN) $(MANDIR)/$(MAN)

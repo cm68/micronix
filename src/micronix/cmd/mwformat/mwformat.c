@@ -740,11 +740,12 @@ main(argc, argv)
      * the board use.  Sixteen bytes with no padding between them - a pad
      * byte would move every field after it, and the format would lay down
      * whatever those bytes happened to mean.  The status byte the board
-     * answers with is the thirteenth, which is why the two sizes have to be
-     * equal and not merely close.
+     * answers with is the thirteenth, and the block has to fit inside the
+     * cdb the driver carries, which is wider because the DJ-DMA's program
+     * is.
      */
-    if (sizeof (struct hddma_cmd) != CDBMAX)
-        die("the command block is not the cdb block");
+    if (sizeof (struct hddma_cmd) > CDBMAX)
+        die("the command block is wider than the cdb block");
 
     device = 0;
     mp = 0;
