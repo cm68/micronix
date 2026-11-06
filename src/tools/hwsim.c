@@ -73,8 +73,15 @@ repo_root(const char *argv0)
 				break;
 			path = end + 1;
 		}
+		/*
+		 * A bare name the PATH search could not resolve: the
+		 * process still got here, and sim.json is then read from
+		 * the current directory, so use that same directory as
+		 * the root.  Falling back to the name itself made every
+		 * image path "hwsim/disks/...".
+		 */
 		if (!found)
-			strncpy(bin, argv0, sizeof bin - 1);
+			strncpy(bin, ".", sizeof bin - 1);
 	}
 	bin[sizeof bin - 1] = '\0';
 	for (i = 0; i < 3; i++) {
