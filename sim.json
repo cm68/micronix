@@ -176,6 +176,7 @@
       "config": {
         "nomon": true,
         "console": "ss1",
+        "xterm": ["uart0"],
         "clock": "normal"
       },
       "wiring": "ss1,vi0=djdma,vi1=hddma,vi2=ncr,vi3=nic,vi4=ide,vi5=hdca,vi6=disk3,vi7=disk2",
