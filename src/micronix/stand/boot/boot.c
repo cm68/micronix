@@ -174,7 +174,7 @@ load()
 	if (!readblock(blist[0], buf0.bytes))
 		bail("read header failed");
 	if (buf0.obj.ident == OBJECT) {
-		loadbase = buf0.obj.textoff;
+		loadbase = (int (*)())buf0.obj.textoff;
 		loadptr = (char *) (buf0.obj.textoff - 0x10);
 		loadsize = buf0.obj.text + buf0.obj.data + 0x10;
 	} else {

@@ -378,11 +378,11 @@ char **argv;
 		exit(1);
 	}
 	close(a);
-	signal(SIGHUP, term);
+	signal(SIGHUP, (void (*)(int))term);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
-		signal(SIGINT, term);
-	signal(SIGPIPE,term);
-	signal(SIGTERM,term);
+		signal(SIGINT, (void (*)(int))term);
+	signal(SIGPIPE,(void (*)(int))term);
+	signal(SIGTERM,(void (*)(int))term);
 	nfiles = eargc;
 	if(!mflg && !cflg) {
 		sort();

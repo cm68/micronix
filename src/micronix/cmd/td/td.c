@@ -141,7 +141,7 @@ sigon()
 
 	for (i = 1; i <= 15; i++)
 		if (i != NOSIG && oldsig[i] != SIG_IGN)
-			signal(i, catch);
+			signal(i, (void (*)(int))catch);
 }
 
 catch()

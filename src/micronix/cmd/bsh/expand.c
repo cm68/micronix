@@ -12,8 +12,12 @@
 #define DIRSIZ 15
 #include	<sys/stat.h>
 #include	<sys/dir.h>
-#include <fcntl.h>
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern int close(int);
+extern int open(char *, int, ...);
+extern int read(int, char *, int);
+extern int stat(char *, char *);
 
 
 

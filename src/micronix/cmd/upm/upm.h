@@ -189,7 +189,7 @@ struct fcb {
 	uchar	r2;		/* 0x23 - CP/M random record, high */
 };
 
-extern int cpystr(char *, char *);
+extern char *cpystr(char *, char *);
 extern int selerr(int);
 extern int lc(int);
 
@@ -204,7 +204,7 @@ extern int closename(char *);
 extern int unlink();
 
 extern int read();
-extern int open(char *, int, int);
+extern int open(char *, int, ...);
 extern int close();
 extern int write();
 extern int match(char *, char *);
@@ -269,7 +269,7 @@ extern int argname(struct fcb *, char *);
 extern int access(char *, int);
 extern int fork(void);
 extern void perror(char *);
-extern int cpystr(char *, char *);
+extern char *cpystr(char *, char *);
 extern int suffix(char *, char *);
 extern int Lower(char *);
 extern int load(void);

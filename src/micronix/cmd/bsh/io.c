@@ -9,8 +9,13 @@
 
 #include	"defs.h"
 #include	"dup.h"
-#include <fcntl.h>
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern int close(int);
+extern int creat(char *, int);
+extern int open(char *, int, ...);
+extern int pipe(int *);
+extern int write(int, char *, int);
 
 
 /* ========	input output and file copying ======== */

@@ -70,7 +70,7 @@ while( (pid = wait(&status)) != waitpid)
 	if(pid == -1)
 		fatal("bad wait code");
 waitpid = 0;
-enbint(intrupt);
+enbint((int)intrupt);
 return(status);
 }
 
@@ -149,7 +149,7 @@ if((waitpid = fork()) == 0)
 	{
 	enbint(SIG_DFL);
 	doclose();
-	enbint(intrupt);
+	enbint((int)intrupt);
 	execvp(str, argv);
 	fatal1("Cannot load %s",str);
 	}

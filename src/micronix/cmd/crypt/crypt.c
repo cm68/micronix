@@ -140,7 +140,8 @@ main(argc, argv)
  * line.  v7 went straight to getpass; the gtty is the port's, and
  * the comment at the top of this file says why.
  */
-keyprompt()
+char *
+keyprompt(void)
 {
 	char ttyb[8];
 

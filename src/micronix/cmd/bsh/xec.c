@@ -9,8 +9,14 @@
 
 #include	"defs.h"
 #include	"sym.h"
-#include <signal.h>
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern unsigned int alarm(unsigned int);
+extern int chdir(char *);
+extern int close(int);
+extern int dup(int);
+extern int pause(void);
+extern short signal(int, short);
 
 LOCAL INT	parent;
 
@@ -307,7 +313,7 @@ execute(argt, execflg, pf1, pf2)
 				/* except for those `lost' by trap   */
 				oldsigs();
 				IF treeflgs&FINT
-				THEN	signal(INTR,1); signal(QUIT,1);
+				THEN	signal(INTR,(void (*)(int))1); signal(QUIT,(void (*)(int))1);
 				FI
 
 				/* pipe in or out */

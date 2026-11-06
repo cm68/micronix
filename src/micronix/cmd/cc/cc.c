@@ -56,7 +56,7 @@ char *xopt;
 
 int err;
 
-int idexit(void);
+void idexit(int);
 char *setsuf(char *, char);
 char *strcat(char *, char *);
 char *strcpy(char *, char *);
@@ -445,8 +445,10 @@ assemble:
     exit(err);
 }
 
-idexit()
+void
+idexit(int sig)
 {
+    (void) sig;
     err = 100;
 	exit(err);
 }

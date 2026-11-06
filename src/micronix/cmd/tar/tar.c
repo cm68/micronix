@@ -67,12 +67,42 @@
 #include <sys/dir.h>
 #include <dirent.h>
 #include <sys/signal.h>
-#include <fcntl.h>
 #include <signal.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
+/*
+ * The library headers cost c0 heap in a 64K process, and this file's
+ * own older declarations disagree with some of them; name what it calls.
+ */
+extern void exit(int);
+extern char *malloc(unsigned);
+extern void free(char *);
+extern int atoi(char *);
+extern unsigned strlen(char *);
+extern int strcmp(char *, char *);
+extern char *strcpy(char *, char *);
+extern char *strncpy(char *, char *, unsigned);
+extern char *strcat(char *, char *);
+extern char *rindex(char *, int);
+extern void *memset(void *, int, unsigned);
+extern void *memcpy(void *, void *, unsigned);
+extern char *ctime(long *);
+extern int open(char *, int, ...);
+extern int close(int);
+extern int dup(int);
+extern int dup2(int, int);
+extern int pipe(int *);
+extern int wait(int *);
+extern int execv(char *, char **);
+extern int read(int, char *, int);
+extern int write(int, char *, int);
+extern int creat(char *, int);
+extern int chmod(char *, int);
+extern int chown(char *, int);
+extern int chdir(char *);
+extern int mkdir(char *, int);
+extern int access(char *, int);
+extern int link(char *, char *);
+extern int unlink(char *);
+extern int stat(char *, char *);
 /* the fd is byte-wide and rides in A; no unistd.h here because its
  * other declarations disagree with this file's older ones */
 extern long lseek(unsigned char, long, int);
@@ -213,10 +243,9 @@ unsigned char	first;
 unsigned char	prtlinkerr;
 unsigned char	freemem = 1;
 int	nblock = 0;
-int	onintr(void);
-int	onquit(void);
-int	onhup(void);
-
+void	onintr(int);
+void	onquit(int);
+void	onhup(int);
 /*
  * stdout here is a variable the startup code fills in, not a
  * constant, so the assignment waits for main.  A file-scope
@@ -1054,20 +1083,26 @@ checkdir(name)
 	return (cp[-1]=='/');
 }
 
-onintr()
+void
+onintr(int sig)
 {
+	(void) sig;
 	(void) signal(SIGINT, SIG_IGN);
 	term++;
 }
 
-onquit()
+void
+onquit(int sig)
 {
+	(void) sig;
 	(void) signal(SIGQUIT, SIG_IGN);
 	term++;
 }
 
-onhup()
+void
+onhup(int sig)
 {
+	(void) sig;
 	(void) signal(SIGHUP, SIG_IGN);
 	term++;
 }

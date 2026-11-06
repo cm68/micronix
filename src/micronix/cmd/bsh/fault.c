@@ -8,7 +8,9 @@
  */
 
 #include	"defs.h"
-#include <signal.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern short signal(int, short);
 
 
 STRING		trapcom[MAXTRAP];
@@ -30,7 +32,7 @@ VOID	fault(sig)
 {
 	REG INT		flag;
 
-	signal(sig,fault);
+	signal(sig,(void (*)(int))fault);
 	IF sig==BKGND
 	THEN	/* ^Z: the foreground pipeline is ours to stop and record */
 		backnote = 1;
@@ -58,7 +60,7 @@ stdsigs()
 	 * This handler is how the tty driver recognises the shell that
 	 * owns a job, so it has to be installed.
 	 */
-	signal(BKGND,fault);
+	signal(BKGND,(void (*)(int))fault);
 	getsig(MEMF);
 	getsig(ALARM);
 }
@@ -67,7 +69,7 @@ ignsig(n)
 {
 	REG INT		s, i;
 
-	IF (s=signal(i=n,1)&01)==0
+	IF (s=(int)signal(i=n,(void (*)(int))1)&01)==0
 	THEN	trapflg[i] |= SIGMOD;
 	FI
 	return(s);
@@ -78,7 +80,7 @@ getsig(n)
 	REG INT		i;
 
 	IF trapflg[i=n]&SIGMOD ORF ignsig(i)==0
-	THEN	signal(i,fault);
+	THEN	signal(i,(void (*)(int))fault);
 	FI
 }
 
@@ -111,7 +113,7 @@ clrsig(i)
 {
 	free(trapcom[i]); trapcom[i]=0;
 	IF trapflg[i]&SIGMOD
-	THEN	signal(i,fault);
+	THEN	signal(i,(void (*)(int))fault);
 		trapflg[i] &= ~SIGMOD;
 	FI
 }

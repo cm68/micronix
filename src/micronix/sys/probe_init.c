@@ -50,6 +50,7 @@ extern struct ovlintr ovlint[MAXNOVLINE];  /* sys/probe.c */
 static INT16 (*intrprobe[NPINTR]) ();
 static INT16 (*intrfn[NPINTR]) ();
 static UINT16 intrseg[NPINTR];
+static UINT8 intrhere[NPINTR];  /* the probe found a card on its line */
 static UINT8 nintr;
 static UINT8 nintrdone;
 
@@ -151,6 +152,7 @@ intr_attach()
             ovlcall1(intrprobe[i], intrseg[i], PROBE_CLEAR);
             continue;           /* no card there, nothing to wire */
         }
+        intrhere[i] = 1;        /* the controller answered its line */
         /*
          * A vector belongs to one device.  The gripe names the probe and
          * the line it landed on so a miswired machine can be fixed from
@@ -173,4 +175,28 @@ intr_attach()
         if (ovlint[l].fn)
             inton(l);       /* the line is live */
     return (0);
+}
+
+/*
+ * Did the controller placed at this segment answer its interrupt probe?
+ *
+ * 1  it declared a probe and raised its line
+ * 0  it declared a probe and nothing raised - there is no card
+ * -1 it declared no probe, so the tickle cannot say
+ *
+ * A block driver's drive enumeration asks this before reading labels: a
+ * controller that is not in the machine cannot report the drives behind
+ * it, and every unit read would only be the watchdog timing out on a
+ * card that is not there.
+ */
+INT8
+intr_attached(seg)
+    UINT16 seg;
+{
+    UINT8 i;
+
+    for (i = 0; i < nintr; i++)
+        if (intrseg[i] == seg)
+            return (intrhere[i] ? 1 : 0);
+    return (-1);
 }

@@ -59,7 +59,7 @@ ptyidx(dev)
  * ustart(), and cstart() tests it and ustart() clears it (sys/ttyres.c).
  * t->start is reached no other way.
  */
-void
+INT16
 pty_start(t)
     register struct tty *t;
 {
@@ -68,18 +68,20 @@ pty_start(t)
     peer = PEER(t);
     while ((t->outque.count || t->nextc) && peer->rawque.count < HIWATER)
         ttyout(t);
+    return (0);
 }
 
 /*
  * One cooked byte from this end becomes one for the other end to read,
  * through the same ttyin() a board port's interrupt calls.
  */
-void
+INT16
 pty_put(t, c)
     struct tty *t;
-    UINT8 c;
+    INT16 c;
 {
     ttyin(c, PEER(t));
+    return (0);
 }
 
 /*

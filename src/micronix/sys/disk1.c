@@ -276,7 +276,7 @@ disk1strat(b)
 void
 d1start()
 {
-    if (!busget(&d1start))
+    if (!busget((INT16 (*)())&d1start))
         return;
     newdrv();
 }
@@ -709,7 +709,7 @@ void
 d1busplease()
 {
     di();
-    if (!busget(d1ready))
+    if (!busget((INT16 (*)())d1ready))
         sleep(d1ready, PRIBIO);
     else
         ei();

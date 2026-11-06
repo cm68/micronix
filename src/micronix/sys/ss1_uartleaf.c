@@ -43,12 +43,13 @@ extern INT16 in(), out();
 /* prototypes for functions defined below */
 int out(int, int);
 void ttyopen(struct tty *);
-void
+INT16
 ss1_putc(tty, c)
     struct tty *tty;
-    UINT8 c;
+    INT16 c;
 {
     out(SS1_UART_DATA, c);
+    return (0);
 }
 
 /*

@@ -13,7 +13,16 @@
 #include	"timeout.h"
 #include	<sys/fs.h>
 #include	<sys/stat.h>
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern unsigned int alarm(unsigned int);
+extern int close(int);
+extern int dup(int);
+extern int getpid(void);
+extern int getuid(void);
+extern int gtty(int, char *);
+extern char *sbrk(int);
+extern int stat(char *, char *);
 
 UFD		output = 2;
 LOCAL BOOL	beenhere = FALSE;

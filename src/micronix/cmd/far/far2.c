@@ -53,6 +53,7 @@ mcheck(a, s)
 }
 
 fexists(a)
+    char *a;
 {
     struct stat s;
 

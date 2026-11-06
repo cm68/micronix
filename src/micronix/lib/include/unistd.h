@@ -59,7 +59,7 @@ extern int kill(int pid, int sig);
 extern int link(char *oldpath, char *newpath);
 extern long lseek(unsigned char fd, long offset, int whence);
 extern int mknod(char *path, int mode, int dev);
-extern int mkdir(char *path);
+extern int mkdir(char *path, int mode);
 extern int rename(char *from, char *to);
 extern int mount(char *dev, char *dir, int flags);
 extern int nice(int inc);

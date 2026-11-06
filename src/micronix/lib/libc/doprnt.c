@@ -8,7 +8,7 @@
 
 static uchar	ival;
 static char *	x;
-static int	(*emit)(int);
+static void	(*emit)(int);
 extern int	atoi(char *);
 extern int	strlen(char *);
 
@@ -16,7 +16,7 @@ extern int	strlen(char *);
 /* prototypes for functions defined below */
 int _fnum(char *, char, unsigned char, unsigned char, void (*)(int));
 int _pnum(unsigned long, char, char, unsigned char, unsigned char, void (*)(int));
-static
+static void
 pputc(c)
 int	c;
 {

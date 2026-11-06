@@ -8,7 +8,7 @@ extern int	_doprnt(void (*)(), char *, int *);
 
 static FILE *	fpf;
 
-static
+static void
 emit_file(c)
 int	c;
 {

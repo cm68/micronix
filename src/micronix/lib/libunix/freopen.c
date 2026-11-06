@@ -6,7 +6,6 @@
 #include	<stdio.h>
 #include <unistd.h>
 
-extern int	open(char *, int), creat(char *, int);
 
 FILE *
 freopen(name, mode, iob)

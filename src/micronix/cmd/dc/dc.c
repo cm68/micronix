@@ -1049,7 +1049,9 @@ char *argv[];
 	sfree = &symlst[0];
 	return;
 }
-onintr(){
+void
+onintr(int sig){
+	(void) sig;
 
 	signal(SIGINT,onintr);
 	while(readptr != &readstk[0]){
@@ -1694,7 +1696,8 @@ subt(){
 command(){
 	int c;
 	char line[100],*sl;
-	register (*savint)(),pid,rpid;
+	register int savint;
+	register int pid, rpid;
 	int retcode;
 
 	switch(c = readc()){

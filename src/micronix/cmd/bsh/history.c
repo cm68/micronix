@@ -18,7 +18,10 @@
  */
 
 #include	"defs.h"
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern int read(int, char *, int);
+extern int write(int, char *, int);
 
 #define	HISTSIZE	16		/* memorable lines */
 #define	HISTLEN		128		/* longest line kept, with NUL */

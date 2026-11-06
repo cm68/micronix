@@ -38,7 +38,6 @@
 #include <unistd.h>
 
 /* prototypes for functions defined below */
-int error(int, int);
 char * symnam(int);
 int aryfil(int *, int, int);
 int outc(int);

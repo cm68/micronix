@@ -19,6 +19,8 @@
 #include <sys/signal.h>
 #endif
 
+#define SIGIGN	((void (*)(int))1)
+
 /*
  * ar_hdr and ARMAG live in ar.h beside this file, which was never
  * included - gcc let it pass because struct ar_hdr was completed by
@@ -61,7 +63,7 @@ char	*man	=	{ "mrxtdpqs" };
 char	*opt	=	{ "uvnbail" };
 
 int	signum[] = {SIGHUP, SIGINT, SIGQUIT, 0};
-int	sigdone(void);
+void	sigdone(int);
 int	rcmd(void);
 int	dcmd(void);
 int	xcmd(void);
@@ -124,7 +126,7 @@ char *argv[];
 	register char *cp;
 
 	for(i=0; signum[i]; i++)
-		if(signal(signum[i], SIG_IGN) != SIG_IGN)
+		if(signal(signum[i], SIGIGN) != SIGIGN)
 			signal(signum[i], sigdone);
 	if(argc < 3)
 		usage();
@@ -382,7 +384,7 @@ qcmd()
 	}
 	getqf();
 	for(i=0; signum[i]; i++)
-		signal(signum[i], SIG_IGN);
+		signal(signum[i], SIGIGN);
 	lseek(qf, 0l, 2);
 	for(i=0; i<namc; i++) {
 		file = namv[i];
@@ -632,8 +634,10 @@ noar()
 	done(1);
 }
 
-sigdone()
+void
+sigdone(int sig)
 {
+	(void) sig;
 	done(100);
 }
 
@@ -1028,7 +1032,7 @@ install()
 	register i;
 
 	for(i=0; signum[i]; i++)
-		signal(signum[i], SIG_IGN);
+		signal(signum[i], SIGIGN);
 	if(af < 0)
 		if(!flg['c'-'a'])
 			fprintf(stderr, "ar: creating %s\n", arnam);

@@ -35,7 +35,7 @@ extern UINT8 inton(UINT16);
 struct nd ndinfo[NND];
 
 static INT16 ndmutex;		/* the card, 0 = free */
-static INT16 (*ndintr)(struct nd *);	/* the phase the op-done interrupt resumes */
+static void (*ndintr)(struct nd *);	/* the phase the op-done interrupt resumes */
 static struct nd *ndintarg;
 static UINT8 nddead;		/* seconds the request has been in flight */
 static UINT8 ndstat;		/* the status that raised the interrupt */

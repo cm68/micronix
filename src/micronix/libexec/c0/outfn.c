@@ -21,14 +21,14 @@ extern int frameSaveBase;                   /* regalloc.c */
 
 /* Emit function parameter declarations */
 void
-emitPrmDecls(struct type *functype, struct local *locals)
+emitPrmDecls(struct name *func, struct local *locals)
 {
 	struct name *param;
 	struct local *local, *found;
 
-	if (!functype || !(functype->flags & TF_FUNC))
+	if (!func || !(func->type && (func->type->flags & TF_FUNC)))
 		return;
-	for (param = functype->elem; param; param = param->next) {
+	for (param = fnparamsGet(func); param; param = param->next) {
 		if (param->type->size == 0)
 			continue;
 		found = NULL;
@@ -186,7 +186,7 @@ emitFuncPre(struct name *func)
 	/* Count params and locals first */
 	param_count = local_count = 0;
 	if (func->type->flags & TF_FUNC)
-		for (n = func->type->elem; n; n = n->next)
+		for (n = fnparamsGet(func); n; n = n->next)
 			if (n->type->size > 0)
 				param_count++;
 	for (l = func->u.locals; l; l = l->next)
@@ -227,7 +227,7 @@ emitFuncPre(struct name *func)
 	emit1((unsigned char)frameFree(func, frm_size, param_count));
 
 	/* Emit declarations */
-	emitPrmDecls(func->type, func->u.locals);
+	emitPrmDecls(func, func->u.locals);
 	emitLocals(func->u.locals);
 
 	/* Block header */

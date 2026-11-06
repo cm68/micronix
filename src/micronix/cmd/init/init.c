@@ -157,6 +157,34 @@ dbgopen()
 #endif
 
 /*
+ * Read the MPZ80 switch register through /dev/kmem (major 2 minor 1,
+ * offset 0x402).  Bit 004h asks init to end an unattended single-user
+ * session and go multiuser; without it the shell stays single user
+ * until it exits.  A machine with no /dev/kmem, or a failed read,
+ * keeps the old timed behaviour.
+ *
+ * The monitor reads the same register at reset for the boot bits; this
+ * is the one hardware byte sys/memdev.c serves to a user program.
+ */
+static int
+readswitch()
+{
+	int fd, n;
+	char b;
+
+	fd = open("/dev/kmem", 0);
+	if (fd < 0)
+		return (-1);
+	if (lseek(fd, 0x402, 0) < 0) {
+		close(fd);
+		return (-1);
+	}
+	n = read(fd, &b, 1);
+	close(fd);
+	return (n == 1 ? (int)(UINT8)b : -1);
+}
+
+/*
  * Argument vectors for the execs below.  exec(name, argv) takes the
  * vector by reference, so each of these has to be an array that
  * outlives the call rather than a list of arguments written at it.
@@ -241,7 +269,7 @@ struct ttyent ttys[NTTYS];
  */
 static int idlealarm;
 static int singlereq;		/* SIGINT: back to the single user shell */
-static int noidle;		/* a requested single user has no timer */
+static int noidle;		/* a requested single user, or switch 004h clear: no timer */
 static int sawwait;		/* the shell has reached tty input */
 static int useractive;		/* a command ran after that: never auto */
 static int ticks;		/* seconds of ttywait with nothing typed */
@@ -256,6 +284,8 @@ static int ticks;		/* seconds of ttywait with nothing typed */
  */
 main()
 {
+	int sw;
+
 	dbgopen();          /* nothing without INITDBG; must precede closeall */
 	closeall();
 
@@ -265,8 +295,8 @@ main()
 	 * safe to run this early - findpid() returns 0 for a pid not in the
 	 * tty table and logout() takes a 0 pointer, so an empty ttys is fine.
 	 */
-	signal(SIGTERM, shutdown);
-	signal(SIGINT, onsingle);
+	signal(SIGTERM, (void (*)(int))shutdown);
+	signal(SIGINT, (void (*)(int))onsingle);
 
 	rootfd = open("/dev/root", 0);
 	swapfd = open("/dev/swap", 0);
@@ -289,6 +319,15 @@ main()
 
 	bootrecord();
 	resetttys();
+
+	/*
+	 * The monitor leaves the multiuser choice to the switch: 004h
+	 * set goes multiuser after the single-user idle timeout, clear
+	 * stays single user.  A failed read keeps the old timed path.
+	 */
+	sw = readswitch();
+	if (sw >= 0 && !(sw & 0x04))
+		noidle = 1;
 
 	while (console() == 0)
 		;
@@ -315,14 +354,14 @@ gotosingle()
 
 	signal(SIGINT, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
-	signal(SIGTERM, shutdown);
+	signal(SIGTERM, (void (*)(int))shutdown);
 	noidle = 1;
 	console();
 	noidle = 0;
 	singlereq = 0;
-	signal(SIGINT, onsingle);
-	signal(SIGHUP, reload);
-	signal(SIGTERM, shutdown);
+	signal(SIGINT, (void (*)(int))onsingle);
+	signal(SIGHUP, (void (*)(int))reload);
+	signal(SIGTERM, (void (*)(int))shutdown);
 }
 
 /*
@@ -470,7 +509,7 @@ runsingle()
  */
 onidle()
 {
-	signal(SIGALRM, onidle);	/* V7 resets the handler on delivery */
+	signal(SIGALRM, (void (*)(int))onidle);	/* V7 resets the handler on delivery */
 	idlealarm = 1;
 }
 
@@ -481,7 +520,7 @@ onidle()
  */
 onsingle()
 {
-	signal(SIGINT, onsingle);
+	signal(SIGINT, (void (*)(int))onsingle);
 	singlereq = 1;
 }
 
@@ -529,7 +568,7 @@ console()
 		 */
 		sawwait = useractive = ticks = 0;
 		idlealarm = 0;
-		signal(SIGALRM, onidle);
+		signal(SIGALRM, (void (*)(int))onidle);
 		for (;;) {
 			alarm(1);
 			r = wait(&status);
@@ -553,7 +592,7 @@ console()
 				}
 				if (useractive)
 					break;		/* wait normally */
-				if (sawwait && ++ticks >= 30) {
+				if (!noidle && sawwait && ++ticks >= 30) {
 					consmsg("init: single user idle; going multiuser");
 					kill(pid, SIGKILL);
 					break;
@@ -938,8 +977,8 @@ ignoresigs()
 
 catchsigs()
 {
-	signal(SIGHUP, reload);
-	signal(SIGTERM, shutdown);
+	signal(SIGHUP, (void (*)(int))reload);
+	signal(SIGTERM, (void (*)(int))shutdown);
 }
 
 spawnall()

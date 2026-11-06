@@ -18,9 +18,6 @@ int errcode;
 #include <sys/stat.h>
 #include <sys/dir.h>
 
-char *sprintf(char *, char *, ...);
-
-
 /* prototypes for functions defined below */
 int dotname(char *);
 int rm(char [], int, int, int, int);

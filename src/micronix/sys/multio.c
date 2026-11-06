@@ -108,13 +108,13 @@ extern void ttinit(struct tty *, INT16);
  */
 extern INT16 ace_start(), ace_stop(), ace_putc(), ace_set();
 extern INT16 ss1_start(struct tty *), ss1_stop(), ss1_set();
-extern void ss1_putc(struct tty *, UINT8);
+extern INT16 ss1_putc(struct tty *, INT16);
 extern void ss1_uart_open(INT16, INT16);
 extern UINT8 ttypub(UINT16, INT16 (*) (UINT8, struct tty *), INT16 (*) (struct tty *), INT16 (*) (struct tty *));            /* publish the page's doors (sys/ttyres.c) */
 extern void ttyconnect(struct tty *), cstart();  /* shared helpers, sys/ttyres.c */
-extern void ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
+extern INT16 ttyin(UINT8, struct tty *), ttyout(struct tty *);   /* the line discipline, same page (sys/tty.c) */
 extern void outwait(struct tty *, INT16);  /* drain the output queue (sys/ttysys.c) */
-extern void mumint();                   /* below, and an entry point the resident half calls */
+extern INT16 mumint();                   /* below, and an entry point the resident half calls */
 
 /*
  * Tty structures for the four ports: the SS1's 2651 and the three
@@ -391,7 +391,7 @@ muselect(t)
  * mumint - multio modem status change interrupt service routine
  */
 
-void
+INT16
 mumint(t)
     struct tty *t;
 {
@@ -421,6 +421,7 @@ mumint(t)
             ttyhangup(t);       /* carrier lost */
         }
     }
+    return (0);
 }
 
 /*

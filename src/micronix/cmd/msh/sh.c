@@ -333,7 +333,7 @@ char **av;
 			dup(f);
 			close(f);
 			promp = 0;
-			signal(INTR, catchintr);
+			signal(INTR, (void (*)(int))catchintr);
 		} else
 			proflag = 0;
 	}
@@ -1004,7 +1004,7 @@ tryagain:	/* if expr command may come back here to do command */
 			}
 			copy(cp2, gointr);
 			wasintr = 0;
-			signal(INTR, catchintr);
+			signal(INTR, (void (*)(int))catchintr);
 			break;
 
 		case ZEQUALS:
@@ -1491,7 +1491,7 @@ register char **t;
 		signal(INTR, 0);
 		proflag = 0;
 	}
-	signal(SIGPIPE, catchpipe);
+	signal(SIGPIPE, (void (*)(int))catchpipe);
 	setxcod(0);		/* in case real eof */
 	copy("!", eofstr);
 	for(; *t; t++)

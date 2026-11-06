@@ -156,7 +156,7 @@ STATIC	int	fins[MAXINC];
 STATIC	int	lineno[MAXINC];
 
 STATIC	char	*dirs[10];	/* -I and <> directories */
-char *strdex(char *, char), *copy(struct blk *, int), *subst(char *, char *), *trmdir();
+char *strdex(char *, char), *copy(char *), *subst(char *, struct symtab *), *trmdir(char *);
 struct symtab *stsym(char *);
 STATIC	int	fin	= STDIN;
 STATIC	FILE	*fout	= stdout;

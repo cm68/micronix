@@ -314,10 +314,10 @@ copytemp()
 	char buf[BUFSIZ];
 	register int i, f;
 
-	signal(SIGHUP,done);
-	signal(SIGINT,done);
-	signal(SIGPIPE,done);
-	signal(SIGTERM,done);
+	signal(SIGHUP,(void (*)(int))done);
+	signal(SIGINT,(void (*)(int))done);
+	signal(SIGPIPE,(void (*)(int))done);
+	signal(SIGTERM,(void (*)(int))done);
 	tempfile = mktemp("/tmp/dXXXXX");
 	f = creat(tempfile,0600);
 	if (f < 0) {

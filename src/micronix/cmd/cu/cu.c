@@ -132,8 +132,10 @@ int	intr;
  *	^C arrived in the middle of a diversion
  */
 
-sig2()
+void
+sig2(int sig)
 {
+	(void) sig;
 
 	signal(SIGINT, SIG_IGN);
 	intr = 1;
@@ -165,8 +167,10 @@ xalarm(n)
  *	pause is not ended early by the second alarm.
  */
 
-sig14()
+void
+sig14(int sig)
 {
+	(void) sig;
 
 	signal(SIGALRM, sig14);
 	if (set14) alarm(1);

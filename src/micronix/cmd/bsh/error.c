@@ -8,8 +8,10 @@
  */
 
 #include	"defs.h"
-#include <stdlib.h>
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern void exit(int);
+extern int unlink(char *);
 
 
 /* ========	error handling	======== */

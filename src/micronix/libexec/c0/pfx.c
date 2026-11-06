@@ -57,10 +57,7 @@ pfxSym(void)
          * function returning int */
         if (cur.type == LPAR) {
             /* Create implicit function declaration: int name() */
-            tp = (struct type *)permalloc(sizeof(struct type));
-            tp->flags = TF_FUNC;
-            tp->sub = inttype;  /* Return type: int */
-            tp->elem = NULL;    /* No parameter info */
+            tp = fnType(inttype, 0, 0);
 
             np = (struct name *)galloc(sizeof(struct name));
             /* Initialize in struct field order */

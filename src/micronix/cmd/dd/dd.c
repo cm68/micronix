@@ -181,7 +181,7 @@ unsigned char	atoibm[] =
 /* prototypes for functions defined below */
 int match(char *);
 int null(int);
-int term(int);
+void term(int);
 int ebcdic(int), ibm(int), ascii(int), null(int), cnull(int), block(int), unblock(int);
 static int (*conv)(int);
 
@@ -631,6 +631,7 @@ block(cc)
 		null(c);
 }
 
+void
 term(status)
 int status;
 {

@@ -120,7 +120,8 @@ extern INT16 ss1_clockinit(void), ss1_rtcinit(), ss1_rtcwrite();
 extern INT16 upd_clockinit(void), upd_rtcinit(), upd_rtcwrite();
 
 /* the two console boards' entry points (ss1_uart.c, mio.s/inits.s) */
-extern void ss1_putc(struct tty *, UINT8), ss1_uart_init();
+extern INT16 ss1_putc(struct tty *, INT16);
+extern INT16 ss1_uart_init();
 extern INT16 ss1_start(struct tty *), ss1_stop(), ss1_set();
 extern INT16 ace_putc(), ace_start(), ace_stop(), ace_set(), ace_minit();
 

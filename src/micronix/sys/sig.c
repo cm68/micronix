@@ -19,8 +19,14 @@ extern void write(INT16, INT16);
 extern void close(int fd);
 extern UINT8 valid(UINT16, UINT16);
 
-#define TERMIN	0               /* code for terminate */
-#define IGNORE	1               /* code for ignore */
+/*
+ * The dispositions are function addresses; 0 and 1 are the two
+ * codes, cast to the type the table holds.  The first argument is
+ * not passed to a handler at all - the kernel imitates an interrupt
+ * - so the empty parameter list is the table's shape.
+ */
+#define TERMIN	((UINT16 (*)())0)   /* code for terminate */
+#define IGNORE	((UINT16 (*)())1)   /* code for ignore */
 
 /*
  * Signal system call
@@ -33,9 +39,9 @@ void setframe(char *, char *);
 void
 signal(sig, func)
     INT16 sig;
-    register INT16 (*func) ();
+    register UINT16 (*func) ();
 {
-    register INT16 old;
+    register UINT16 (*old) ();
 
     if (sig >= NSIG || sig == SIGKILL || sig == 0) {
         u.error = EINVAL;
@@ -47,7 +53,7 @@ signal(sig, func)
     u.p->slist[sig] = func;
     if ((u.p->slist[0] == sig) && (func == IGNORE))
         u.p->slist[0] = 0;
-    u.hl = old;
+    u.hl = (INT16)old;
 }
 
 /*
@@ -108,7 +114,7 @@ send(p, sig)
     }
     if (p->slist[0] == SIGKILL)
         return;
-    p->slist[0] = sig;
+    p->slist[0] = (UINT16 (*)())(INT16)sig;
     /*
      * A stopped job still has to die.  The scheduler will not look at
      * it, so the one signal the shell's stop cannot hold off lets it
@@ -152,9 +158,9 @@ INT16
 sig()
 {
     register UINT8 s;
-    register INT16 func;
+    register UINT16 (*func) ();
 
-    s = u.p->slist[0];
+    s = (UINT8)(INT16)u.p->slist[0];
 
     if (!s)
         return 0;              /* no signal to process */
@@ -171,7 +177,7 @@ sig()
          * if (s == SIGQUIT || s == SIGILL || s == SIGBAD) u.p->status |=
          * 0200; /* exit will dump core * 
          */
-        func = setexit();
+        func = (UINT16 (*)())setexit();
     }
 
     u.p->slist[0] = 0;
@@ -184,7 +190,7 @@ sig()
 
     valid(--u.sp, 2);           /* allocate user memory if necessary */
     putword(u.pc, u.sp);
-    u.pc = func;
+    u.pc = (INT16)func;
     return (s);
 }
 

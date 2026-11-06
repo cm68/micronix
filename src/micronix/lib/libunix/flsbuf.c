@@ -6,8 +6,6 @@
 #include	<stdio.h>
 #include <unistd.h>
 
-extern int	write(int, void *, int);
-
 _flsbuf(c, f)
 register FILE *	f;
 uchar	c;

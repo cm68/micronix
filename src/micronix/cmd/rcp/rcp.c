@@ -78,7 +78,7 @@ bit(n)
 
 onalarm()
 {
-    signal(SIGALRM, onalarm);   /* V7 semantics: re-arm the handler */
+    signal(SIGALRM, (void (*)(int))onalarm);   /* V7 semantics: re-arm the handler */
 }
 
 /*
@@ -531,7 +531,7 @@ server_fetch(args, nargs)
 
     fd = 0;
     rawmode();
-    signal(SIGALRM, onalarm);
+    signal(SIGALRM, (void (*)(int))onalarm);
     if (send_bytes("\0", 1) < 0 || rx_exact(rbuf, 1) < 0)
         return (1);
     for (i = 0; i < nargs; i++)
@@ -546,7 +546,7 @@ server_sink(dest)
 {
     fd = 0;
     rawmode();
-    signal(SIGALRM, onalarm);
+    signal(SIGALRM, (void (*)(int))onalarm);
     if (send_bytes("\0", 1) < 0)
         return (1);
     recv_all(dest, isdirpath(dest));
@@ -669,7 +669,7 @@ client(args, nargs)
         fprintf(stderr, "rcp: no %s\n", DEV);
         exit(1);
     }
-    signal(SIGALRM, onalarm);
+    signal(SIGALRM, (void (*)(int))onalarm);
     {
         struct netcard c;
 

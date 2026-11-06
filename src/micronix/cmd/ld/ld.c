@@ -6,9 +6,6 @@
  * Pass 2: write output with relocations applied
  */
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 
 #ifdef linux
 #include <stdio.h>
@@ -33,6 +30,26 @@
 #ifdef linux
 #define __malloc malloc
 #endif
+#else
+/*
+ * The micronix build names only what it calls.  The three library
+ * headers are a hundred interned names between them, and c0 - which
+ * runs inside a 64K process - runs out of heap on this file with them
+ * in scope.  The types are the bodies' own.
+ */
+extern void exit(int);
+extern char *malloc(unsigned);
+extern char *__malloc(unsigned);
+extern int free(char *);
+extern int strcmp(char *, char *);
+extern int strncmp(char *, char *, unsigned);
+extern unsigned strlen(char *);
+extern char *strcpy(char *, char *);
+extern void *memset(void *, int, unsigned);
+extern int creat(char *, int);
+extern int open(char *, int, ...);
+extern int close(int);
+extern int unlink(char *);
 #endif
 
 #include <obj.h>

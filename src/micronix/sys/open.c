@@ -17,7 +17,6 @@ extern void irelse(struct inode *);
 extern void copen(INT16, UINT8);
 extern void ilock(struct inode *);
 extern void bopen(UINT16, UINT16);
-extern void fclose(FILE *);
 extern void wakeup(INT16);
 extern void cclose(INT16, UINT8);
 extern void iclose();

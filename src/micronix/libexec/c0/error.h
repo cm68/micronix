@@ -73,6 +73,7 @@ char *errmsg[] = {
 	"ptr compat",
 	"struct value",
 	"addr of register",
+	"fn type mismatch",
 	"out of memory",
 	"sym truncated",
 	"too many ifs",
@@ -167,13 +168,14 @@ char *errmsg[] = {
 #define ER_E_PT 70
 #define ER_E_AG 71
 #define ER_E_RA 72
-#define ER_NOMEM 73
-#define ER_W_SYMTRUNC 74
-#define ER_S_IF 75
-#define ER_D_FL 76
-#define ER_S_FN 77
-#define ER_S_BLK 78
-#define ER_E_IC 79
-#define ER_WTF 80
+#define ER_E_FT 73
+#define ER_NOMEM 74
+#define ER_W_SYMTRUNC 75
+#define ER_S_IF 76
+#define ER_D_FL 77
+#define ER_S_FN 78
+#define ER_S_BLK 79
+#define ER_E_IC 80
+#define ER_WTF 81
 typedef int error_t;
 #endif

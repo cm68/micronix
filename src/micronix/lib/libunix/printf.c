@@ -6,7 +6,7 @@
 
 extern int	_doprnt(void (*)(), char *, int *);
 
-static
+static void
 emit_stdout(c)
 int	c;
 {

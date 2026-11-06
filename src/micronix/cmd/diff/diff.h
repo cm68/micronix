@@ -107,7 +107,7 @@ struct	stat stb1, stb2;
 char	*malloc(unsigned), *talloc(int), *ralloc(char *, int);
 char	*savestr(char *), *splice(char *, char *);
 char	*mktemp(char *), *copytemp(void), *rindex(char *, int);
-char	*calloc(int, int), *realloc(char *, unsigned short), *ctime(time_t *);
+char	*calloc(unsigned, unsigned), *realloc(char *, unsigned short);
 int	done(void);
 int	execv();
 

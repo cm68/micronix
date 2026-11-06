@@ -84,7 +84,7 @@ FILE	*tf;
 char * ttyname(int);
 int ex(char *);
 int sigs(int);
-void (*signal(int, void (*)(int)))(int);
+short signal(int, short);
 main(argc, argv)
 int argc;
 char *argv[];
@@ -167,7 +167,7 @@ cont:
 		printf("No such tty\n");
 		exit(1);
 	}
-	signal(SIGALRM, timout);
+	signal(SIGALRM, (void (*)(int))timout);
 	alarm(5);
 	if ((tf = fopen(histty, "w")) == NULL)
 		goto perm;
@@ -176,7 +176,7 @@ cont:
 		goto perm;
 	if ((stbuf.st_mode & 02) == 0)
 		goto perm;
-	sigs(eof);
+	sigs((void (*)(int))eof);
 	fprintf(tf, "Message from ");
 	fprintf(tf, "%s %s...\n", me, mytty);
 	fflush(tf);
@@ -217,7 +217,7 @@ char *bp;
 {
 	register i;
 
-	sigs(SIG_IGN);
+	sigs((void (*)(int))SIG_IGN);
 	i = fork();
 	if (i < 0) {
 		printf("Try again\n");
@@ -232,7 +232,7 @@ char *bp;
 		;
 	printf("!\n");
 out:
-	sigs(eof);
+	sigs((void (*)(int))eof);
 }
 
 sigs(sig)

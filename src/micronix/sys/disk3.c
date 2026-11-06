@@ -256,7 +256,7 @@ disk3strat(b)
 void
 d3start()
 {
-    if (!busget(&d3start))
+    if (!busget((INT16 (*)())&d3start))
         return;
     if (d3state == VIRGIN) {
         reset();

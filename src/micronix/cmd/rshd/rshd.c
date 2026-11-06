@@ -83,22 +83,21 @@ static struct passwd *pw;
 
 
 /* prototypes for functions defined below */
-int jobctl(int);
 onalarm()
 {
-    signal(SIGALRM, onalarm);   /* V7 semantics: re-arm the handler */
+    signal(SIGALRM, (void (*)(int))onalarm);   /* V7 semantics: re-arm the handler */
 }
 
 onterm()
 {
-    signal(SIGTERM, onterm);
+    signal(SIGTERM, (void (*)(int))onterm);
     reap = 1;
 }
 
 /* the child's alarm, for its own select deadlines */
 onchildalarm()
 {
-    signal(SIGALRM, onchildalarm);
+    signal(SIGALRM, (void (*)(int))onchildalarm);
 }
 
 static int
@@ -489,8 +488,8 @@ main(argc, argv)
     }
 
     parentpid = getpid();
-    signal(SIGALRM, onalarm);
-    signal(SIGTERM, onterm);
+    signal(SIGALRM, (void (*)(int))onalarm);
+    signal(SIGTERM, (void (*)(int))onterm);
 
     /* the card wants to be on its network; failure is the card's */
     (void) net_card(N_JOIN, peer, 0);
@@ -526,7 +525,7 @@ main(argc, argv)
         pid = fork();
         if (pid == 0) {
             alarm(0);
-            signal(SIGALRM, onchildalarm);
+            signal(SIGALRM, (void (*)(int))onchildalarm);
             n = ioctl(netfd, NETACCEPT, peer);
             if (n < 0) {
                 close(netfd);

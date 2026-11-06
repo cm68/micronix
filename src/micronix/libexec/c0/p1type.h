@@ -58,19 +58,32 @@ struct type {
 };
 
 /*
- * parameter names in a plain declaration are meaningless; only the
- * types matter.  once a declarator turns out not to be a function
- * definition, slimFnArgs() replaces the funarg name entries in a
- * function type's elem list with these compact nodes and sets
- * count = 1 to mark the shape.  a definition's own type keeps full
- * struct name entries: parsefunc/emitPrmDecls/regalloc bind the
- * body's parameters by name.
+ * A function type is its signature: the return type, the parameter
+ * types in order, and whether it is variadic.  Parameter names are
+ * not part of it; they hang off the declaration that defines the
+ * function, where parsefunc/emitPrmDecls/regalloc bind by name.
+ *
+ * Every function type is a node from fnType()'s table, so two
+ * functions with the same signature are the same type, and the
+ * identity test is the right one.  That matters because the calling
+ * convention is in the signature: the first argument goes in A when
+ * it is an 8-bit scalar, and the return value comes back in A or HL
+ * depending on its type.
+ *
+ * elem is always the compact farg list and count is 1, whether or
+ * not the declaration named its parameters.  An empty parameter
+ * list, "f()", is K&R silence and matches any signature.
  */
 struct farg {
 	struct type *type;
 	struct farg *next;
 };
-extern void slimFnArgs(struct type *t);
+extern struct type *fnType(struct type *ret, struct name *params,
+    unsigned char variadic);
+extern struct type *fnUnder(struct type *t);
+extern char fnCompatible(struct type *t1, struct type *t2);
+extern struct name *fnparamsGet(struct name *func);
+extern void fnparamsFree(struct name *func);
 #define TF_AGGREGATE	0x01
 #define TF_INCOMPLETE	0x02
 #define TF_UNSIGNED		0x04
@@ -94,7 +107,6 @@ extern int isBasicType(struct type *t);
 struct type *getType(char flags, struct type *sub, int count);
 int typesize(struct type *t);
 struct type *fnArgType(struct type *t, unsigned char i);
-extern char compatFnTyp(struct type *t1, struct type *t2);
 extern char sameRet(struct type *t1, struct type *t2);
 extern char sameType(struct type *a, struct type *b);
 

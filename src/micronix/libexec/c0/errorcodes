@@ -81,6 +81,7 @@ ER_E_CF		no fold
 ER_E_PT		ptr compat
 ER_E_AG		struct value
 ER_E_RA		addr of register
+ER_E_FT		fn type mismatch
 
 # resource errors
 ER_NOMEM	out of memory

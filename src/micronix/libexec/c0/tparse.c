@@ -45,60 +45,13 @@ fnArgType(struct type *t, unsigned char i)
 }
 
 /*
- * Compare two function types' parameter lists for type equality
- * Returns 1 if equal, 0 if different
- * Parameter names are ignored - only types matter
- */
-int
-cmpParamLists(struct type *t1, struct type *t2)
-{
-    unsigned char i;
-    struct type *a1, *a2;
-
-    for (i = 0; ; i++) {
-        a1 = fnArgType(t1, i);
-        a2 = fnArgType(t2, i);
-        if (a1 != a2) {
-            return 0;
-        }
-        if (!a1) {
-            // Both lists ended at the same time
-            return 1;
-        }
-    }
-}
-
-/*
- * Compare two function types for compatibility
- * Returns 1 if compatible, 0 if different
- * Checks return type and parameter types, ignoring parameter names
- */
-/*
  * Do two declarations agree about what a function hands back?
  *
  * What a caller needs from a return type is how wide the answer is:
  * an int read out of HL where a long was returned takes half of it,
  * which is the whole reason this is checked at all.  Anything the two
  * spellings disagree about that does not change the width, the call
- * site cannot tell apart.
- *
- * Identity is not that test.  Types are interned, so usually the same
- * type is the same pointer - but a function type is built fresh from
- * its parameter list, and a return type can have one inside it.
- * signal() is the one everybody has:
- *
- *	void (*signal(int, void (*)(int)))(int);	// the header
- *	void (*signal(sig, action))()		// the definition
- *
- * Both hand back a pointer, two bytes, and agree about everything a
- * caller can observe.  They differ in whether the parameters of the
- * function pointed at are spelled out - the same K&R silence the
- * outer list is already allowed - so the interned pointers differ and
- * identity alone calls it a conflict.
- *
- * A null side is that silence too: declarators are assembled
- * outwards, so in phase 1 a pointer may not yet have been told what
- * it points to.
+ * site cannot tell apart.  A null side is silence too.
  */
 char
 sameRet(struct type *t1, struct type *t2)
@@ -108,20 +61,117 @@ sameRet(struct type *t1, struct type *t2)
 	return typesize(t1) == typesize(t2);
 }
 
-char
-compatFnTyp(struct type *t1, struct type *t2)
+/*
+ * The function under a pointer, or the function itself.  An array of
+ * them is not one: it decays to a pointer to a pointer to a function,
+ * and there is no function under that.
+ */
+struct type *
+fnUnder(struct type *t)
 {
-    if (!t1 || !t2) return 0;
-    if (!(t1->flags & TF_FUNC) || !(t2->flags & TF_FUNC)) return 0;
+	if (!t)
+		return 0;
+	if (t->flags & TF_FUNC)
+		return t;
+	if ((t->flags & TF_POINTER) && t->sub && (t->sub->flags & TF_FUNC))
+		return t->sub;
+	return 0;
+}
 
-    // Compare return types
-    if (t1->sub != t2->sub) return 0;
+/*
+ * Compatibility as the call needs it.
+ *
+ * Types are interned, so identity is the rule.  The exception is the
+ * generic object pointer: the library declares malloc void * and a
+ * hundred K&R declarations say char *, and both are one call.  A
+ * function value goes through fnCompatible, so a callback's own
+ * signature is still checked, and a byte is still not a word.
+ */
+static char
+typeCompat(struct type *a, struct type *b)
+{
+	struct type *fa, *fb;
 
-    // Compare variadic flag
-    if ((t1->flags & TF_VARIADIC) != (t2->flags & TF_VARIADIC)) return 0;
+	if (a == b)
+		return 1;
+	if (!a || !b)
+		return 0;
+	fa = fnUnder(a);
+	fb = fnUnder(b);
+	if (fa || fb)
+		return fa && fb && fnCompatible(fa, fb);
+	if ((a->flags & (TF_POINTER | TF_ARRAY)) &&
+	    (b->flags & (TF_POINTER | TF_ARRAY))) {
+		if (a->sub == voidtype || b->sub == voidtype)
+			return 1;
+		return a->sub == b->sub;
+	}
+	return 0;
+}
 
-    // Compare parameter lists
-    return cmpParamLists(t1, t2);
+/*
+ * Are these two function signatures the same?  The return type, the
+ * variadic flag and the parameter types, all by identity: every part
+ * of a signature is interned - fnType() for functions, getType() for
+ * pointers and arrays, the static table for primitives - so two
+ * functions of one signature are one type node.  Parameter names are
+ * not consulted; they are not part of the type.
+ *
+ * An empty parameter list is K&R silence ("extern short adds();")
+ * and matches any signature.  That is not "takes no arguments": a
+ * function that really takes none says (void), and an empty list
+ * here is a list with one void entry.
+ *
+ * This is the check the calling convention needs.  The first
+ * argument rides in A when the prototype says it is an 8-bit
+ * scalar, and the answer comes back in A or HL depending on its
+ * type; two signatures that disagree are two conventions, and a
+ * call through the wrong one is wrong code, not a loose match.
+ */
+char
+fnCompatible(struct type *t1, struct type *t2)
+{
+	unsigned char i;
+	struct type *a1, *a2;
+
+	if (t1 == t2)
+		return 1;
+	if (!t1 || !t2)
+		return 0;
+	if (!(t1->flags & TF_FUNC) || !(t2->flags & TF_FUNC))
+		return 0;
+	if (!typeCompat(t1->sub, t2->sub))
+		return 0;
+	/*
+	 * Silence says nothing about the parameters at all.
+	 */
+	if (!t1->elem || !t2->elem)
+		return 1;
+	/*
+	 * The ellipsis starts the optional part of the definition.  What
+	 * a call must supply is the fixed prefix; a pointer type that
+	 * stops there can hold a variadic function, and two declarations
+	 * that agree about the required parameters agree, one spelling
+	 * the optional tail and one not.  On this machine it is not even
+	 * an ABI question: the first-argument convention comes from the
+	 * first declared parameter, and the tail is on the stack either
+	 * way.  What the ellipsis does is let a callee read past the
+	 * fixed list; it does not change what a fixed call looks like.
+	 */
+	/*
+	 * The lists are the required parameters.  They must match
+	 * exactly; only the ellipsis flag may differ, because it
+	 * describes an optional tail the other spelling simply does not
+	 * mention.
+	 */
+	for (i = 0; ; i++) {
+		a1 = fnArgType(t1, i);
+		a2 = fnArgType(t2, i);
+		if (!typeCompat(a1, a2))
+			return 0;
+		if (!a1)
+			return 1;
+	}
 }
 
 /*

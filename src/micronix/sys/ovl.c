@@ -24,7 +24,8 @@ extern INT8 intrset(INT16 (*)(), INT16 (*)(), UINT16);
 
 extern UINT16 nbdev, ncdev;
 extern UINT8 map0[];
-extern UINT16 bmajor(UINT16), cmajor();
+extern UINT16 bmajor(UINT16);
+extern INT16 cmajor();
 extern void nodev(void), noioctl();
 
 #define	OVLMAJ	16			/* majors we keep a place for */
@@ -400,15 +401,19 @@ cvecset(maj, open, close, read, write, ioc)
 #define	TICKINT	HERTZ			/* resident tick, once a second */
 
 static
-void
-ovltick()
+INT16
+ovltick(arg)
+    INT16 arg;
 {
     register UINT16 i;
+
+    (void) arg;
 
     for (i = 0; i < novltick; i++)
         ovlcall(ovlticks[i].fn, ovlticks[i].seg);
 
     timeout(&ovltick, 0, TICKINT);
+    return (0);
 }
 
 /*

@@ -397,7 +397,7 @@ mwstrat(b)
 void
 mwstart()
 {
-    if (!busget(&mwstart))
+    if (!busget((INT16 (*)())&mwstart))
         return;
     if (mwstate == VIRGIN)
         reset();
@@ -825,7 +825,7 @@ void
 mwbusplease()
 {
     di();
-    if (!busget(mwbusready))
+    if (!busget((INT16 (*)())mwbusready))
         sleep(mwbusready, PRIBIO);
     else
         ei();

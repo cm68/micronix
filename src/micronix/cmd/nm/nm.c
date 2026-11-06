@@ -11,12 +11,27 @@
 #include <obj.h>
 #else
 #include <stdio.h>
+
+/*
+ * Name only what this file calls.  The library headers are a hundred
+ * interned names between them, and c0 - which runs inside a 64K
+ * process - runs out of heap on this file with them in scope.
+ */
+extern void exit(int);
+extern void *malloc(unsigned);
+extern void *realloc(void *, unsigned);
+extern void free(void *);
+extern unsigned strlen(char *);
+extern int strcmp(char *, char *);
+extern char *strcpy(char *, char *);
+extern char *strncpy(char *, char *, unsigned);
+extern char *strcat(char *, char *);
+extern char *strrchr(char *, int);
+extern void *memset(void *, int, unsigned);
+extern void *memcpy(void *, void *, unsigned);
 #endif
 
 #include <obj.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #ifdef DO_HITECH
 #include "hiobj.h"
 #endif

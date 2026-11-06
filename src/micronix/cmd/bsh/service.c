@@ -8,7 +8,16 @@
  */
 
 #include	"defs.h"
-#include <unistd.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern long lseek(unsigned char, long, int);
+extern int close(int);
+extern int open(char *, int, ...);
+extern int dup(int);
+extern int unlink(char *);
+extern int wait(int *);
+extern int kill(int, int);
+extern int execve(char *, char **, char **);
 
 
 
@@ -34,7 +43,6 @@ LOCAL VOID jobreaped(INT);
 INT cf(REG STRING, REG STRING);
 int chkopen(STRING);
 int create(STRING);
-int namscan(VOID *(*)());
 int prn(INT);
 int stoi(STRING);
 int trim(STRING);

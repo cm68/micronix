@@ -45,9 +45,9 @@ struct hd hdinfo[NHD];
 static struct slicemap hdslice[NHD][NSLICE];
 
 static INT16 hdmutex;		/* the controller, 0 = free */
-static INT16 (*hdintr)(struct hd *);	/* the phase the op-done interrupt resumes */
+static void (*hdintr)(struct hd *);	/* the phase the op-done interrupt resumes */
 static struct hd *hdintarg;	/* its argument */
-static INT16 (*hdseekintr)(struct hd *);	/* the phase the seek-done interrupt resumes */
+static void (*hdseekintr)(struct hd *);	/* the phase the seek-done interrupt resumes */
 static struct hd *hdseekarg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
 static struct hd *hdactive;	/* the drive owning the controller */

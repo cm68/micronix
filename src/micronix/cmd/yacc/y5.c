@@ -73,7 +73,6 @@ int adb = 0;
 
 
 /* prototypes for functions defined below */
-int error(char *, int, int);
 int arout(char *, int *, int);
 int earout(char *, int *, int);
 int farout(char *, int *, int);

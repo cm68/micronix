@@ -1136,6 +1136,15 @@ landarg(Expr *a)
 	w = a->width;
 	if (w != 'l' && w != 'L')
 		w = 's';
+	/*
+	 * A signed byte promotes with its sign.  The ASSIGN rule that
+	 * lands a byte in HL pads the high half with zeroes, which is
+	 * right for unsigned and wrong for char, and C promotes char
+	 * arguments to int.  Doing it here and not as a conversion node
+	 * in c0's tree keeps the tight side of the compiler out of it.
+	 */
+	if (ISBYTE(a->width) && ISSIGNED(a->width))
+		a = mkunary(SEXT, w, a);
 
 	hl = mkcode(w, R_HL);
 	hl->op = INHL;

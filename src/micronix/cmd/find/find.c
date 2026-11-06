@@ -76,7 +76,7 @@ char	*nxtarg(void);
 char *rindex(char *, int);
 
 /* prototypes for functions defined below */
-struct anode * mk(int *(*)(), struct anode *, struct anode *);
+struct anode * mk(int (*)(), struct anode *, struct anode *);
 int amatch(char *, char *);
 int descend(char *, struct anode *);
 int doex(int);

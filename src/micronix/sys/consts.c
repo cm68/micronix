@@ -141,7 +141,7 @@ extern void r_pipe();
 extern void select();
 extern void signal();
 
-extern void nodev(), nulldev(), nullwrite();
+extern INT16 nodev(), nulldev(), nullwrite();
 extern void memread(), memwrite();
 extern INT16 ovlopen(), ovlclose(), ovlstrat(), ovlioctl();
 extern INT16 ovlcopen(), ovlcclose(), ovlcread(), ovlcwrite(), ovlcioctl();

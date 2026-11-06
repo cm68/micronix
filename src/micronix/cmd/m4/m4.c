@@ -238,9 +238,9 @@ char **argv;
 	ap = argstk;
 #ifndef gcos
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
-		signal(SIGHUP, catchsig);
+		signal(SIGHUP, (void (*)(int))catchsig);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
-		signal(SIGINT, catchsig);
+		signal(SIGINT, (void (*)(int))catchsig);
 	tempname = mktemp("/tmp/m4aXXXXX");
 	close(creat(tempname, 0));
 #endif

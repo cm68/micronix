@@ -295,8 +295,33 @@ pfxCall(struct expr *e)
                 /* a struct cannot be passed - pass its address */
                 if (isaggr(e2->type))
                     gripe(ER_E_AG);
-                if (ft->flags & TF_FUNC)
-                    e2 = argcvt(e2, fnArgType(ft, argi));
+                if (ft->flags & TF_FUNC) {
+                    {
+                        struct type *pt, *fa, *fb;
+                        int nullp, intscalar;
+
+                        pt = fnArgType(ft, argi);
+                        fa = fnUnder(pt);
+                        fb = e2 ? fnUnder(e2->type) : 0;
+                        nullp = e2 && (e2->flags & E_CONST) &&
+                            e2->v == 0;
+                        intscalar = pt && pt->size > 0 &&
+                            !(pt->flags & (TF_POINTER | TF_ARRAY |
+                              TF_FUNC | TF_AGGREGATE));
+                        /*
+                         * A function pointer argument is a promise
+                         * about the callee's convention.  Check it
+                         * where the prototype states the parameter
+                         * type; the variadic tail states none.
+                         */
+                        if (pt && (fa || fb)) {
+                            if (!nullp && !(fb && !fa && intscalar) &&
+                                (!fa || !fb || !fnCompatible(fa, fb)))
+                                gripe(ER_E_FT);
+                        }
+                        e2 = argcvt(e2, pt);
+                    }
+                }
                 e2->flags |= E_FUNARG;
                 if (e3) {
                     e3->next = e2;

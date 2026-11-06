@@ -50,8 +50,8 @@ extern void sleep(INT16, UINT8);
 extern INT16 ttyread(struct tty *);
 extern void ttywrite(struct tty *), ttymode(), ttyopen(), ttyclose();
 extern void cstart(struct tty *), ustart(), drainques(), qinit(), sendque();
-extern void pty_start(struct tty *), pty_put();
-extern void nulldev(void);          /* the kernel's empty entry */
+extern INT16 pty_start(struct tty *), pty_put(struct tty *, INT16);
+extern INT16 nulldev();          /* the kernel's empty entry */
 extern void ptyioctl(INT16, INT16, UINT8 *);
 extern void ptyhang(INT16);            /* the process-table walk, resident */
 extern INT16 selectchan;          /* select(2): a reader may be watching */

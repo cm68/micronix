@@ -50,8 +50,19 @@ void
 parsefunc(struct name *f)
 {
 	struct name *param;
+	struct name *declf;
+	struct name *params;
 	struct name *phase1_func = NULL;
 	struct name *gravemark;
+
+	/*
+	 * The parameter names come from the declaration, not from the
+	 * type: the type is the signature, and a signature is shared by
+	 * every function of that shape.  fnparamsGet() holds this
+	 * declaration's entries until the body has been emitted.
+	 */
+	declf = f;
+	params = fnparamsGet(f);
 
 	/* In phase 2, lookup the function definition from phase 1 to get
 	 * its u.locals which contains locals for register allocation.
@@ -68,6 +79,8 @@ parsefunc(struct name *f)
 			f = phase1_func;  /* Use the phase 1 version with u.locals */
 		}
 	}
+	if (!params)
+		params = fnparamsGet(f);
 
 #ifdef DEBUG
 	if (phase == 2 && VERBOSE(V_PHASE2))
@@ -87,9 +100,9 @@ parsefunc(struct name *f)
 	pushScope(nameOf(f->id));
 
 	// Install function parameters into the scope at level 2
-	// Read parameter info from f->type->elem but create NEW entries at level 2
+	// Read the declaration's parameter entries but create NEW entries at level 2
 	if (f->type->flags & TF_FUNC) {
-		for (param = f->type->elem; param; param = param->next) {
+		for (param = params; param; param = param->next) {
 			// Only add parameters with actual names (skip anonymous ones)
 			if (param->id) {
 				// Create a NEW name entry at level 2 (don't reuse type->elem)
@@ -165,6 +178,13 @@ parsefunc(struct name *f)
 	if (phase == 2 && f->kind == kfdef && f->u.locals) {
 		freeLocals(f->u.locals);
 		f->u.locals = NULL;
+	}
+	/* The body has been emitted.  The parameter names were the
+	 * declaration's, not the type's; nothing refers to them now. */
+	if (phase == 2) {
+		fnparamsFree(f);
+		if (declf != f)
+			fnparamsFree(declf);
 	}
 
 	/*
@@ -437,15 +457,17 @@ declaration()
         }
 
         /*
-         * Not a function definition: any function type in this
-         * declarator keeps only parameter types, not names.
-         * Never slim a type owned by a function definition, though:
-         * in phase 2 a prototype resolves to the phase 1 fdef entry,
-         * and its type still carries the parameter names the body
-         * needs (parsefunc/emitPrmDecls/regalloc bind by name).
+         * Not a function definition: the parameter names parked by
+         * the declarator are not needed.  The type is the canonical
+         * signature already and carries no names.
+         *
+         * Never free a definition's entries here, though: in phase 2
+         * a prototype can resolve to the phase 1 fdef entry while
+         * that body is being emitted, and the body is binding the
+         * names.
          */
         if (v->kind != kfdef)
-            slimFnArgs(v->type);
+            fnparamsFree(v);
 
         /*
          * Assign storage class for variables (non-functions or

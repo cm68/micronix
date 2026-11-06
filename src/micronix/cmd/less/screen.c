@@ -130,7 +130,7 @@ probe_size()
 	lputs("\033[9999;9999H\033[6n");
 	flush();
 
-	signal(14, probe_alarm);
+	signal(14, (void (*)(int))probe_alarm);
 	alarm(1);
 	i = 0;
 	while (i < sizeof buf - 1)

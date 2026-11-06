@@ -21,6 +21,7 @@
 #include <sys/fs.h>
 #include <sys/stat.h>
 #include <sys/dir.h>
+#include <unistd.h>
 
 #define SHELLCOM "/bin/sh"
 typedef long TIMETYPE;
@@ -72,37 +73,6 @@ extern char funny[128];
 #define SIGINT  2
 #define SIGQUIT 3
 extern short signal(int sig, short handler);
-
-/*
- * The standard library has no declaration for these three in stdio.h,
- * so make's implicit use of them would not type-check.  Declared here
- * with the shapes libc's bodies actually have.
- */
-extern int fread(char *, int, int, FILE *);
-extern int fclose(FILE *);
-extern int fflush(FILE *);
-
-/*
- * The system calls make reaches directly, declared with the shapes
- * libunix actually implements.  unistd.h is not pulled in because its
- * stat prototype takes a char * buffer and make passes a struct stat;
- * the ABI is the same pointer either way but the types are cleaner
- * spelled out here.
- */
-extern int fork(void);
-extern int wait(int *);
-extern int execv(char *, char **);
-extern int execl(char *, char *, char *, char *, char *);
-extern long lseek(int, long, int);
-extern int stat(char *, struct stat *);
-extern int creat(char *, int);
-extern int open(char *, int);
-extern int read(int, char *, int);
-extern int write(int, char *, int);
-extern int close(int);
-extern int unlink(char *);
-extern long time(long *);
-extern int access(char *, int);
 
 extern int sigivalue;
 extern int sigqvalue;

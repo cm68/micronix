@@ -156,7 +156,7 @@ else fprintf(stderr,"No suffix list.\n");
 
 sigivalue = (int) signal(SIGINT, SIG_IGN) & 01;
 sigqvalue = (int) signal(SIGQUIT, SIG_IGN) & 01;
-enbint(intrupt);
+enbint((int)intrupt);
 
 nfargs = 0;
 

@@ -82,50 +82,178 @@ createPrmEnt(unsigned short id, struct type *type)
 }
 
 /*
- * Replace a declaration's parameter name entries with compact
- * type-only nodes (struct farg), marking the shape with count = 1.
- * Chases pointers, arrays and return types so function pointer
- * declarators and functions returning function pointers get slimmed
- * too, and recurses into parameter types for fn-pointer parameters.
- * Safe to call on any type; no-op for non-functions and for types
- * already slimmed.  Never called on a definition's own type.
+ * A function type is its signature: the return type, the parameter
+ * types in order, and whether it is variadic.  Parameter names are
+ * not part of it - they belong to the declaration that names them,
+ * which is where parsefunc and the emitters bind them.
+ *
+ * Every function type is interned here, so two functions of one
+ * signature are the same type node.  That is not bookkeeping: the
+ * calling convention is in the signature.  The first argument is
+ * passed in A when the prototype says it is an 8-bit scalar, and the
+ * return value comes back in A or HL depending on its type.  Two
+ * signatures that disagree are two conventions, and a call through
+ * the wrong one is wrong code.
+ *
+ * The named entries are kept beside the type until the declaration
+ * is known not to be a definition; a definition's body binds them.
  */
-void
-slimFnArgs(struct type *t)
-{
-    struct name *p, *pnext;
-    struct farg *fa, *tail;
+static struct type *fntypes;
 
-    while (t && !(t->flags & TF_FUNC)) {
-        if (t->flags & (TF_POINTER | TF_ARRAY)) {
-            t = t->sub;
-        } else {
+static void
+freeNameList(struct name *p)
+{
+    struct name *next;
+
+    while (p) {
+        next = p->next;
+        free(p);
+        p = next;
+    }
+}
+
+static int
+fargsSame(struct farg *a, struct farg *b)
+{
+    while (a && b) {
+        if (a->type != b->type)
+            return 0;
+        a = a->next;
+        b = b->next;
+    }
+    return a == b;
+}
+
+static struct type *
+fnAlloc(struct type *ret, struct farg *params, unsigned char variadic)
+{
+    struct type *t;
+    unsigned char vf;
+
+    vf = variadic ? TF_VARIADIC : 0;
+    for (t = fntypes; t; t = t->next)
+        if (t->sub == ret && (t->flags & TF_VARIADIC) == vf &&
+            fargsSame((struct farg *)t->elem, params))
+            return t;
+    t = (struct type *)permalloc(sizeof(*t));
+    t->flags = TF_FUNC | vf;
+    t->sub = ret;
+    t->count = 1;               /* elem is a farg list */
+    t->elem = (struct name *)params;
+    t->next = fntypes;
+    fntypes = t;
+    return t;
+}
+
+/*
+ * The canonical type for a signature spelled as a parameter name
+ * list.  The table is searched first, so a repeated signature does
+ * not allocate its farg list only to throw it away.
+ */
+struct type *
+fnType(struct type *ret, struct name *params, unsigned char variadic)
+{
+    struct type *t;
+    struct name *p;
+    struct farg *fa, *tail;
+    unsigned char vf;
+
+    vf = variadic ? TF_VARIADIC : 0;
+    for (t = fntypes; t; t = t->next) {
+        if (t->sub != ret || (t->flags & TF_VARIADIC) != vf)
+            continue;
+        fa = (struct farg *)t->elem;
+        p = params;
+        while (fa && p && fa->type == p->type) {
+            fa = fa->next;
+            p = p->next;
+        }
+        if (!fa && !p)
+            return t;
+    }
+    fa = tail = NULL;
+    for (p = params; p; p = p->next) {
+        struct farg *f = (struct farg *)permalloc(sizeof(*f));
+        f->type = p->type;
+        f->next = NULL;
+        if (tail)
+            tail->next = f;
+        else
+            fa = f;
+        tail = f;
+    }
+    return fnAlloc(ret, fa, vf);
+}
+
+/*
+ * The same signature with the return type completed after the
+ * parameter list was built:
+ *
+ *      void (*signal(int, void (*)(int)))(int)
+ *
+ * The type node is interned, so it cannot have its sub plugged the
+ * way it used to be; the signature is rebuilt and found in the table.
+ */
+static struct type *
+fnWithReturn(struct type *t, struct type *ret)
+{
+    return fnAlloc(ret, (struct farg *)t->elem,
+        (t->flags & TF_VARIADIC) != 0);
+}
+
+/*
+ * The parameter names of a definition, kept from the declarator until
+ * the body has been emitted.  Keyed by the name entry: a file-scope
+ * declarator is walked twice and both walks reach the same entry.
+ */
+struct fnparams {
+    struct name *func;
+    struct name *params;
+    struct fnparams *next;
+};
+static struct fnparams *fnplist;
+
+static void
+fnparamsSet(struct name *func, struct name *params)
+{
+    struct fnparams *p;
+
+    for (p = fnplist; p; p = p->next)
+        if (p->func == func) {
+            freeNameList(p->params);
+            p->params = params;
             return;
         }
-    }
-    if (!t || t->count) {
-        return;
-    }
-    t->count = 1;           /* elem is now a farg list */
-    p = t->elem;
-    t->elem = NULL;
-    tail = NULL;
-    while (p) {
-        pnext = p->next;
-        slimFnArgs(p->type);    /* fn-pointer parameter */
-        fa = (struct farg *)permalloc(sizeof(*fa));
-        fa->type = p->type;
-        fa->next = NULL;
-        if (tail) {
-            tail->next = fa;
-        } else {
-            t->elem = (struct name *)fa;
+    p = (struct fnparams *)galloc(sizeof(*p));
+    p->func = func;
+    p->params = params;
+    p->next = fnplist;
+    fnplist = p;
+}
+
+struct name *
+fnparamsGet(struct name *func)
+{
+    struct fnparams *p;
+
+    for (p = fnplist; p; p = p->next)
+        if (p->func == func)
+            return p->params;
+    return 0;
+}
+
+void
+fnparamsFree(struct name *func)
+{
+    struct fnparams *p, **pp;
+
+    for (pp = &fnplist; (p = *pp); pp = &p->next)
+        if (p->func == func) {
+            *pp = p->next;
+            freeNameList(p->params);
+            free(p);
+            return;
         }
-        tail = fa;
-        free(p);
-        p = pnext;
-    }
-    slimFnArgs(t->sub);     /* function returning function pointer */
 }
 
 /*
@@ -281,14 +409,12 @@ prmFnPtr(struct type *param_type, unsigned short *namep)
         if (cur.type == LPAR) {
             struct type *fn_type;
             struct name *inner_arg, *inner_tail;
-            fn_type = (struct type *)permalloc(sizeof(*fn_type));
-            fn_type->flags = TF_FUNC;
-            fn_type->sub = param_type;  // return type
-            inner_tail = NULL;
+            inner_arg = inner_tail = NULL;
             gettoken();  // consume (
             // Parse inner function's parameters
             while (cur.type != RPAR && cur.type != E_O_F) {
                 struct type *inner_base, *inner_type;
+                struct name *arg;
                 inner_base = getbasetype();
                 if (!inner_base) {
                     if (cur.type == COMMA) {
@@ -301,13 +427,13 @@ prmFnPtr(struct type *param_type, unsigned short *namep)
                 // Skip optional inner parameter name
                 if (cur.type == SYM)
                     gettoken();
-                inner_arg = createPrmEnt(0, inner_type);
-                inner_arg->next = NULL;
+                arg = createPrmEnt(0, inner_type);
+                arg->next = NULL;
                 if (inner_tail)
-                    inner_tail->next = inner_arg;
+                    inner_tail->next = arg;
                 else
-                    fn_type->elem = inner_arg;
-                inner_tail = inner_arg;
+                    inner_arg = arg;
+                inner_tail = arg;
                 if (cur.type == COMMA) {
                     gettoken();
                     continue;
@@ -316,6 +442,8 @@ prmFnPtr(struct type *param_type, unsigned short *namep)
             }
             expect(RPAR, ER_D_FA);
             // Result: pointer to function type
+            fn_type = fnType(param_type, inner_arg, 0);
+            freeNameList(inner_arg);
             param_type = getType(TF_POINTER, fn_type, 0);
         } else {
             // Just (*) without function params - pointer type
@@ -443,27 +571,22 @@ prmDecl(void)
 
 /*
  * The parameter list of a fresh declaration, cur just past the
- * opening LPAR.  Builds and returns the function type.
+ * opening LPAR.  Builds the canonical function type and hands back
+ * the named entries, which a definition's body binds.
  */
 struct type *
-fnParams(struct type *prefix)
+fnParams(struct type *prefix, struct name **paramsp)
 {
-    struct type *suffix;
     struct name *arg, *param_tail;
 
-    // Create a new function type (don't use getType() which caches types)
-    // Function types need unique instances because we modify elem list
-    suffix = (struct type *)permalloc(sizeof(*suffix));
-    suffix->flags = TF_FUNC;
-    suffix->sub = prefix ? prefix : inttype;
-
+    *paramsp = NULL;
     param_tail = NULL;
     while (cur.type != RPAR && cur.type != E_O_F) {
         // Check for variadic ...
         if (cur.type == ELLIPSIS) {
             gettoken();
-            suffix->flags |= TF_VARIADIC;
-            break;  // exit parameter loop
+            expect(RPAR, ER_D_FA);
+            return fnType(prefix ? prefix : inttype, *paramsp, 1);
         }
         arg = prmDecl();
         if (!arg)
@@ -472,7 +595,7 @@ fnParams(struct type *prefix)
         if (param_tail) {
             param_tail->next = arg;
         } else {
-            suffix->elem = arg;
+            *paramsp = arg;
         }
         param_tail = arg;
 
@@ -487,7 +610,7 @@ fnParams(struct type *prefix)
         }
     }
     expect(RPAR, ER_D_FA);
-    return suffix;
+    return fnType(prefix ? prefix : inttype, *paramsp, 0);
 }
 
 /*
@@ -587,9 +710,20 @@ skipParams(struct name *nm, struct type *prefix)
      * it bit them silently.
      */
     if (needsFuncSfx(nm)) {
-        suffix = (struct type *)permalloc(sizeof(*suffix));
-        suffix->flags = TF_FUNC;
-        suffix->sub = prefix ? prefix : inttype;
+        /*
+         * Build the real signature, not a bare one.  The type is
+         * interned and the parameter entries are freed immediately,
+         * so the reason this used to skip the list - building it
+         * again would only leak - no longer holds.  A local function
+         * pointer that carries no signature cannot be checked against
+         * anything, and the call through it picks its convention from
+         * a signature nobody wrote.
+         */
+        struct name *params;
+
+        suffix = fnParams(prefix ? prefix : inttype, &params);
+        freeNameList(params);
+        return suffix;
     }
     while (pdepth && cur.type != E_O_F) {
         if (cur.type == LPAR)
@@ -755,6 +889,7 @@ struct name *
 declare(struct type **btp, unsigned char struct_elem)
 {
     struct name *nm;
+    struct name *params;
     struct type *t, *prefix, *suffix, *rt;
     unsigned long i;
     unsigned long dims[MAXDIM];
@@ -769,6 +904,7 @@ declare(struct type **btp, unsigned char struct_elem)
 
     paren = 0;
     suffix = 0;
+    params = 0;
 
     nm = 0;
 
@@ -866,7 +1002,7 @@ declare(struct type **btp, unsigned char struct_elem)
         if (phase == 2)
             suffix = skipParams(nm, prefix);
         else
-            suffix = fnParams(prefix);
+            suffix = fnParams(prefix, &params);
     }
 
     if ((cur.type != ASSIGN) && (cur.type != BEGIN) &&
@@ -878,6 +1014,8 @@ declare(struct type **btp, unsigned char struct_elem)
         nm = 0;
     }
     if (!nm) {
+        if (params)
+            freeNameList(params);
         return 0;
     }
 
@@ -1065,40 +1203,61 @@ declare(struct type **btp, unsigned char struct_elem)
              * void (*signal(args))(args2).  The recursion produced
              * fn(args) returning an incomplete pointer; this level's
              * (args2) completes it: return type = ptr -> fn(args2).
-             * nm->type is a unique permalloc'd function type, so
-             * plugging its sub is safe (never a cached type).
+             * The type is interned, so its sub cannot be plugged;
+             * rebuild the signature with the completed return.
              */
-            nm->type->sub = getType(TF_POINTER, suffix, 0);
+            nm->type = fnWithReturn(nm->type,
+                getType(TF_POINTER, suffix, 0));
         } else {
             nm->type = suffix;
+            /*
+             * This is the declaration's own signature; keep the
+             * parameter names for the body, if one follows.  Only
+             * phase 1 parses them - a phase 2 walk of a definition
+             * reuses the entry and must not replace the names the
+             * body is about to bind.
+             */
+            if (phase == 1) {
+                fnparamsSet(nm, params);
+                params = 0;
+            }
         }
+    }
+    if (params) {
+        freeNameList(params);
+        params = 0;
     }
 
     /*
-     * A function redeclared as returning something else.
+     * Two declarations of a name.
      *
-     * An unknown name called as a function is an int-returning one -
-     * that is the language, and pfxSym says so.  What is not allowed
-     * is for a later declaration to disagree, and nothing checked:
-     * the entry was reused and its type quietly overwritten, so
-     *
-     *	caller() { return f() + 1; }	implies int f()
-     *	long f() { ... }
-     *
-     * compiled without a word, the caller reading a long return as an
-     * int and taking HL for the whole of it.
-     *
-     * Return type only.  compatFnTyp compares parameter lists too and
-     * is too strict to use here: a K&R declaration names no parameters
-     * - "extern short adds();" ahead of "short adds(a, b)" - and the
-     * two are meant to agree.  It is the return type that decides how
-     * a call site reads the answer, and the return type that was being
-     * silently replaced.
+     * The return type was checked and the parameter list was not:
+     * compatFnTyp compares both and was thought too strict, because a
+     * K&R declaration names no parameters - "extern short adds();"
+     * ahead of "short adds(a, b)" - and the two are meant to agree.
+     * But silence is not disagreement.  fnCompatible() gives an empty
+     * parameter list every signature and compares the stated ones; a
+     * stated list that disagrees is a hard error, because the two
+     * declarations choose different argument and return conventions.
      */
     if (redeclOld && nm->type) {
         if ((nm->type->flags & TF_FUNC) && (redeclOld->flags & TF_FUNC)) {
-            if (!sameRet(redeclOld->sub, nm->type->sub))
+            /*
+             * Two prototypes must state the same signature.  A
+             * definition is compared on the return width alone: its
+             * parameter list is the language's old-style spelling,
+             * often with no type written at all, and the prototype
+             * is the better statement of the contract.  The
+             * function-pointer checks are a different question and
+             * are made at the pointer, where the convention is
+             * chosen.
+             */
+            if (cur.type == BEGIN) {
+                if (!sameRet(redeclOld->sub, nm->type->sub))
+                    gripe(ER_D_RD);
+            } else if (!fnCompatible(redeclOld, nm->type)) {
                 gripe(ER_D_RD);
+            }
         } else if ((nm->type->flags & TF_ARRAY) &&
                    (redeclOld->flags & TF_ARRAY)) {
             /*
@@ -1280,9 +1439,7 @@ parseTypeName(void)
                                           result_type, adims[--andim]);
                 return getType(TF_POINTER, result_type, 0);
             }
-            fn = (struct type *)permalloc(sizeof(*fn));
-            fn->flags = TF_FUNC;
-            fn->sub = result_type;      /* return type */
+            fn = fnType(result_type, 0, 0);
             if (cur.type == LPAR) {
                 unsigned char d = 1;
                 gettoken();

@@ -7,8 +7,15 @@
  */
 
 #include "upm.h"
-#include <fcntl.h>
-#include <unistd.h>
+
+/* the library headers cost c0 heap in a 64K process; name what this file calls */
+extern int open(char *, int, ...);
+extern int close(int);
+extern int read(int, char *, int);
+extern int unlink(char *);
+extern int stat(char *, char *);
+extern int chmod(char *, int);
+extern int rename(char *, char *);
 
 
 /*

@@ -4,9 +4,22 @@
  */
 
 #include "upm.h"
-#include <fcntl.h>
-#include <stdio.h>
-#include <unistd.h>
+
+/* the library headers cost c0 heap in a 64K process; name what this file calls */
+extern int open(char *, int, ...);
+extern int close(int);
+extern int read(int, char *, int);
+extern int creat(char *, int);
+extern int unlink(char *);
+extern int stat(char *, char *);
+extern int access(char *, int);
+extern int rename(struct fcb *);
+extern int dup(int);
+extern int dup2(int, int);
+extern int pipe(int *);
+extern int wait(int *);
+extern int execl(char *, char *, ...);
+extern void _exit(int);
 
 char	*farg1;		/* 0100 - the first CP/M file argument, or 0 */
 char	*farg2;		/* 0102 - the second */
@@ -458,7 +471,7 @@ char *word;
  */
 setsig()
 {
-	signal(7, tint);
+	signal(7, (int)tint);
 	signal(13, 1);
 }
 
@@ -504,7 +517,7 @@ patch()
 	*(char *)0 = 0xC3;
 	*(char **)1 = biospage + 3;
 	*(char *)5 = 0xC3;
-	*(char **)6 = entry;
+	*(char **)6 = (char *)entry;
 
 	/* the SAVE allocator's free list */
 	bfree((struct node *)savebuf, sizeof(savebuf));

@@ -102,7 +102,7 @@ extern UINT16 busheirseg;
  */
 UINT8
 busget(func)
-    INT16 *(func) ();
+    INT16 (*func) ();
 {
     di();
     if (busmaster != 0 && busmaster != func) {  /* someone else has it */
@@ -127,7 +127,7 @@ busget(func)
  */
 UINT8
 busgive(func)
-    INT16 *(func) ();
+    INT16 (*func) ();
 {
     di();
     if (busheir) {              /* there is an heir */

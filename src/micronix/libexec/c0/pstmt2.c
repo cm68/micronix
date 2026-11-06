@@ -89,6 +89,22 @@ stRet2(void)
     if (e1 && e1->type && (e1->type->flags & TF_AGGREGATE) &&
         !(e1->type->flags & (TF_POINTER | TF_ARRAY | TF_FUNC)))
         gripe(ER_E_AG);
+    /*
+     * A function pointer returned for a different signature is the
+     * same wrong call as one assigned to the wrong variable.
+     */
+    if (e1 && curFunc && curFunc->type) {
+        struct type *fa, *fb;
+        int nullp;
+
+        fa = fnUnder(curFunc->type->sub);
+        fb = fnUnder(e1->type);
+        nullp = (e1->flags & E_CONST) && e1->v == 0;
+        if (fa || fb) {
+            if (!nullp && (!fa || !fb || !fnCompatible(fa, fb)))
+                gripe(ER_E_FT);
+        }
+    }
     /* Emit: RETURN has_value [expr] */
     e1 = foldTree(e1);
     emit1(RETURN);

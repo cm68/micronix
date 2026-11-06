@@ -304,8 +304,33 @@ parseExpr(unsigned char pri)
         /* Determine result type */
         if (e->right) {
             if (is_assignment && assign_type) {
-                if (!ptrcompat(assign_type, e->right->type))
+                struct type *fa, *fb;
+                int nullp, intscalar;
+
+                fa = fnUnder(assign_type);
+                fb = fnUnder(e->right->type);
+                nullp = (e->right->flags & E_CONST) && e->right->v == 0;
+                intscalar = assign_type && assign_type->size > 0 &&
+                    !(assign_type->flags &
+                      (TF_POINTER | TF_ARRAY | TF_FUNC | TF_AGGREGATE));
+                /*
+                 * A function pointer is a promise about the calling
+                 * convention: which register the first argument
+                 * rides in and where the answer comes back.  A
+                 * signature that does not match is not a loose
+                 * assignment; it is a wrong call waiting to happen.
+                 *
+                 * A bare function name assigned to an integer is its
+                 * address, which is how this system's signal() takes
+                 * a handler and how ddt-style code stores vectors.
+                 */
+                if (fa || fb) {
+                    if (!nullp && !(fb && !fa && intscalar) &&
+                        (!fa || !fb || !fnCompatible(fa, fb)))
+                        gripe(ER_E_FT);
+                } else if (!ptrcompat(assign_type, e->right->type)) {
                     gripe(ER_E_PT);
+                }
                 e->type = assign_type;
             }
             else if (IS_CMPLOG(op))

@@ -41,6 +41,7 @@ extern void panic(UINT8 *);
 extern void irelse(struct inode *);
 extern void ovlplaceall(void);
 extern UINT8 intr_attach(void);
+extern INT8 intr_attached(UINT16);
 
 /*
  * resident data, defined in main_data.c (and malloc.c / con.c)
@@ -159,6 +160,14 @@ main()
      * it costs no resident space; a unit with nothing behind it does not
      * answer, and the driver's watchdog turns that silence into an error
      * in a couple of seconds.
+     *
+     * Enumerate only controllers that answered their interrupt probe.
+     * "No card" and "no drive" are different questions, and the tickle
+     * has already answered the first: a card that is not in the machine
+     * raised no line and is not in intrseg[].  Reading a unit through a
+     * controller that is not there would only report the watchdog timing
+     * out, which is not news about a drive.  Drivers that declare no
+     * probe at all return -1 and are still enumerated.
      */
     {
         struct ovlhdr *h;
@@ -166,7 +175,8 @@ main()
         UINT8 nm[12];
 
         for (i = 1; i < nbdev; i++)
-            if (biosw[i].strat != &nodev && bdevseg[i]) {
+            if (biosw[i].strat != &nodev && bdevseg[i] &&
+                intr_attached(bdevseg[i]) != 0) {
                 h = ovlbmap(i);
                 if (h && h->ndrv) {
                     for (j = 0; j < 12; j++)
@@ -407,8 +417,8 @@ pinit()
     u.p->pri = PRISWAP;
     u.p->nice = 128;
     u.p->pid = 0;
-    u.p->slist[SIGTINT] = 1;    /* ignore record-available signal */
-    u.p->slist[SIGBACK] = 1;    /* ignore backgrounding signal */
+    u.p->slist[SIGTINT] = (UINT16 (*)())1;    /* ignore record-available signal */
+    u.p->slist[SIGBACK] = (UINT16 (*)())1;    /* ignore backgrounding signal */
     copy("swap", u.p->args, 5);
 
     for (i = 0; i < 17; i++) {  /* memory map */

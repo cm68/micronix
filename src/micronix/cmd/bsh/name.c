@@ -8,8 +8,14 @@
  */
 
 #include	"defs.h"
-#include <unistd.h>
-#include <stdlib.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+extern long lseek(unsigned char, long, int);
+extern int dup(int);
+VOID free(BLKPTR);
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+VOID free(BLKPTR);
 
 
 PROC BOOL	chkid(STRING);

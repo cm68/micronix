@@ -23,9 +23,16 @@
 #define	SIGINT	1		/* control-C */
 #endif	unix
 
-#define	SIG_DFL	((void (*)(int))0)	/* default action is to exit */
-#define	SIG_IGN	((void (*)(int))1)	/* ignore them */
+#define	SIG_DFL	0		/* default action is to exit */
+#define	SIG_IGN	1		/* ignore them */
 
-extern void (*	signal(int, void (*)(int)))(int);
+/*
+ * The handler here is an int, not a function pointer.  libunix's
+ * signal() keeps the address in a short and the trampolines call it;
+ * a function name in an argument is an address, and that is the
+ * calling convention this system has.  The POSIX spelling was a
+ * fiction that never matched the body.
+ */
+extern short	signal(int, short);
 
 /* vim: set tabstop=4 shiftwidth=4 noexpandtab: */

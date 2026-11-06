@@ -262,52 +262,72 @@ void emitS(char *s)
  * the heap instead rides alongside the symbol table and returns it all
  * at exit.
  */
-#define INMAX   128
-#define INBUF   1024
-static char *inbuf;
-static char **iname;
-static unsigned short *iid;
+#define ITMAX0  16
+#define ITBUF0  176
+
+struct iblock {
+    struct iblock *next;
+    unsigned short max;     /* entries in this block */
+    unsigned short n;       /* entries used */
+    unsigned short used;    /* name bytes used */
+    unsigned short bufsz;
+};
+
+static struct iblock *ithead;
+static struct iblock *ittail;
 static unsigned short nicnt;
-static unsigned short inused;
 
 extern char *galloc(unsigned int size);	/* error.c: calloc, fatal on OOM */
 
+#define ITIDS(b)    ((unsigned short *)((char *)(b) + sizeof(struct iblock)))
+#define ITOFFS(b)   ((unsigned short *)((char *)(b) + sizeof(struct iblock) + 2 * (b)->max))
+#define ITBYTES(b)  ((char *)(b) + sizeof(struct iblock) + 4 * (b)->max)
+
 /*
- * Allocate the interning table on the first static: a file with no
- * function-scope statics (lower.c has none) never pays for it.
+ * A block of entries and their name bytes, one allocation.  Blocks are
+ * chained rather than a single table grown by copying: the copy holds
+ * the old table and the new at once, and on the machine that is the
+ * allocation that does not fit.  A lookup walks the chain - there are
+ * a few blocks, and the walk is once per emitted static.
  */
-static void
-internInit(void)
+static struct iblock *
+itblock(unsigned short need)
 {
-	if (inbuf)
-		return;
-	inbuf = galloc(INBUF);
-	iname = (char **)galloc(INMAX * sizeof(char *));
-	iid = (unsigned short *)galloc(INMAX * sizeof(unsigned short));
+    struct iblock *b;
+
+    b = (struct iblock *)galloc(sizeof(struct iblock) + 4 * ITMAX0 +
+        (need > ITBUF0 ? need : ITBUF0));
+    b->next = 0;
+    b->max = ITMAX0;
+    b->bufsz = (need > ITBUF0 ? need : ITBUF0);
+    if (ittail)
+        ittail->next = b;
+    else
+        ithead = b;
+    ittail = b;
+    return b;
 }
 
 unsigned short
 intern(char *name)
 {
-	unsigned short i;
-	int len;
+    struct iblock *b;
+    unsigned short i, len;
 
-	internInit();
-	for (i = 0; i < nicnt; i++)
-		if (strcmp(iname[i], name) == 0)
-			return iid[i];
-	len = strlen(name) + 1;
-	if (nicnt >= INMAX || inused + len > INBUF) {
-		/* raw fd, not fprintf(stderr): the stdio _iob pulls
-		 * cleanup.o and collides with pass1's _cleanup stub */
-		write(2, "c0: too many distinct names\n", 28);
-		exit(1);
-	}
-	iname[nicnt] = inbuf + inused;
-	strcpy(iname[nicnt], name);
-	inused += len;
-	iid[nicnt] = nicnt + 1;
-	return iid[nicnt++];
+    for (b = ithead; b; b = b->next)
+        for (i = 0; i < b->n; i++)
+            if (strcmp(ITBYTES(b) + ITOFFS(b)[i], name) == 0)
+                return ITIDS(b)[i];
+    len = strlen(name) + 1;
+    b = ittail;
+    if (!b || b->n >= b->max || b->used + len > b->bufsz)
+        b = itblock(len);
+    ITOFFS(b)[b->n] = b->used;
+    strcpy(ITBYTES(b) + b->used, name);
+    b->used += len;
+    ITIDS(b)[b->n] = ++nicnt;
+    b->n++;
+    return nicnt;
 }
 
 /*
@@ -323,6 +343,7 @@ namWrite(char *o1)
 {
 	static char nf[256];
 	unsigned char two[2];
+	struct iblock *b;
 	int n, fd, i;
 
 	if (!nicnt)
@@ -337,8 +358,10 @@ namWrite(char *o1)
 	two[0] = nicnt & 0xff;
 	two[1] = (nicnt >> 8) & 0xff;
 	write(fd, (char *)two, 2);
-	for (i = 0; i < nicnt; i++)
-		write(fd, iname[i], strlen(iname[i]) + 1);
+	for (b = ithead; b; b = b->next)
+		for (i = 0; i < b->n; i++)
+			write(fd, ITBYTES(b) + ITOFFS(b)[i],
+			    strlen(ITBYTES(b) + ITOFFS(b)[i]) + 1);
 	close(fd);
 }
 

@@ -37,7 +37,7 @@ struct sgtty {
 #define TIOCSETA 0x7402         /* set it */
 
 extern INT16 ioctl(int, int, char *);
-extern INT16 stty(int, struct sgtty *), gtty(int, struct sgtty *);      /* the library wrappers, lib/libc */
+extern int stty(int, char *), gtty(int, char *);      /* the library wrappers, lib/libc */
 
 /*
  * tty mode bits - note that micronix does not use most of this, and in

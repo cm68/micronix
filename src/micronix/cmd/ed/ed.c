@@ -75,8 +75,8 @@ char	*linebp;
 int	ninbuf;
 int	io;
 int	pflag;
-int	(*oldhup)();
-int	(*oldquit)();
+int	oldhup;
+int	oldquit;
 int	vflag	= 1;
 
 
@@ -139,13 +139,13 @@ char **argv;
 {
 	register char *p1, *p2;
 	extern int onintr(void), quit(), onhup();
-	int (*oldintr)();
+	int oldintr;
 
 	oldquit = signal(SIGQUIT, SIG_IGN);
 	oldhup = signal(SIGHUP, SIG_IGN);
 	oldintr = signal(SIGINT, SIG_IGN);
 	if (signal(SIGTERM, SIG_IGN) == SIG_DFL)
-		signal(SIGTERM, quit);
+		signal(SIGTERM, (void (*)(int))quit);
 	argv++;
 	while (argc > 1 && **argv=='-') {
 		switch((*argv)[1]) {
@@ -175,9 +175,9 @@ char **argv;
 	tfname = mktemp("/tmp/eXXXXX");
 	init();
 	if ((int)oldintr != SIG_IGN)
-		signal(SIGINT, onintr);
+		signal(SIGINT, (void (*)(int))onintr);
 	if ((int)oldhup != SIG_IGN)
-		signal(SIGHUP, onhup);
+		signal(SIGHUP, (void (*)(int))onhup);
 	setjmp(savej);
 	commands();
 	quit();
@@ -585,7 +585,7 @@ exfile()
 
 onintr()
 {
-	signal(SIGINT, onintr);
+	signal(SIGINT, (void (*)(int))onintr);
 	putchr('\n');
 	lastc = '\n';
 	error(Q);
@@ -781,7 +781,8 @@ int (*f)();
 
 callunix()
 {
-	register (*savint)(), pid, rpid;
+	register int savint;
+	register int pid, rpid;
 	int retcode;
 
 	setnoaddr();

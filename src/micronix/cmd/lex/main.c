@@ -23,8 +23,8 @@ char **argv; {
 	register int i;
 	errorf = stderr;
 #ifdef DEBUG
-	signal(10,buserr);
-	signal(11,segviol);
+	signal(10,(void (*)(int))buserr);
+	signal(11,(void (*)(int))segviol);
 #endif
 	while (argc > 1 && argv[1][0] == '-' ){
 i = 0;

@@ -8,7 +8,9 @@
  */
 
 #include	"defs.h"
-#include <stdlib.h>
+
+/* the library header costs c0 heap in a 64K process; name what this file calls */
+VOID free(BLKPTR);
 
 PROC STRING *copyargs(STRING [], int);
 LOCAL DOLPTR	dolh;

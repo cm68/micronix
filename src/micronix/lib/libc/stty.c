@@ -12,7 +12,7 @@
 
 stty(fd, vec)
     int fd;
-    struct sgtty *vec;
+    char *vec;
 {
     return (ioctl(fd, TIOCSETA, vec));
 }

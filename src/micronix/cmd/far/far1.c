@@ -171,7 +171,7 @@ arglist()
 }
 
 main(ac, av)
-    UINT ac;
+    int ac;
     char **av;
 {
     init(ac, av);

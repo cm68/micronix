@@ -177,36 +177,40 @@ cmajor(dev)
 /*
  * Do-nothing entry for biosw or ciosw
  */
-void
+INT16
 nulldev()
 {
+    return (0);
 }
 
 /*
  * Error entry for biosw or ciosw
  */
-void
+INT16
 nodev()
 {
     u.error = ENXIO;
+    return (0);
 }
 
 /*
  * An ioctl the device does not have.
  */
-void
+INT16
 noioctl()
 {
     u.error = ENOTTY;
+    return (0);
 }
 
 /*
  * Null write. Pretend to write all characters.
  */
-void
+INT16
 nullwrite()
 {
     u.count = 0;
+    return (0);
 }
 
 /*

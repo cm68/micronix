@@ -78,7 +78,7 @@ char **argv;
 
 	setbuf(stdout, obuf);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
-		signal(SIGINT, onintr);
+		signal(SIGINT, (void (*)(int))onintr);
 	lastarg = &argv[argc-1];
 	for (nfdone=0; argc>1; argc--) {
 		argv++;

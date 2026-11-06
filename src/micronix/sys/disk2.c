@@ -115,7 +115,7 @@ struct info
  */
 static struct info *d2info = 0; /* the drive of the request in flight */
 static struct buf *d2buf = 0;   /* the request in flight */
-static INT16 (*d2intr) () = 0;    /* the phase the op-done interrupt resumes */
+static void (*d2intr) () = 0;    /* the phase the op-done interrupt resumes */
 static UINT8 retry = 0;         /* number of retries so far */
 static UINT8 curdrv = -1;       /* number of current drive */
 static UINT8 d2dead = 0;        /* ticks the request has been in flight */
@@ -133,7 +133,7 @@ struct buf * bread(UINT16, UINT16);
 INT16 d2cyl(UINT16, UINT16, UINT16, UINT16, UINT16);
 static void d2load(UINT16, UINT16, UINT16);
 static void d2sc(struct buf *, INT16);
-static void d2settle(INT16 (*)());
+static void d2settle(void (*)());
 INT16
 disk2open(dev, mode)
     UINT16 dev, mode;
@@ -252,7 +252,7 @@ disk2strat(b)
 void
 d2start()
 {
-    if (!busget(&d2start))
+    if (!busget((INT16 (*)())&d2start))
         return;
     d2begin();
 }
@@ -371,7 +371,7 @@ d2step(dir, n)
  */
 static void
 d2settle(cont)
-    INT16 (*cont) ();
+    void (*cont) ();
 {
     d2intr = cont;
     out(D2_CTL, D2_ATTN | D2_RUN | (curdrv & 3));
@@ -556,7 +556,7 @@ d2error()
 INT16
 disk2int()
 {
-    INT16 (*f) ();
+    void (*f) ();
 
     f = d2intr;
     if (f == 0)

@@ -34,7 +34,7 @@ assignFrmOff(struct name *func)
 
 	/* Parameters: positive offsets starting at +4 (skip saved FP + ret addr) */
 	off = 4;
-	for (p = func->type->elem; p; p = p->next) {
+	for (p = fnparamsGet(func); p; p = p->next) {
 		if (p->type->size == 0)
 			continue;  /* skip void */
 		if (p->id) {

@@ -410,7 +410,7 @@ djint()
 		return;
 	}
 
-	if (busget(&djint) == 0) {  /* can't get bus yet. See mw.c */
+	if (busget((INT16 (*)())&djint) == 0) {  /* can't get bus yet. See mw.c */
 		ei();
 		return;
 	}
@@ -444,7 +444,7 @@ djint()
 			if (!qtail)
 				goto request;
 
-			if (busgive(&djint) || !busget(&djint)) {
+			if (busgive((INT16 (*)())&djint) || !busget((INT16 (*)())&djint)) {
 				inservice = 0;
 				ei();
 				return;
@@ -897,7 +897,7 @@ busplease()
 {
 	di();
 
-	if (!busget(busready))
+	if (!busget((INT16 (*)())busready))
 		sleep(busready, DJPRIORITY);
 	else
 		ei();
