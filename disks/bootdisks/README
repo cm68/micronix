@@ -10,10 +10,19 @@ at the top of the tree builds three, here:
 	d5ds.img	5 1/4, double sided	40 cyl, 2 heads, 10 x 512	 760 blocks
 
 They are build output, regenerated from the tree the way a .vol is, and
-.gitignore drops them; the script that makes them is the only real file
-in this directory.  Nothing here is the distributed standalone: see
-REGEN.md in ../hdinstall for what patching that costs and for what is left
-open there.
+.gitignore drops them.  create_bootdisk is the script that makes them;
+manifest reads one back.  Nothing here is the distributed standalone:
+see REGEN.md in ../hdinstall for what patching that costs and for what
+is left open there.
+
+What one carries, without booting it:
+
+	./manifest d5ds.img
+
+lists every path, its size and its device numbers, and the blocks used
+and free.  It reads the image, not the build script, so it is the
+answer to "what is actually on this diskette", and the block counts
+below come from it.
 
 The five inch single sided medium is deliberately absent.  194 K is not
 a running system, and a diskette that can only be a data carrier is not
@@ -45,125 +54,160 @@ level 1 rom the chain starts from are the simulator's own defaults, and
 what is on it, and why so little
 --------------------------------
 
-The install diskette is not a tool bag.  hdcdmainit mkfs's a hard disk,
-mounts it on /b and copies the running system across with cptree, so
-what has to fit is the smallest micronix that can do that, and the
-medium it has to fit in is 760 blocks:
+The install diskette is one article for every controller: it carries
+hdinit, the parameterized install script, and the level 2 + level 3
+boot of each controller.  hdinit takes the controller as its argument,
+so one diskette installs onto any of them.  It is not a tool bag -
+hdinit mkfs's a hard disk, mounts it on /b and copies the running
+system across with cptree - so what has to fit is the smallest micronix
+that can do that.  The five inch medium is the tight one:
 
 	/micronix	the kernel, 128 K (131072 bytes), 257 blocks
 			with its indirect block
-	/bootmw.bin	the controller's 4k level 2 boot the install writes
-			into the new drive's boot area - mkfs.h's DEFBOOT,
-			read from the diskette that is running the install.
-			It is bootimg for an hdcdma target, and the target's
-			own image for the others
-	/hdcdmainit	the install script, 382 bytes
-	/.sh		the shell's path, 19 bytes
-	/bin		the thirteen commands an install needs:
+	/boot		the four controllers' level 2 + level 3 boots,
+			about 4k each - bootmw.bin, bootide.bin,
+			bootncr.bin and boothdca.bin - 32 blocks
+	/hdinit		the install script, 1619 bytes
+	/bin		the fourteen commands an install needs:
 			sh rm mkfs mount umount chmod cptree mknod
-			setdev ln sync echo format halt
+			setdev ln sync echo format halt.  sh is the real
+			Bourne shell, because hdinit uses case and
+			parameters; the old csh-like sh is not here
 	/dev		every node in ../../src/micronix/dev/devlist,
 			including kmem; the directory is three blocks
-	/etc		the config and init, 13 files, 57 blocks
-	/b /f /tmp	the mount points hdcdmainit and finstall use, and a
-			scratch directory
+	/etc		the config and init, thirteen files
+	/b /f /tmp	the mount points the install uses, and a scratch
+			directory
 
-That is 532 of the 760 blocks on the five inch, leaving 228 free.  The
-eight inch carries the same kernel and the same install set; it is not
-a bigger toolkit, it is the same article on a medium with more room.
-
-format low-level formats a hard disk on any of the controllers - the
-HD-DMA, the HDCA, the 5380 or the IDE card - or a DJ-DMA diskette,
-which is done to the drive before the diskette installs onto it.  It is
-one binary where there used to be four, and the install diskette
-carries it: a drive has to be laid down before mkfs can read its
-label, and the operator runs format with the model or geometry the
-drive is.  cat and the operator commands are not needed by an install.
-chg and fdj are what makes a *booted* diskette able to make diskettes,
-with "chg djdma:1 blank:dist-1.img; fdj format djdma:1; mount it; copy
-data; umount" and no host tool at all.  See sys/MEDIACHG.md.  They are
-on the maintenance diskette, with the repair tools.
+The five inch image uses 589 of its 760 blocks and leaves 171 free.
+The eight inch carries the same set in 626 of 2250 on the double sided
+medium, and in 599 of 1125 on the single sided one.  Run manifest for
+the live numbers: the binaries and the init change, and the free count
+changes with them.
 
 fsck is not on the install diskette.  An install makes a new
 filesystem; checking the one it just made is not a step that can repair
 anything, and the block it costs is better spent on the formatter.
 label is not there either: format writes the label and its prototype
 table.  The tools for repairing an existing hard disk are on the
-maintenance diskette:
+maintenance diskette, below.
 
-	./create_bootdisk -m d8ds /tmp/maintenance.img hdcdma
+the formatter: format
+---------------------
 
-which is the same boot and root with fsck, label, format and the file
-tools, and without the install script.  The five inch maintenance set
-leaves out login and the diskette loop; it is still fsck, label,
-format, mount and the file tools, and it fits.
+The install diskette carries one formatter binary where it used to
+carry hdformat, mwformat and scsiformat.  format reads the controller
+from the device node - the high byte of the node's device number is the
+major - so the same command serves the HD-DMA, the HDCA, the 5380 SCSI
+adapter, the IDE card and the DJ-DMA floppy.  For the four hard disk
+controllers the install path passes the drive's whole-disk slice and
+its shape:
 
-So the install knapsack is exactly the install tooling, with room to
-spare on both media.  The maintenance diskette is the other article:
-fsck, label, format, the file tools and the diskette loop.
+	format -m m40 /dev/hd0c			the HD-DMA
+	format -m m26 /dev/hdac			the HDCA
+	format -c 392 -h 16 -s 63 /dev/scsi0c	the SCSI target
+	format -c 392 -h 16 -s 63 /dev/ide0c	the IDE card
+
+-m names a model from the controller's own table: m5, m10, m16, m32
+and m40, and the xt, st, ms, tm, q, wren and mp MFM drives on the
+HD-DMA; m10, m20 and m26 on the HDCA.  m10 is the Seagate ST-412 on one
+and the Discus M10 on the other, which is why the table is chosen by
+the controller and not by the name alone.  -c, -h and -s are cylinders,
+heads and 512-byte blocks per track, and override a model or a label.
+The HD-DMA also takes -P precomp, -l lowcur, -d step and -k skew, and
+-t/-e for a single cylinder or head; -p is the HDCA's header probe.
+An option the controller has no use for is an error, not ignored.
+
+format writes the label as well as the medium: the geometry, the first
+sector the controller numbers from - one on the HDCA, zero everywhere
+else - the drive's timing on the HD-DMA, and the prototype slice table.
+Prototype a is the biggest filesystem that fits, b is 1M of swap, and d
+through h are further filesystems.  A low-level format has just erased
+the label with everything else it wrote, so the label is written after;
+a format that writes only headers, or a card with no format command at
+all, keeps a carved table that was already there.
+
+The IDE card has no format command in this tree: its format writes the
+label and the prototype table and nothing else, so the drive must
+already be one the card understands.  The other three lay the medium
+down.  See format(1).
 
 install, from the diskette
 --------------------------
 
-Boot it, wait for the welcome and then for the shell's "#".  The drive
-must carry a label before mkfs can read its geometry; if it does not,
-format lays down the geometry and the prototype slice table.  For an
-HD-DMA drive whose model is m40:
+Boot it, wait for the shell's "#", and run hdinit with the controller
+and, if the drive does not already carry a label, the format options
+for its geometry:
 
-	format -m m40 /dev/hd0c
+	sh hdinit hdcdma -m m40
+	sh hdinit ide -c 392 -h 16 -s 63
+	sh hdinit scsi -c 392 -h 16 -s 63
+	sh hdinit hdca -m m26
 
-The IDE and SCSI cards are given the geometry with -c, -h and -s, and
-the HDCA has its own models; a drive that already has a label keeps the
-geometry in it and can skip this.
+The controller is hdcdma, ide, scsi (or ncr) or hdca.  Everything after
+it is passed to format with the drive's whole-disk node; with no
+options, format is not run and the drive must already carry a label.
+The controller is also what picks the device, the kernel major and the
+boot mkfs writes below slice a:
 
-Then type
+	hdcdma	/dev/hd0a	/dev/hd0c	3	/boot/bootmw.bin
+	ide	/dev/ide0	/dev/ide0c	4	/boot/bootide.bin
+	scsi	/dev/scsi0	/dev/scsi0c	5	/boot/bootncr.bin
+	hdca	/dev/hda	/dev/hdac	1	/boot/boothdca.bin
 
-	source hdcdmainit
+hdinit then mkfs's slice a with the controller's boot (-i) and -f,
+mounts it on /b, and copies the whole running system across with
+cptree.  It makes /b/dev/root and /b/dev/swap the drive's slice a and
+b nodes - minor 0 and 32 under the controller's major - and points
+/b/micronix at them with setdev.  It removes the install's own files
+from the copy - hdinit, the four boots, the plain signon - and links
+the signon2 the diskette carries as /b/etc/signon.  Then it unmounts,
+syncs and prints "Disk initialization complete."
 
-which mkfs's /dev/hd0a, mounts it on /b, copies the system across with
-cptree, points the copy's kernel at the drive with setdev, relinks
-/dev/root, and unmounts.  It prints "Disk initialization complete."
-when it is done, and cptree is copying a filesystem through a simulated
-Z80, so give it time.
+The boot is written by mkfs from the /boot file hdinit names, so the
+drive boots when hdinit is done; there is no host hardboot step.  The
+boots live in /boot and not in the root because the floppy's own level
+3 offers every large file in the root and would stop at "File to
+boot:".
 
-The drive's boot area is below slice a and a guest mkfs leaves it to the
-host, so write it first - for an hdcdma drive:
+cptree is copying a whole filesystem through a simulated Z80, so give
+it time.
 
-	mnix hardboot <volume> src/micronix/stand/boot/bootimg
+the maintenance diskette
+------------------------
 
-Then boot the drive:
+	./create_bootdisk -m d8ds /tmp/maintenance.img
 
-	./d1 -c 0x0c hdcdma0:<volume>
+-m before the medium makes the other article: the same boot and root,
+with the repair tools and the diskette-to-diskette loop, and without
+hdinit.  It boots to the same shell; nothing runs automatically.
 
-which is the HD-DMA path with the monitor skipped - the configuration
-switch 0x0c everything used to be written down as.  See ../hdinstall
-for the volume to point it at and for the rest of that run.
+The eight inch set is the install set plus fsck, label, login, the file
+tools (ls, cp, mv, cat, mkdir), chg and fdj: 881 of 2250 blocks.  It
+repairs an existing drive - fsck and label check and rewrite the
+filesystem and label, format lays a drive down again, mount and the file
+tools copy files on and off - and chg and fdj make and move diskettes.
 
-"source hdcdmainit" rather than "hdcdmainit", because the console
-shell's path is /bin and /usr/bin and the script is in the root
-directory.  source is a builtin and reads the file where you name it.
-
-The diskette is one article for one controller.  create_bootdisk also
-takes ide, scsi and hdca, and each carries that controller's init
-script and its own 4k level 2 boot under /bootmw.bin:
-
-	./create_bootdisk d8ds /tmp/d8ds-ide.img ide
-
-The boot area is below slice a, so the installed drive boots only after
-the boot image is written there.  A guest mkfs leaves that to the host,
-which is what "mnix hardboot" does; the matrix harness does it after
-the install boot, before it boots the drive.
+The five inch maintenance article carries the repair set but not the
+operator login, the diskette loop or cptree: fsck, label, format,
+mount, the file tools and the shell, 733 of 760 blocks with 27 free.
+Everything it carries is there for a repair; cptree copies whole trees
+and is a system-making tool, not a repair one.
 
 what is not here
 ----------------
 
-	/.login		rootfiles/.login is "cd /usr/src; make" - the
-			volume's build login, which on a diskette with no
-			sources would only fail
-	era		a Whitesmiths command this tree has never built; the
-			install uses rm -f where the original used it
+	/.login		the shell reads .login and .profile; the
+			diskette has neither, so booting it leaves you
+			at the shell's "#" with nothing run
+	era		a Whitesmiths command this tree has never built;
+			the install uses rm -f where the original used it
 	a compiler, sources, man pages, and the rest of /bin - a system
 	with a hard disk installs those from the media that carry them
+
+The old .sh file is gone too: it was the csh-like shell's startup
+(`path /bin /usr/bin`), and the real shell has that path built in and
+reads .login and .profile instead.
 
 the label, and the format byte that used to be read
 ---------------------------------------------------

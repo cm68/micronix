@@ -2,7 +2,7 @@
 #
 # Make a bootable install diskette.
 #
-#	./create_bootdisk <medium> [<image>] [<target>]
+#	./create_bootdisk [-m] <medium> [<image>]
 #
 # <medium> is one of the three this tree builds for, by the same names
 # stand/boot's FLOPPIES table and mkbootimg use:
@@ -11,14 +11,12 @@
 #	d8ds	8 inch, double sided	77 cyl, 2 heads, 15 x 512, 2250 blocks
 #	d5ds	5 1/4 inch, double sided 40 cyl, 2 heads, 10 x 512, 760 blocks
 #
-# <target> is the controller the diskette installs onto: hdcdma (the
-# Morrow HD-DMA), ide (the 8255/ATA card), scsi (the NCR 5380) or hdca
-# (the Discus M26).  hdcdma by default.  It picks the init script that
-# does the install and the controller's 4k level 2 boot, so a diskette is
-# one article for one controller and the default is what "make
-# bootdisks" builds.  An install onto another controller wants its own:
-#
-#	./create_bootdisk d8ss /tmp/d8ss-ide.img ide
+# The diskette is one article for every controller: it carries hdinit,
+# the parameterized install script, and the level 2 + level 3 boot of
+# each controller - hdcdma, ide, scsi and hdca.  hdinit takes the
+# controller as its argument, so a floppy made here installs onto any of
+# them.  -m makes the maintenance article instead, with the repair tools
+# and no install script.
 #
 # The image is made as <medium>.img in this directory unless the second
 # argument names another path, and it is truncated if it already exists.
@@ -31,9 +29,8 @@
 # device nodes, and the kernel, pointed at the diskette as its own root.
 #
 # What the diskette is for: booting it gives a system whose root is the
-# floppy, off which the target's init script mkfs's a hard disk, copies
-# this whole filesystem onto it with cptree, and points that kernel at
-# the drive.
+# floppy, off which hdinit mkfs's a hard disk, copies this whole
+# filesystem onto it with cptree, and points that kernel at the drive.
 # So the contents are not a tool bag, they are the smallest micronix
 # that can do that - see the knapsack in the README beside this file.
 # Nothing that is only useful on a running system with a hard disk is
@@ -66,11 +63,6 @@ case "$1" in
 -m|--maintenance) maint=1; shift ;;
 esac
 
-# The target is read here, before the boot image below can want it, and
-# not with the other two arguments further down.
-target="$3"
-[ -z "$target" ] && target=hdcdma
-
 mnix="$root/src/tools/mnix"
 imd="$root/src/tools/imd"
 setdev="$root/src/tools/setdev"
@@ -83,31 +75,16 @@ filesystem="$root/filesystem"
 bootdir="$srcdir/stand/boot"
 
 #
-# The hard disk boot the install writes.  The target's init script mkfs's
-# the drive and then reads a boot into the area mkfs reserved for it, out
-# of the file mkfs names by default - /bootmw.bin, on the diskette that is
-# running the install (mkfs.h DEFBOOT).  Without it the drive comes out
-# with a zeroed boot area, which mounts and passes fsck and does not boot,
-# so the file is here or the diskette cannot do the one job it has.
+# The hard disk boots the install writes.  Every one of the five level 3
+# programs has a home here, because hdinit takes the controller as a
+# parameter and one diskette therefore serves every controller.  Each
+# file is a level 2 sector and the level 3 loader it brings in, about
+# 4k: bootimg for the HD-DMA, idebootimg for the IDE card, ncrbootimg
+# for the NCR 5380 and hdcabootimg for the HDCA.  hdinit names the one
+# its controller wants, and mkfs writes it below slice a.
 #
-# One image serves every drive on a controller, because the geometry is
-# not in it.  The label is written by the mkfs the init script runs, on
-# the target machine, out of the drive node - the only thing that knows
-# what the drive is.  So the target names the controller's level 2, and
-# each controller has its own: bootimg for the HD-DMA, idebootimg for
-# the IDE card, ncrbootimg for the NCR 5380 and hdcabootimg for the
-# HDCA.  Each is about 4k, eight blocks of the five inch diskette's
-# twenty-five free.
-#
-case "$target" in
-hdcdma)	hdinit="$bootdir/bootimg" ;;
-ide)	hdinit="$bootdir/idebootimg" ;;
-scsi)	hdinit="$bootdir/ncrbootimg" ;;
-hdca)	hdinit="$bootdir/hdcabootimg" ;;
-*)	echo "$0: $target is not a controller this tree builds for" >&2
-	echo "$0: targets: hdcdma ide scsi hdca" >&2
-	exit 1 ;;
-esac
+BOOTS="bootimg:bootmw.bin idebootimg:bootide.bin \
+	ncrbootimg:bootncr.bin hdcabootimg:boothdca.bin"
 
 #
 # What goes in /bin.  Not a copy of the tree's bin: this is the list the
@@ -118,7 +95,7 @@ esac
 # era is deliberately absent, and no init script calls it: it is a
 # Whitesmiths command this tree has never built, so a diskette that
 # carried the original text would leave the new hard disk's /dev/root
-# pointing at the floppy.  See rootfiles/hdcdmainit.
+# pointing at the floppy.  See rootfiles/hdinit.
 #
 # chg is the way a running diskette reaches the medium in another drive,
 # and fdj the way it formats one, so the two together are what lets a
@@ -153,16 +130,17 @@ MAINTBINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod
 # The five inch maintenance set: the repair tools, without the operator
 # login and the diskette-to-diskette loop, which are what will not fit
 # beside the kernel.  fsck, label, format, mount and the file tools are
-# the repair, and they do fit.
-MAINT5="sh rm mkfs fsck mount umount chmod cptree mknod setdev ln
+# the repair; cptree is a system-copy tool rather than a repair one, and
+# on this medium its 28 blocks are the difference between fitting four
+# controller boots and not.
+MAINT5="sh rm mkfs fsck mount umount chmod mknod setdev ln
 	sync echo halt format label ls cp mv cat mkdir"
 
 medium="$1"
 image="$2"
 if [ -z "$medium" ]; then
-	echo "usage: $0 [-m] <medium> [<image>] [<target>]" >&2
+	echo "usage: $0 [-m] <medium> [<image>]" >&2
 	echo "media: d8ss d8ds d5ds d5soft" >&2
-	echo "targets: hdcdma ide scsi hdca (hdcdma by default)" >&2
 	echo "-m makes the maintenance diskette, not the install one" >&2
 	exit 1
 fi
@@ -208,14 +186,15 @@ if [ ! -f "$bootimg" ]; then
 	echo "$0:   make -C $srcdir/stand/boot djbootimgs" >&2
 	exit 1
 fi
-if [ ! -f "$hdinit" ]; then
-	echo "$0: $hdinit not found - build the boot images first:" >&2
-	echo "$0:   make -C $srcdir/stand/boot bootimgs" >&2
-	exit 1
-fi
-if [ ! -f "$rootfiles/${target}init" ]; then
-	echo "$0: $rootfiles/${target}init not found - there is no install" >&2
-	echo "$0: targets: hdcdma ide scsi hdca" >&2
+for b in $BOOTS; do
+	if [ ! -f "$bootdir/${b%%:*}" ]; then
+		echo "$0: $bootdir/${b%%:*} not found - build the boots:" >&2
+		echo "$0:   make -C $srcdir/stand/boot bootimgs idebootimgs ncrbootimgs hdcabootimgs" >&2
+		exit 1
+	fi
+done
+if [ ! -f "$rootfiles/hdinit" ]; then
+	echo "$0: $rootfiles/hdinit not found - there is no install" >&2
 	exit 1
 fi
 if [ ! -f "$filesystem/etc/init" ]; then
@@ -249,7 +228,11 @@ rm -f "$image.lock" "$image-delta"
 stripped="$tmp-stripped"
 mkdir -p "$stripped/bin" || exit 1
 for f in $BINS; do
-	cp "$filesystem/bin/$f" "$stripped/bin/$f" || exit 1
+	# the real shell, under the system's name; the old csh-like sh is
+	# not what hdinit's parameters and case are written for
+	src="$filesystem/bin/$f"
+	[ "$f" = sh ] && src="$filesystem/bin/bsh"
+	cp "$src" "$stripped/bin/$f" || exit 1
 	"$strip" "$stripped/bin/$f" || exit 1
 done
 set --
@@ -262,12 +245,10 @@ tar -C "$stripped" -c -f "$tmp" "$@" || exit 1
 tar -C "$filesystem" -c -f "$tmp" etc || exit 1
 "$mnix" -f "$image" tar x "$tmp" || exit 1
 
-if [ "$maint" = 1 ]; then
-	tar -C "$rootfiles" -c -f "$tmp" .sh || exit 1
-else
-	tar -C "$rootfiles" -c -f "$tmp" "${target}init" .sh || exit 1
+if [ "$maint" != 1 ]; then
+	tar -C "$rootfiles" -c -f "$tmp" hdinit || exit 1
+	"$mnix" -f "$image" tar x "$tmp" || exit 1
 fi
-"$mnix" -f "$image" tar x "$tmp" || exit 1
 
 # 3. the device nodes, from the source tree's dev/devlist, and the
 # mount points and /tmp, which no tar carried - it archives files, not
@@ -276,6 +257,7 @@ fi
 "$mnix" -f "$image" mkdir /tmp || exit 1
 "$mnix" -f "$image" mkdir /b || exit 1
 "$mnix" -f "$image" mkdir /f || exit 1
+"$mnix" -f "$image" mkdir /boot || exit 1
 while read type major minor name; do
 	case "$type" in
 	''|\#*)	continue ;;
@@ -296,11 +278,16 @@ if [ -f "$kernel" ]; then
 	"$mnix" -f "$image" mknod /dev/root b 2 "$rootmin" || exit 1
 fi
 
-# 5. the hard disk's boot image, under the name mkfs reads by default.
-# It is not the diskette's own boot - that is in the sectors in front of
-# the filesystem and came in with step 1 - but the boot of the drive the
-# install is about to make.
-"$mnix" -f "$image" write "$hdinit" /bootmw.bin || exit 1
+# 5. the hard disk boots, one per controller, under the names hdinit
+# gives mkfs.  They are not the diskette's own boot - that is in the
+# sectors in front of the filesystem and came in with step 1 - but the
+# boots of the drives the install can make.  They live in /boot, not the
+# root, because the floppy's own level 3 offers every large file in the
+# root and would stop at "File to boot:".  hdinit names the one its
+# controller wants and mkfs writes it below slice a.
+for b in $BOOTS; do
+	"$mnix" -f "$image" write "$bootdir/${b%%:*}" "/boot/${b##*:}" || exit 1
+done
 
 # 6. A 1K medium's physical sectors are 1024 bytes, but the raw image
 # built above is 512 byte blocks - the unit mnix writes a filesystem in.
