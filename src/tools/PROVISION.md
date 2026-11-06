@@ -129,22 +129,15 @@ src/tools/hwsim.c; the bit meanings are the simulator's):
 
 | field | bits | values |
 |---|---|---|
-| boot | 0x08 · 0x10 · 0x00 | hdcdma / djdma / hdca·ide — packed only when `boot.monitor` is a 375/447 |
-| nomon | 0x04 | skip the monitor; mon500 reads the same bit as "boot" |
-| console | 0x08 | wb / ss1 — packed when the monitor is not a 375/447; which console the monitor probes first |
+| boot | mon500: 0x08 · 0x10 · 0x20 · 0x40 · 0x80; 375/447: 0x08 · 0x10 · 0x00 | mon500: floppy / hdcdma·disk3 / ide / scsi / hdca·disk2.  375/447: hdcdma / djdma / hdca·ide |
+| nomon | mon500: 0x7c when no `boot.device`; 375/447: 0x04 | boot; for mon500 the usual set plus multiuser |
+| console | none for mon500 | wb / ss1 — checked; mon500 probes the Wunderbus first and the SS1 after |
 | xterm | 0x0700 (3 bits) | which of uart0 / ttyB / ttyC go to xterms |
 | clock | 0x0800 · 0x1000 | 1hz / noclk / normal |
 
-The console bit and the HD-DMA boot bit are the same switch, 5: a
-375/447 reads it as the boot device, so there the boot field owns it.  A
-mon500 reads it as "find the Wunderbus first" (set) or "the SS1 first"
-(clear).  Both boards read 0x100 as "my console in an xterm", so a
-machine with both opens both windows; `console` decides which one the
-monitor and level 2 use.
-
-`boot_vol`'s `-c 0x70c` is `xterm: all` (0x700) + `boot: hdcdma` (0x08)
-+ `nomon` (0x04).  The tool emits one packed `-c` — not `-B`, which
-covers only the boot bits and a later `-c` would override.
+mon500 no longer gives the console a switch bit.  The old switch 5 is now
+the floppy-enable bit; a mon500 profile's `console` is only checked, and
+the monitor's probe order is fixed.
 
 ## The boot chain
 
@@ -165,9 +158,8 @@ controllers and finds a medium — so it is a sim property and not a
 volume's.
 
 Level 2 belongs to the controller: it is the sector that knows how to
-read the rest off its own card.  The tool does not yet choose it by
-controller; every volume gets the hdcdma image above.  These are the
-per-controller images a later revision would pick from:
+read the rest off its own card.  The tool chooses it from the volume's
+controller, which is the one thing the image cannot be shared across:
 
     hdcdma   src/micronix/stand/boot/bootimg
     hdca     src/micronix/stand/boot/hdcabootimg
@@ -177,32 +169,44 @@ per-controller images a later revision would pick from:
              djbootimg-d5soft
 
 `dist/create_dist` picks `djbootimg-d8ds` for the eight inch diskettes
-and `djbootimg-d5soft` for the five inch ones by hand today.
+and `djbootimg-d5soft` for the five inch ones by hand today.  A
+`djdma` volume is a removable medium and is not a `mkfs` target, so the
+tool reports it rather than choosing an image.
 
 disk1, disk2 and disk3 have boot readers in the level 1 rom's
 controller table (`ctable`, src/micronix/stand/roms/l1boot.s) and no
 image to put in front of them.  The tool's major table does not know
 those names, so a volume on one of them cannot appear in `root` or
-`swap`, and `mkfs` would still write the hdcdma image.  The ND network
-disk has no row in that table at all.
+`swap`, and `mkfs` reports it rather than guessing a level 2.  The ND
+network disk has no row in that table at all.
 
 ### The rom decides what the boot bits mean
 
-`boot.device` and `config.nomon` are mon447's fields: that rom reads the
-boot device from the top five bits of the switch, and 0x04 on top of it
-says "skip the monitor".  mon500 reads **only** 0x04 as a boot selector
-— S6 is monitor or boot, and to mon500 a boot *is* the level 1 rom
-(`mon500.s:443-452`) — while switch 5 picks the console.  So the tool
-packs the boot bits only when
-`boot.monitor` is a rom that has them; with mon500 it emits the two roms
-(`-b` and `-M`) and nothing else, and the machine comes up in the level 1
-menu, which is the point of level 1.
+mon500's switch is software-defined (`mon500.s`, switch equates):
+
+| bit | meaning |
+|---|---|
+| 0x04 | multiuser after the single-user idle timeout |
+| 0x08 | enable boot from floppy |
+| 0x10 | enable boot from hdcdma/disk3 |
+| 0x20 | enable boot from ide |
+| 0x40 | enable boot from scsi |
+| 0x80 | enable boot from hdca/disk2 |
+
+Any of 0x08..0x80 enters the level 1 rom; with none set the monitor
+runs.  `boot.device` names one class and the tool adds 0x04; `nomon`
+with no device takes the usual set 0x7c.  The level 1 rom probes the
+enabled classes in policy order (floppy, mfm, ide, scsi, hdca/disk2)
+and boots the first with a label, so no menu input is needed.
+
+375/447 still read the old boot-address field, so the tool packs the
+old bits only for those roms (`boot` 0x08/0x10/0x00, `nomon` 0x04).
 
 `boot.j2` is the DJ-DMA card's J2 strap.  `ab` (the default, and how the
 real machine is wired) does not run the card's own bootstrap; `bc` does,
 which is what the stock monitor's `djdma` path needs.  It is a field
 because it is a strap on a board being simulated and not a property of a
-disk — and because `-b mon447.bin -B djdma -j bc` is a machine somebody
+disk — and because `-b mon447.bin -c 0x14 -j bc` is a machine somebody
 may still want to stand up.  See `stand/boot/LEGACYBOOT.md`.
 
 ### The network disk: nd
@@ -225,7 +229,9 @@ about the card is in `sim.json`.
                        then the volume's file overrides
     files <sim>        write each volume's file overrides into its image
     boot <sim>         launch the volumes; d1p headless by default, d1 with
-                       -g/--debug, logging to /tmp/hwsim-<sim>.log
+                       -g/--debug, logging to /tmp/hwsim-<sim>.log.  Both
+                       pass -H, so a task-0 halt reaches the monitor trap
+                       instead of ending the simulation.
     volumes <sim>      each volume: controller unit geometry image
     add <sim> <controller> <unit> <geometry> <image>
     del <sim> <controller>:<unit>
@@ -240,10 +246,10 @@ volume without checking that its controller or geometry is known, and
 JSON, then `# root`, `# swap` and the `-b`, `-M`, `-j`, `-c` and `-w`
 values the boot would use.
 
-`mkfs` uses `src/micronix/stand/boot/bootimg`, the hdcdma level 2, for
-every volume.  Until the tool chooses the image by controller, a volume
-on another controller needs an image built with that controller's
-level 2.
+`mkfs` writes the volume's controller level 2 into the boot area, by
+the table above.  A volume whose controller has no level 2 - `djdma` is
+the only one - is reported and the verb stops rather than making an
+unbootable image.
 
 `volumes` is the machine-readable form of the volume list, one line per
 volume, for host scripts.  `disks/hdinstall/create_sim_images` uses it
@@ -273,7 +279,7 @@ else is input it expects the tree to have built:
                                (make bootimgs, make djbootimgs)
     dist/distsets              the -e manifest format hwsim reproduces
     disks/bootdisks/create_bootdisk
-                               one install diskette, for one target drive
+                               one install diskette, for one controller
     disks/hdinstall/build_dist, dist_boot
                                the worked example, done by hand today
 

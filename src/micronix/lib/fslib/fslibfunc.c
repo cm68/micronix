@@ -214,10 +214,15 @@ bmap(struct dsknod *dp, off_t offset, int alloc)
 		if (!alloc)
 			return 0;
 		aa[iindex] = balloc(ip->fs);
-		if (aa == dp->d_addr)
-			writeblk(ip->fs, iblkno, (char *)iblk);
-		else
-			writeblk(ip->fs, iiblkno, (char *)iiblk);
+		/*
+		 * Zero the block the entry now names, and write it through
+		 * its own number.  Writing the previous indirect block's
+		 * number instead leaves the new one holding the medium's
+		 * fill (0xe5), whose first word a large file then reads as
+		 * a block pointer and writes past the end of the drive.
+		 */
+		memset((char *)iblk, 0, sizeof(iblk));
+		writeblk(ip->fs, aa[iindex], (char *)iblk);
 	}
 
 	if (iblkno != aa[iindex]) {

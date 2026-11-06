@@ -153,7 +153,6 @@ filesystem: src/tools/readall
 		cp -r src/micronix/$$i filesystem/usr/src ; \
 	done
 	mkdir -p filesystem/old
-	echo "path /bin /usr/bin" > filesystem/.sh
 
 #
 # The filesystem skeleton, from source alone: the directory tree, /dev
@@ -177,7 +176,6 @@ filesystem-skel:
 		[ -z "$$name" ] && continue; \
 		ln -sf "$${t}dev($$m,$$n)" $(DEVROOT)/$$name; \
 	done
-	echo "path /bin /usr/bin" > filesystem/.sh
 	: > filesystem/.login
 
 clean:

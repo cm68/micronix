@@ -1,19 +1,23 @@
 # Z180 CPU board CPLDs
 
-Verilog-2001 RTL for the two **ATF1508AS-10**, 84-pin PLCC CPLDs on the
+RTL for the two **ATF1508AS-10**, 84-pin PLCC CPLDs on the
 Z180 MPZ80-compatible S-100 board.  The board contract is
 `../z180-cpu.md`; this directory is the first-cut logic, not a fitted
 JEDEC/POF image.
+
+The design exists twice: as Verilog-2001 (`u1.v`, `u2.v`) and as a
+line-for-line VHDL-93 translation (`u1.vhd`, `u2.vhd`).  The two are
+intended to be behaviourally identical; when one changes, change both.
 
 ## Files
 
 | file | device | contents |
 |---|---|---|
-| `u1.v` | U1 | sequencer + translation: task register and 8-M1 delay, trap window, trap-address shift, mask/status, register/local decode, permission check, map RAM and flash control |
-| `u2.v` | U2 | S-100 bus cycle, wait states, buffer enables, interrupts, DMA grant, S-100 clock divider, switch status |
+| `u1.v`, `u1.vhd` | U1 | sequencer + translation: task register and 8-M1 delay, trap window, trap-address shift, mask/status, register/local decode, permission check, map RAM and flash control |
+| `u2.v`, `u2.vhd` | U2 | S-100 bus cycle, wait states, buffer enables, interrupts, DMA grant, S-100 clock divider, switch status |
 | `pins_u1.csv` | U1 | 60 logical user-I/O assignments |
 | `pins_u2.csv` | U2 | 51 logical user-I/O assignments |
-| `Makefile` | - | optional iverilog syntax check |
+| `Makefile` | - | optional ghdl/iverilog syntax checks |
 
 ## Pin budget
 
@@ -36,22 +40,23 @@ budget.
 
 ## Toolchain
 
-The ATF1508AS is a 5 V, 128-macrocell CPLD.  Practical Verilog paths:
+The ATF1508AS is a 5 V, 128-macrocell CPLD.  Practical paths:
 
 - **ProChip Designer** with Mentor Precision RTL (Verilog/VHDL) and the
   bundled FIT15xx fitter.  Precision RTL is licensed; this is the
-  supported Verilog route.
-- Synthesize the Verilog elsewhere to **EDIF 2.0** and run the ATF15xx
-  fitter directly, for example `FTT1502 -i file.edf -ifmt EDIF
-  -lib aprim.lib -dev p1508c84`.
+  supported Verilog/VHDL route.
+- Synthesize to **EDIF 2.0** and run the ATF15xx fitter directly, for
+  example `FTT1502 -i file.edf -ifmt EDIF -lib aprim.lib -dev p1508c84`.
 - Quartus plus POF2JED is an alternate front end for the ATF1508AS.
 
-WinCUPL is free but is CUPL-only; it does not consume these Verilog
-files.  The fitter device mnemonic for the 84-pin PLCC is `p1508c84`.
+WinCUPL is free but is CUPL-only; it does not consume these files.  The
+fitter device mnemonic for the 84-pin PLCC is `p1508c84`.
 
-`make` runs iverilog if it is installed.  There is no testbench and no
-iverilog in the authoring environment; the RTL has not been simulated,
-fitted or timing-checked.
+`make` analyzes and elaborates the VHDL with **GHDL** (`--std=93`) and,
+if `iverilog` is installed, also syntax-checks the Verilog.  There is no
+testbench: the RTL has been elaborated but not simulated, fitted or
+timing-checked.  The VHDL is written to VHDL-93 (no `process(all)` and
+no reading of output ports) so the older fitter front ends accept it.
 
 ## Implemented behaviour
 

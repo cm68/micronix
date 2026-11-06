@@ -256,7 +256,11 @@ These came with the same work and are worth knowing:
   `sys/NET.md`.
 - **`/dev/mem` and `/dev/ports`** keep their 1.6 meanings; both are
   now served by `sys/memdev.c`'s `memread`/`memwrite`, which tell
-  memory from ports by the major.
+  memory from ports by the major.  The kernel-space minor (the usual
+  `/dev/kmem` node, major 2 minor 1) serves RAM and EPROM, with one
+  exception: a one-byte read at 0x402 returns the MPZ80 switch
+  register.  The task/mask and map registers stay blocked, and writes
+  to 0x402 are not served — writing it would switch tasks.
 
 ## Where to check
 

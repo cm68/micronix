@@ -9,7 +9,7 @@
  * the mediasets block into the -e manifest.
  *
  * The design is src/tools/PROVISION.md; the slice layout is the format
- * program's protoslices() (cmd/mwformat/mwformat.c), reproduced here.
+ * program's protoslices() (cmd/format/format.c), reproduced here.
  *
  * See docs/WORKORDER-provisioning.md.
  */
@@ -128,7 +128,7 @@ struct medium {
 
 /* A copy of mnix.c's mediums[] — the geometry the tool needs to lay out
  * slices, which mnix itself uses only for format.  The same duplication
- * mnix and mwformat already share. */
+ * mnix and format already share. */
 static struct medium mediums[] = {
 	{ "m5", 153, 4, 17 },
 	{ "m10", 306, 4, 17 },
@@ -196,6 +196,29 @@ major_of(const char *ctl)
 	if (!strcmp(ctl, "ncr"))
 		return 5;
 	return -1;
+}
+
+/*
+ * The level 2 boot a controller's volume gets.  It is the sector the
+ * level 1 rom reads from block 0, and it is per controller because the
+ * code that reads the rest of the medium is: the HD-DMA's command block,
+ * the IDE card's 8255 and task file, the 5380's REQ/ACK handshake and
+ * the HDCA's header bytes.  Each is about 4k and mkfs -i writes it into
+ * the area the label reserved below slice a.  A floppy gets its image
+ * from create_bootdisk, by medium, not from here.
+ */
+static const char *
+bootimg_of(const char *ctl)
+{
+	if (!strcmp(ctl, "hdcdma"))
+		return "bootimg";
+	if (!strcmp(ctl, "hdca"))
+		return "hdcabootimg";
+	if (!strcmp(ctl, "ide"))
+		return "idebootimg";
+	if (!strcmp(ctl, "ncr"))
+		return "ncrbootimg";
+	return NULL;
 }
 
 /* "hdcdma:0a" -> major/minor; minor = (slice<<5)|unit, a=0..h=7. */
@@ -271,33 +294,71 @@ pack_config(jv *sim)
 	/* the older schema kept the device in config.boot */
 	if (!boot)
 		boot = json_str(config, "boot");
-	if (boot && monitor_has_bootdev(mon)) {
-		if (!strcmp(boot, "hdcdma"))
-			c |= 0x08;
-		else if (!strcmp(boot, "djdma"))
-			c |= 0x10;
-		else if (strcmp(boot, "hdca") != 0 && strcmp(boot, "ide") != 0) {
-			fprintf(stderr, "hwsim: unknown boot device: %s\n", boot);
-			exit(1);
+	if (monitor_has_bootdev(mon)) {
+		/* 375/447: the old boot-address field */
+		if (boot) {
+			if (!strcmp(boot, "hdcdma"))
+				c |= 0x08;
+			else if (!strcmp(boot, "djdma"))
+				c |= 0x10;
+			else if (strcmp(boot, "hdca") != 0 &&
+			    strcmp(boot, "ide") != 0) {
+				fprintf(stderr,
+				    "hwsim: unknown boot device: %s\n", boot);
+				exit(1);
+			}
+			/* hdca / ide are 0x00 */
+			c |= 0x04;	/* the boot, not the monitor */
 		}
-		/* hdca / ide are 0x00 */
-		c |= 0x04;		/* the boot, not the monitor */
+		if (json_bool(config, "nomon"))
+			c |= 0x04;
+	} else {
+		/*
+		 * mon500's software bits: 004h multiuser after the
+		 * single-user timeout, 008h floppy, 010h hdcdma/disk3,
+		 * 020h ide, 040h scsi, 080h hdca/disk2.  With none of
+		 * 008h..080h set the monitor runs; a boot.device names
+		 * one class, and nomon with no device takes the usual
+		 * set (floppy, hdcdma, ide, scsi) plus multiuser.
+		 */
+		if (boot) {
+			if (!strcmp(boot, "floppy") ||
+			    !strcmp(boot, "djdma") ||
+			    !strcmp(boot, "disk1"))
+				c |= 0x08;
+			else if (!strcmp(boot, "hdc") ||
+			    !strcmp(boot, "hdcdma") ||
+			    !strcmp(boot, "hddma") ||
+			    !strcmp(boot, "disk3"))
+				c |= 0x10;
+			else if (!strcmp(boot, "ide"))
+				c |= 0x20;
+			else if (!strcmp(boot, "scsi") ||
+			    !strcmp(boot, "ncr"))
+				c |= 0x40;
+			else if (!strcmp(boot, "hdca") ||
+			    !strcmp(boot, "disk2"))
+				c |= 0x80;
+			else {
+				fprintf(stderr,
+				    "hwsim: unknown boot device: %s\n", boot);
+				exit(1);
+			}
+			c |= 0x04;	/* multiuser */
+		} else if (json_bool(config, "nomon")) {
+			c |= 0x7C;	/* the usual set, multiuser */
+		}
 	}
-	if (json_bool(config, "nomon"))
-		c |= 0x04;
 	/*
-	 * On the mon500 class switch 5 (0x08) says which console to find
-	 * first: set, the Wunderbus; clear, the SS1.  A 375/447 reads the
-	 * same bit as the HD-DMA boot device, so there the boot field above
-	 * already owns it.
+	 * The console no longer owns a switch bit: mon500 probes the
+	 * Wunderbus first and the SS1 after it.  375/447 read the
+	 * console from the boot field above.  The name is still
+	 * checked so a typo in sim.json does not pass silently.
 	 */
-	if (console && !monitor_has_bootdev(mon)) {
-		if (!strcmp(console, "wb"))
-			c |= 0x08;
-		else if (strcmp(console, "ss1") != 0) {
-			fprintf(stderr, "hwsim: unknown console: %s\n", console);
-			exit(1);
-		}
+	if (console && strcmp(console, "wb") != 0 &&
+	    strcmp(console, "ss1") != 0) {
+		fprintf(stderr, "hwsim: unknown console: %s\n", console);
+		exit(1);
 	}
 	if (xterm && xterm->type == J_ARR) {
 		for (i = 0; i < xterm->n; i++) {
@@ -323,7 +384,7 @@ pack_config(jv *sim)
 	return c;
 }
 
-/* the default slice table the format program writes (mwformat.c
+/* the default slice table the format program writes (format.c
  * protoslices): a = biggest filesystem up to 65535 blocks, b = 1M swap,
  * d..h = 32M each, the last a runt.  Fills sl[i] (i = slice letter index
  * a..h) with the inclusive cylinder range; sl[i].set is 0 when empty. */
@@ -652,23 +713,33 @@ v_mkfs(const char *root, const char *name)
 	jv *sim = sim_get(name);
 	jv *vols = json_get(sim, "volumes");
 	char *mnix = resolve_path(root, "src/tools/mnix");
-	char *bootimg = resolve_path(root, "src/micronix/stand/boot/bootimg");
 	int i;
 
 	for (i = 0; vols && i < vols->n; i++) {
 		jv *v = vols->v[i];
 		const char *img = json_str(v, "image");
+		const char *ctl = json_str(v, "controller");
+		const char *bimg = ctl ? bootimg_of(ctl) : NULL;
+		char bootpath[PATH_MAX];
 		char *av[8];
 
 		if (!img) {
 			fprintf(stderr, "hwsim: volume %d missing image\n", i);
 			exit(1);
 		}
+		if (!bimg) {
+			fprintf(stderr,
+			    "hwsim: volume %d: no boot image for %s\n",
+			    i, ctl ? ctl : "(no controller)");
+			exit(1);
+		}
+		snprintf(bootpath, sizeof bootpath,
+		    "%s/src/micronix/stand/boot/%s", root, bimg);
 		av[0] = mnix;
 		av[1] = "mkfs";
 		av[2] = resolve_path(root, img);
 		av[3] = "-i";
-		av[4] = bootimg;
+		av[4] = bootpath;
 		av[5] = "-f";
 		av[6] = NULL;
 		runv(av);
@@ -770,8 +841,7 @@ v_boot(const char *root, const char *name, int debug)
 		exit(1);
 	}
 	av[n++] = simbin;
-	if (!debug)
-		av[n++] = "-H";			/* headless, like dist_boot */
+	av[n++] = "-H";			/* keep the machine alive on a task-0 halt */
 	av[n++] = "-b";
 	av[n++] = resolve_path(root, mon);
 	if (level1) {

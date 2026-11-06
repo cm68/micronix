@@ -541,9 +541,8 @@ SETDEV    ?= $(BIN)/setdev
 # dev is not tar'd: its entries are device nodes, which a tar archive
 # cannot carry.  They are made below with mknod, from the list read out
 # of the blessed image.
-HWSIM_FILES = bin etc usr \
-	finstall hdinit m5init m10init m16init \
-	.sh .login
+HWSIM_FILES = bin etc usr
+HWSIM_ROOTFILES = fininstall hdinit .login
 
 install-hwsim: $(MNIX) $(SETDEV)
 	$(MNIX) initialize $(HWMEDIA) $(HWIMAGE)
@@ -554,6 +553,12 @@ install-hwsim: $(MNIX) $(SETDEV)
 	rm -f $(HOSTROOT)/micronix.k
 	tar -C $(ROOT) -c -f $(HOSTROOT)/hwsim.tar \
 	    --exclude='usr/src' --exclude='usr/man' $(HWSIM_FILES)
+	$(MNIX) -f $(HWIMAGE) tar x $(HOSTROOT)/hwsim.tar
+	rm -f $(HOSTROOT)/hwsim.tar
+	# the install scripts are seeds, not built binaries, so they come
+	# from rootfiles rather than from $(ROOT)
+	tar -C $(HOSTROOT)/src/micronix/rootfiles -c \
+	    -f $(HOSTROOT)/hwsim.tar $(HWSIM_ROOTFILES)
 	$(MNIX) -f $(HWIMAGE) tar x $(HOSTROOT)/hwsim.tar
 	rm -f $(HOSTROOT)/hwsim.tar
 	$(MNIX) -f $(HWIMAGE) mkdir /dev

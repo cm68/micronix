@@ -318,7 +318,7 @@ real card J2 selects it, A to B is the non-bootstrapping position (which
 is how our machine is wired, per `stand/boot/README`), and B to C is the
 conditional bootstrap the stock monitor's `djdma` path needs.  So:
 
-	d1 -b mon447.bin -B djdma -j bc <disk>
+	d1 -b mon447.bin -c 0x14 -j bc <disk>
 
 `-j bc` runs the nineteen bytes at 0038h, reads one sector of cylinder 0
 side 0 to 0080h, and raises 40h at 004Ah — the handshake `mon447`'s
@@ -333,27 +333,21 @@ with the level 1 rom and no djdma boot anywhere in it:
 	d1 <disk>		# -b mon500.bin -M l1boot.bin, J2 ab
 
 `-b` defaults to `mon500.bin` and `-M` to `l1boot.bin`, both looked for
-beside the tree's `stand/roms` first (`hwsim.c:1805-1835`), and the
-switch register comes up at S6 off — which the negated switch reads as
-set, meaning no monitor and a boot, and to mon500 a boot *is* the level
-1 rom (`mon500.s:443-452`; nothing else on the switch is read).  So a
-bare disk argument is a disk level 1 can boot, and level 1 is what walks
-the drives and finds it.  The `-j bc` recipe above is the stock machine
-reproduced — kept because `mon447.s` and `mon375.s` still lean on the
-card, not because anything we run needs it — and `-b mon447.bin` is how
-to get back to it.
+beside the tree's `stand/roms` first (`hwsim.c:1805-1835`).  mon500's
+switch is software-defined now: 008h..080h each enable a boot class and
+any of them takes the level 1 rom; 004h asks init to go multiuser after
+the single-user idle timeout.  With none of 008h..080h set the monitor
+runs.  The default emulator register is 7ch — 004h|008h|010h|020h|040h —
+the floppy, hdcdma/disk3, ide and scsi, plus multiuser.  Level 1 probes
+the enabled classes in policy order and boots the first that answers
+with a label; a bootable floppy wins.  `-B floppy|hdc|ide|scsi|hdca`
+names one class and ORs in 004h, and `-c` sets the whole register, with
+a `-c` after `-B` winning.
 
-Nothing on that line says which switch position it is, and nothing has
-to: `-B djdma` *is* 14h, and 14h is what the emulator comes up with
-(`switchreg = SW_DJDMA | SW_NOMON`, `mpz80.c:1543`), so the recipe above
-runs as written.  A `-c` after `-B` wins, and one that leaves bit 2
-clear is the trap worth naming, because the failure does not look like a
-switch setting: `-c 10h` still selects `djdma` at `tstsw`, the card
-answers, the boot address is read out of 0048h, `check` sets `u.pc` to
-0080h — and then `bit 2,a` at `mon447.s:553` sends the machine to
-`montor` instead, which prints the monitor's `FFFF` and its `:` prompt.
-The card worked and the switch said not to boot.  14h is SW_DJDMA with
-S6 high; bit 2 clear is "monitor", in mon447 and in mon500 both.
+The mon447 stock-machine recipe above still uses the old boot-address
+field (`-c 0x14` is DJ-DMA with no monitor there); mon447's `tstsw` and
+`check` are unchanged, and `-b mon447.bin` is how to get back to them.  mon500 no
+longer interprets the register that way.
 
 One deliberate imprecision: the card *hunts* drives, and `djdma_boot()`
 reads logical drive 0 instead.  Renumbering the logical drives the way
@@ -365,10 +359,13 @@ either way.
 
 ## What level 1 does
 
-`stand/roms/l1boot.s` walks the rows twice.  Pass 1 (`rowatch`) reads
-block 0 of every drive, stages it in this rom's own page, and looks for
-the label; a block with no label in it is remembered as a legacy
-candidate (`djprobe`, `djleg`) and a label always wins.  Pass 2
+`stand/roms/l1boot.s` walks the enabled rows once, in policy order: the
+floppy rows first (008h), then hdcdma/disk3 (010h), ide (020h), scsi
+(040h), and hdca/disk2 (080h).  A row whose switch bit is clear is
+skipped; the first enabled row whose probe answers and whose block 0
+carries a label — or a legacy boot sector — is chosen.  `rowatch` reads
+block 0 and stages it in this rom's own page; a block with no label in
+it is remembered as a legacy candidate (`djprobe`, `djleg`).  Pass 2
 (`bootit`) re-reads the chosen drive through the window — task 0's
 segment 1 points at bus page 0, so `win + 0100h` is bus 0100h, which is
 where task 1 will run it — and enters it with `switch`, which writes
@@ -545,7 +542,7 @@ Three things this example proves about the medium's assumptions:
     track's fill — is neither: `djcpm` refuses a block whose first 128
     bytes are all the same value, and the row reports the drive as
     answering but not bootable.
-  * `-B djdma` alone no longer boots a legacy medium — the emulated
+  * `-c 0x14` alone no longer boots a legacy medium — the emulated
     bootstrap was removed in 55a9cca9 — and `-j bc` is what puts it
     back, because the real card only bootstraps with its J2 strap in
     that position.  The supported path is the level 1 rom, and it is

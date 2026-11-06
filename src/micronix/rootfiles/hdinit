@@ -1,20 +1,56 @@
+# Install Micronix on a hard disk.
+#
+#	sh hdinit <controller> [format-options]
+#
+# controller is hdcdma, ide, scsi or hdca.  The format options are passed
+# to format, which lays down the geometry and the prototype slice table;
+# with none, the drive must already carry a label.
+#
+#	sh hdinit hdcdma -m m40
+#	sh hdinit ide -c 392 -h 16 -s 63
+#	sh hdinit scsi -c 392 -h 16 -s 63
+#	sh hdinit hdca -m m26
+#
+# The matching level 2 and 3 boot is on the diskette in /boot:
+# bootmw.bin, bootide.bin, bootncr.bin or boothdca.bin.  hdinit passes
+# that file to mkfs, which writes it below slice a.  They are in a
+# subdirectory because the floppy's own level 3 offers every large file
+# in the root and would stop at "File to boot:".
+#
+case "$1" in
+hdcdma)	dev=/dev/hd0a; whole=/dev/hd0c; maj=3; boot=/boot/bootmw.bin ;;
+ide)	dev=/dev/ide0; whole=/dev/ide0c; maj=4; boot=/boot/bootide.bin ;;
+scsi|ncr) dev=/dev/scsi0; whole=/dev/scsi0c; maj=5; boot=/boot/bootncr.bin ;;
+hdca)	dev=/dev/hda; whole=/dev/hdac; maj=1; boot=/boot/boothdca.bin ;;
+*)	echo "usage: sh hdinit <hdcdma|ide|scsi|hdca> [format-options]" >&2
+	exit 1 ;;
+esac
+shift
+
+# bsh has no [ builtin and the diskette has no /bin/[, so the count is
+# tested with the shell's case.  With no options the drive must already
+# carry a label; with options format lays the geometry down first.
+case "$#" in
+0)	;;
+*)	format "$@" $whole ;;
+esac
+
 echo
-label -s /dev/hdac a 0 235
-label -s /dev/hdac b 236
-mkfs -f /dev/hda
-fsck /dev/hda
-mount /dev/hda /b
+echo "Installing on $dev"
+mkfs -i $boot -f $dev
+mount $dev /b
 chmod 755 /b
 cptree -v / /b
 rm -f /b/dev/root /b/dev/swap
-mknod /b/dev/root b 1 0
-mknod /b/dev/swap b 1 32
-setdev /b/micronix 1/0 1/32
-rm -f /b/hdinit /b/m5init /b/m10init /b/m16init
+mknod /b/dev/root b $maj 0
+mknod /b/dev/swap b $maj 32
+setdev /b/micronix $maj/0 $maj/32
+rm -f /b/hdinit
+rm -f /b/boot/bootmw.bin /b/boot/bootide.bin /b/boot/bootncr.bin /b/boot/boothdca.bin
 rm -f /b/etc/signon
 ln /b/etc/signon2 /b/etc/signon
 rm -f /b/etc/signon2
-umount /dev/hda
+umount $dev
 sync
 echo
-echo Hard disk initialization complete.
+echo Disk initialization complete.

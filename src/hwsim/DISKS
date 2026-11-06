@@ -570,8 +570,10 @@ The first proof of the path was a hand built filesystem, host side:
     permute the filesystem into physical order, prepend a label
     d1 -b ../../micronix/stand/roms/mon447.bin -c 0x0c -d <dir>
 
--c 0x0c is SW_HDDMA and SW_NOMON, which is what the monitor's switch test
-wants for nuboot; 0x14 is the floppy, and it is the default.
+-c 0x0c is SW_HDDMA and SW_NOMON under mon447's old boot-address field,
+which is what its switch test wants for nuboot; 0x14 is the floppy there.
+The current mon500 default is 0x7c (floppy, hdcdma, ide, scsi and
+multiuser), and `-B floppy|hdc|ide|scsi|hdca` names one class.
 
     Micronix loader for the HD-DMA
     Files:

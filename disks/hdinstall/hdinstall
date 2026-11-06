@@ -1,0 +1,171 @@
+#!/bin/sh
+#
+# Make a fresh, bootable hard disk volume on any of the four controllers.
+#
+#	./hdinstall <controller> <volume>
+#
+# Controllers: hdcdma (Morrow HD-DMA), hdca (Discus M26), ide (the
+# 8255/ATA card) and ncr (the NCR 5380 SCSI adapter).  Each names its
+# drive geometry, its kernel major, the level 2 boot mkfs writes below
+# slice a, and the slice table the host labeler carves:
+#
+#	hdcdma	m40	3	bootimg		1..480, b 481
+#	hdca	m26	1	hdcabootimg	1..192, b 193
+#	ide	m40	4	idebootimg	1..480, b 481
+#	ncr	m40	5	ncrbootimg	1..480, b 481
+#
+# The four are one tool because the only real differences are that
+# table; the filesystem, the userland, the device nodes, the kernel and
+# its root/swap stamps are the same work on every card.  The wrappers
+# beside this file (create_vol, hdca_create_vol, ide_create_vol,
+# ncr_create_vol) name a controller and keep their old command lines.
+#
+# <volume> is the drive file to make, given without its suffix: the file
+# is made as <volume>.vol.  It is built from scratch: initialize lays
+# down the blank drive with its geometry label, label carves the slice
+# table, mkfs -i writes the filesystem and the controller's 4k boot, and
+# then the userland is copied across - the built binaries from the
+# filesystem directory that "make install" populates, and the config
+# (/etc, the root-level scripts, /dev) straight from the src/micronix
+# tree.  The kernel is then replaced with the freshly built ccc one.
+#
+# /boot is not copied: mkfs -i has just built it for this controller,
+# and copying it from elsewhere would put the wrong boot over it.  /dev
+# is recreated node by node rather than carried, because tar does not
+# carry device nodes - the list comes from the source tree's dev/devlist.
+#
+# The volume is made in this directory unless an absolute path is given,
+# and it is truncated if it already exists.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+
+case "$1" in
+hdcdma)	medium=m40; major=3; bootimg=bootimg; slices="-s a 1 480 -s b 481" ;;
+hdca)	medium=m26; major=1; bootimg=hdcabootimg; slices="-s a 1 192 -s b 193" ;;
+ide)	medium=m40; major=4; bootimg=idebootimg; slices="-s a 1 480 -s b 481" ;;
+ncr)	medium=m40; major=5; bootimg=ncrbootimg; slices="-s a 1 480 -s b 481" ;;
+-h|--help)
+	echo "usage: $0 <controller> <volume>" >&2
+	echo "controllers: hdcdma hdca ide ncr" >&2
+	exit 0 ;;
+*)
+	echo "$0: $1: no such controller" >&2
+	echo "$0: controllers: hdcdma hdca ide ncr" >&2
+	exit 1 ;;
+esac
+shift
+
+mnix="$root/src/tools/mnix"
+setdev="$root/src/tools/setdev"
+bootimg="$root/src/micronix/stand/boot/$bootimg"
+devlist="$root/src/micronix/dev/devlist"
+kernel="$root/src/micronix/sys/unix"
+srcdir="$root/src/micronix"
+srctar="$srcdir/srctar.tar"
+rootfiles="$srcdir/rootfiles"
+filesystem="$root/filesystem"
+
+vol="$1"
+if [ -z "$vol" ]; then
+	echo "usage: $0 <controller> <volume>" >&2
+	exit 1
+fi
+# The suffix is added here rather than left to the caller, so that every
+# volume this directory makes is named the one way.  Given with it
+# already, the name is left alone.
+case "$vol" in
+*.vol)	;;
+*)	vol="$vol.vol" ;;
+esac
+case "$vol" in
+/*)	;;
+*)	vol="$here/$vol" ;;
+esac
+
+if [ ! -f "$devlist" ]; then
+	echo "$0: $devlist not found - nothing to populate /dev from" >&2
+	exit 1
+fi
+if [ ! -f "$bootimg" ]; then
+	echo "$0: $bootimg not found - build the boot first:" >&2
+	echo "$0:   make -C $root/src/micronix/stand/boot bootimgs idebootimgs ncrbootimgs hdcabootimgs" >&2
+	exit 1
+fi
+if [ ! -f "$filesystem/etc/init" ]; then
+	echo "$0: $filesystem/etc/init not found - make install has not built init" >&2
+	exit 1
+fi
+
+tmp=`mktemp` || exit 1
+trap 'rm -f "$tmp" "$tmp.k"' 0
+
+# clear any sidecar lock file the host tools leave at "<volume>.lock"
+rm -f "$vol.lock"
+
+# 1. the blank drive and its geometry.
+"$mnix" initialize "$medium" "$vol" || exit 1
+
+# 2. the disk label: slice a is the filesystem, slice b is swap, and
+# cylinder 0 is the boot below both.  The label command writes the
+# in-band label at device block 0.  Without it the prototype label's
+# extents are zero, slice a is not carved, and nothing can be made on it.
+"$mnix" label "$vol" $slices || exit 1
+
+# 3. the filesystem and the controller's boot below it.
+"$mnix" mkfs "$vol" -i "$bootimg" -f || exit 1
+
+# 4. the userland.  The built binaries come from the source tree's
+# filesystem (make install); the root-level scripts and /etc config are
+# source files and come straight from the tree.  The kernel is not
+# carried here - step 6 writes the freshly built one - and neither is
+# init, which make install built into filesystem/etc/init and which is
+# written below because it is a binary, not a source file.
+tar -C "$filesystem" -c -f "$tmp" \
+	--exclude='usr/src' --exclude='usr/man' \
+	bin lib libexec usr || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+
+tar -C "$rootfiles" -c -f "$tmp" \
+	finstall hdinit .login || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+
+tar -C "$srcdir" -c -f "$tmp" etc || exit 1
+"$mnix" -f "$vol" tar x "$tmp" || exit 1
+"$mnix" -f "$vol" write "$filesystem/etc/init" /etc/init || exit 1
+
+# 5. the device nodes, from the source tree's dev/devlist, and /tmp,
+# which the tar above does not carry - it archives files, not empty
+# directories.
+"$mnix" -f "$vol" mkdir /dev || exit 1
+"$mnix" -f "$vol" mkdir /tmp || exit 1
+while read type maj min name; do
+	case "$type" in
+	''|\#*)	continue ;;
+	esac
+	"$mnix" -f "$vol" mknod "/dev/$name" "$type" "$maj" "$min" || exit 1
+done < "$devlist"
+
+# 6. the freshly built kernel, over the one mkfs -i left.  The kernel's
+# root and swap are slice a and slice b on the controller: major $major,
+# minor 0 and 32.  setdev stamps the controller's driver module into the
+# kernel's slot as it patches the device numbers, so work on a copy.
+if [ -f "$kernel" ]; then
+	cp "$kernel" "$tmp.k" || exit 1
+	"$setdev" "$tmp.k" "$major/0" "$major/32" || exit 1
+	"$mnix" -f "$vol" write "$tmp.k" /micronix || exit 1
+	# /dev/root and /dev/swap name the devices setdev just pointed the
+	# kernel at, so init, mkmtab and df do not depend on the boot script
+	# and the name and the number cannot drift.
+	"$mnix" -f "$vol" mknod /dev/root b "$major" 0 || exit 1
+	"$mnix" -f "$vol" mknod /dev/swap b "$major" 32 || exit 1
+fi
+
+# 7. the source tree, sources only, onto /usr/src.  "make tarfile"
+# stages exactly the sources - no .o or built binaries - into one tar.
+make -C "$srcdir" tarfile || exit 1
+"$mnix" -f "$vol" tar x -C /usr/src "$srctar" || exit 1
+
+echo "$0: made $vol"

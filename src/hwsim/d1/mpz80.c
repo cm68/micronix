@@ -224,15 +224,17 @@ char *nearest_sym(word addr, unsigned short *offp);
 // this register is negated:  if the switch is on, the value reads low
 byte switchreg;
 #define SWT     0x402       // switch register board location 16D
-#define     SW_NOMON    0x04        // S6 - if high, no minotaur
-#define     SW_JUMP     0xf8        // S1 - S5 negated jump address
-/* the three below are mon447's boot-device field; mon500 reads S6 only */
-#define     SW_DJDMA    0x10        // boot djdma
-#define     SW_HDDMA    0x08        // boot hdcdma
-#define     SW_HDCA     0x00        // boot hdca
+/* the software-defined bits mon500 and init read */
+#define     SW_MULTI    0x04        // multiuser after the single-user timeout
+#define     SW_FLOPPY   0x08        // enable boot from the floppy
+#define     SW_HDC      0x10        // enable boot from hdcdma/disk3
+#define     SW_IDE      0x20        // enable boot from ide
+#define     SW_SCSI     0x40        // enable boot from scsi
+#define     SW_HDCA     0x80        // enable boot from hdca/disk2
 #define     SW_RESET    0x01
 #define     SW_IPEND    0x02
-static char *swt_bits[] = { "reset", "ipend", "monitor", 0, 0, 0, 0, 0 };
+static char *swt_bits[] = { "reset", "ipend", "multi", "floppy",
+                            "hdc", "ide", "scsi", "hdca" };
 
 #ifndef NODEBUG
 int trace_mpz80;
@@ -1532,13 +1534,13 @@ void
 mpz80_usage()
 {
     printf("config switch values:\n");
-    printf("\t0x04 - no monitor entry.  mon500 reads this bit alone,\n");
-    printf("\t       so it is also the boot: the level 1 rom\n");
-    printf("\t0xf8 - start address mask\n");
-    printf("\t0x00 - boot the local hard disk - hdca under mon447,\n");
-    printf("\t       ide under mon500, so pick the rom to match\n");
-    printf("\t0x08 - boot hddma\n");
-    printf("\t0x10 - boot djdma\n");
+    printf("\t0x04 - multiuser after the single-user idle timeout\n");
+    printf("\t0x08 - enable boot from the floppy\n");
+    printf("\t0x10 - enable boot from hdcdma/disk3\n");
+    printf("\t0x20 - enable boot from ide\n");
+    printf("\t0x40 - enable boot from scsi\n");
+    printf("\t0x80 - enable boot from hdca/disk2\n");
+    printf("\tno 0x08..0x80 bit: enter the monitor\n");
 }
 
 /*
@@ -1550,14 +1552,13 @@ mpz80_setup()
     rom_filename = "mon500.bin";
     rom_size = 4096;
     /*
-     * Half a switch: mon500 is binary, S6 on asks for the monitor and
-     * S6 off for a boot, and nothing else on the board is read (mon500.s
-     * tstsw).  The boot-device bits below are mon447's, and the one
-     * config we run is mon500 with level 1 doing the booting, so they
-     * stay clear - the djdma boot is not ours and its card bootstrap is
-     * off (J2 A-B, -j ab).
+     * The machine's usual set: the floppy, hdcdma/disk3, ide and
+     * scsi enabled, multiuser after the single-user timeout.  The
+     * monitor boots when any of 008h..080h is set; 080h (hdca/disk2)
+     * is not in the default.  -c replaces the whole register, and -B
+     * names one boot device.
      */
-    switchreg = SW_NOMON;               // boot: level 1, no monitor
+    switchreg = SW_MULTI | SW_FLOPPY | SW_HDC | SW_IDE | SW_SCSI;  // 0x7c
     keybreg = 0;
     set_taskreg(0);
 

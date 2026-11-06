@@ -137,13 +137,15 @@ hwsim.c:715.  That is the shape to generalise, and the TODO's idea is
 absorbed below rather than left open.
 
 The boot path is a name-to-switch table plus a comment.  `bootdevs[]`
-(hwsim.c:1401) maps hdca and ide to switch 0x00, hdcdma to 0x08, djdma to
-0x10, and `-B` turns a name into `config_sw` with bit 0x04 set to skip the
-monitor (hwsim.c:1906, bootdev() at 1409).  The switch bits themselves are
-the MPZ80's (SW_DJDMA/SW_HDDMA/SW_HDCA, mpz80.c:219-227), and the rom
-decides what 0x00 means - mon447 boots the hdca, mon500 the ide, and
-nothing tells the simulator that except the comment (hwsim.c:1385-1396) and
-mpz80_usage() (mpz80.c:1524).  A machine with a different boot card would
+(hwsim.c:1401) maps the names to mon500's software bits - floppy/djdma/
+disk1 to 0x08, hdc/hdcdma/disk3 to 0x10, ide to 0x20, scsi/ncr to 0x40,
+hdca/disk2 to 0x80 - and `-B` turns a name into `config_sw` with bit 0x04
+(multiuser) set (hwsim.c:1906, bootdev() at 1409).  The bits are the
+MPZ80 switch register's (SW_FLOPPY/SW_HDC/SW_IDE/SW_SCSI/SW_HDCA,
+mpz80.c:219-235); mon500 boots when any of 0x08..0x80 is set and the
+level 1 rom probes the enabled classes in policy order.  mon447 still
+reads the register as the old boot-address field, and a machine with a
+different boot card would
 have to edit three places that are really one fact.
 
 Two small corrections to the framing, before the sketch proper.  First,

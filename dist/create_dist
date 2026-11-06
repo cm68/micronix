@@ -168,7 +168,7 @@ done
 #
 # /bin/unix is the one file dropped from a directory that is otherwise
 # shipped whole: "make install" in sys puts the cross built kernel there,
-# and the kernel a running system boots is /micronix, which m16init
+# and the kernel a running system boots is /micronix, which hdinit
 # supplies.  A distribution disk carrying a stale copy of it under a name
 # nothing reads is a trap and 86 KB of a 1 MB disk.
 #

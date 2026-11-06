@@ -706,22 +706,23 @@ usage(char *complaint, char *p)
     fprintf(stderr, "  hdcdma0:hddma-0, hdca1:/tmp/scratch, ide0:disk.img,\n");
     fprintf(stderr, "  scsi3:target.img\n");
     fprintf(stderr, "  - or a bare file,\n");
-    fprintf(stderr, "  which is the next floppy.  controllers are the -B names,\n");
-    fprintf(stderr, "  and scsi, which has no boot path.\n");
+    fprintf(stderr, "  which is the next floppy.  controllers are the -B names\n");
+    fprintf(stderr, "  and scsi.\n");
     fprintf(stderr, "\t-h\thelp\n");
     fprintf(stderr, "\t-b\t<boot rom file> (default mon500.bin)\n");
     fprintf(stderr, "\t-M\t<level 1 boot rom file> (default l1boot.bin)\n");
     fprintf(stderr, "\t\tmon500 with the level 1 rom is the configuration to\n");
     fprintf(stderr, "\t\trun: a bare file argument is then a disk level 1 can\n");
     fprintf(stderr, "\t\tboot, and no djdma boot is involved.\n");
-    fprintf(stderr, "\t-B\t<djdma|hdcdma|hdca|ide> boot from this, and skip the monitor\n");
-    fprintf(stderr, "\t\t(mon447's boot-device field; hdca needs mon447, ide\n");
-    fprintf(stderr, "\t\tneeds mon500 - see -b)\n");
+    fprintf(stderr, "\t-B\t<floppy|hdc|ide|scsi|hdca> enable this boot device\n");
+    fprintf(stderr, "\t\t(and multiuser); the monitor boots when any of the\n");
+    fprintf(stderr, "\t\t008h..080h switch bits is set.  -c sets the whole\n");
+    fprintf(stderr, "\t\tregister, and a -c after -B wins.\n");
     fprintf(stderr, "\t-j\t<ab|bc> the djdma card's J2 strap: ab does not bootstrap\n");
     fprintf(stderr, "\t\t(the default, and our machine), bc runs the card's own\n");
     fprintf(stderr, "\t\tbootstrap, which is what the stock monitor's djdma path\n");
     fprintf(stderr, "\t\tneeds - stock machine only:\n");
-    fprintf(stderr, "\t\t-b mon447.bin -B djdma -j bc\n");
+    fprintf(stderr, "\t\t-b mon447.bin -c 0x14 -j bc\n");
     fprintf(stderr, "\t-c\t<configuration switch value>\n");
     fprintf(stderr, "\t-w\t<wiring> boards[,viN=card]...: ss1 | wb | mio | wb,mio | mio,mio\n");
     fprintf(stderr, "\t\tviN=card, irqN=viM|source, int=board\n");
@@ -1481,35 +1482,36 @@ struct moncmd moncmds[MONCMDS] = {
 /*
  * The boot device, by name.
  *
- * The rom decides what to boot from the top five bits of the
- * configuration switch - at tstsw, in mon447.s and again in mon500.s -
- * and the numbers are not memorable:
+ * mon500's software switch bits enable boot devices; the level 1 rom
+ * walks them in policy order - floppy first, then mfm, ide, scsi, then
+ * the hdca/disk2 pair - and boots the first that answers with a label:
  *
- *	0x00	the local hard disk
- *	0x08	nuboot, which is the HDC-DMA
- *	0x10	the DJ-DMA floppy
+ *	0x04	multiuser after the single-user idle timeout
+ *	0x08	floppy (DJ/DMA, Disk 1)
+ *	0x10	hdcdma/disk3 (MFM, Disk 3)
+ *	0x20	ide
+ *	0x40	scsi
+ *	0x80	hdca/disk2
  *
- * with 0x04 on top of any of them to skip the monitor and go straight
- * to the boot.  Everything written down about running this machine says
- * "switches 0x0c" and then explains what 0x0c is; this says hdcdma and
- * does not need explaining.  -c still takes the number for anything
- * these three do not cover, and a -c after -B wins.
- *
- * 0x00 has two names because it has two meanings, and which one it is
- * depends on the rom: mon447 boots the hdca from it, mon500 boots the
- * ide.  That is the ordinary way a machine gets a new boot device - the
- * rom installed is the rom that knows the card - so -B names the device
- * the rom being loaded will find, and naming the other one boots
- * whatever that rom does have.  See mpz80_usage().
+ * No 0x08..0x80 bit enters the monitor.  -B names one of the devices
+ * and ORs in 0x04, so a -B boot still goes multiuser.  -c takes the
+ * whole register for anything else, and a -c after -B wins.
  */
 static struct {
     char *name;
     int sw;
 } bootdevs[] = {
-    { "hdca",   0x00 },
-    { "ide",    0x00 },
-    { "hdcdma", 0x08 },
-    { "djdma",  0x10 },
+    { "floppy", 0x08 },
+    { "djdma",  0x08 },
+    { "disk1",  0x08 },
+    { "hdc",    0x10 },
+    { "hdcdma", 0x10 },
+    { "disk3",  0x10 },
+    { "ide",    0x20 },
+    { "scsi",   0x40 },
+    { "ncr",    0x40 },
+    { "hdca",   0x80 },
+    { "disk2",  0x80 },
     { 0, 0 }
 };
 
@@ -1998,7 +2000,7 @@ main(int argc, char **argv)
      * is the rom our machines run: it boots the level 1 rom below, which
      * asks every drive for a label, so a bare file argument is a disk
      * this machine can boot.  mon447 is the stock monitor and is what
-     * the card's own bootstrap - -B djdma -j bc - is reproduced under;
+     * the card's own bootstrap - mon447 with -c 0x14 -j bc - is reproduced under;
      * it is not a default any more, and its djdma boot is off.
      */
     rom_filename = (char *)conf_str("boot.monitor", NULL);
@@ -2150,11 +2152,11 @@ main(int argc, char **argv)
                     int sw;
 
                     if (!argc--) {
-                        usage("boot device missing: djdma, hdcdma or hdca\n",
+                        usage("boot device missing: floppy, hdc, ide, scsi or hdca\n",
                             progname);
                     }
                     if ((sw = bootdev(*argv++)) < 0) {
-                        usage("boot device is djdma, hdcdma or hdca\n",
+                        usage("boot device is floppy, hdc, ide, scsi or hdca\n",
                             progname);
                     }
                     config_sw = sw | CONF_SET;

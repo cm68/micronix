@@ -267,7 +267,7 @@ rm -f /b/dev/root /b/dev/swap
 mknod /b/dev/root b $major 0
 mknod /b/dev/swap b $major 32
 setdev /b/micronix $major/0 $major/32
-rm -f /b/hdcdmainit /b/hdcainit /b/ideinit /b/scsiinit
+rm -f /b/hdinit
 rm -f /b/etc/signon
 ln /b/etc/signon2 /b/etc/signon
 rm -f /b/etc/signon2
@@ -318,17 +318,16 @@ EOF
 #
 # The install diskette: the tree's d8ds boot diskette, with the install
 # script as /.login so a boot needs nothing typed, and the build script
-# beside it.  create_bootdisk also leaves the hard disk's boot in
-# /bootmw.bin, for a guest mkfs that reads it; this install does not use
-# it - the host writes the boot after the install - and a boot image
-# large enough to be a "large file" makes djboot offer it beside
-# /micronix and stop at "File to boot:".  So it goes.
+# beside it.  create_bootdisk leaves the four hard disk boots in /boot,
+# which the floppy's level 3 does not scan - only the root directory's
+# large files, and there only /micronix is one.  This install does not
+# use them: the host writes the boot after the install, and mkfs's
+# default /bootmw.bin is absent, so the guest leaves it to the host.
 #
 make_bootdisk() {
 	floppy="$w/install.img"
 	rm -f "$floppy" "$floppy.lock" "$floppy-delta"
-	"$bootdisk" d8ds "$floppy" m40 >/dev/null || return 1
-	"$mnix" -f "$floppy" rm /bootmw.bin || return 1
+	"$bootdisk" d8ds "$floppy" >/dev/null || return 1
 	install_login > "$w/install.login" || return 1
 	"$mnix" -f "$floppy" write "$w/install.login" /.login || return 1
 	build_login > "$w/build.login" || return 1

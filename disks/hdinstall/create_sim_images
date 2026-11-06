@@ -9,10 +9,12 @@
 # (the install-built system, the kernel, and /usr/src), and a blank
 # mkfs'd filesystem for the other volumes.
 #
-# The presets in sim.json are hdcdma/m40 pairs, which is what create_vol
-# makes.  A volume on another controller or geometry, or an image outside
-# the tree, is reported and skipped.  With no <sim> the whole list runs.
-# -f rebuilds images that already exist.
+# Each controller has a builder and its own 4k level 2 boot: hdcdma
+# (create_vol, bootimg, m40), hdca (hdca_create_vol, hdcabootimg, m26),
+# ide (ide_create_vol, idebootimg, m40) and ncr (ncr_create_vol,
+# ncrbootimg, m40).  A volume on another controller or geometry, or an
+# image outside the tree, is reported and skipped.  With no <sim> the
+# whole list runs.  -f rebuilds images that already exist.
 #
 # Run it through "make images", which builds the userland, host tools
 # and boot images first; a bare invocation assumes they are built.
@@ -67,7 +69,27 @@ for sim in $sims; do
 			echo "$sim: $image exists (make images FORCE=1 to rebuild)"
 			continue
 		fi
-		if [ "$ctl" != hdcdma ] || [ "$geom" != m40 ]; then
+		#
+		# The controller picks the level 2 boot and the builder.  Each
+		# builder owns one native geometry: create_vol m40, hdca m26,
+		# and ide and ncr m40 with room for the userland and sources.
+		# A volume asking for another geometry has no builder here and
+		# is skipped rather than made wrong.
+		#
+		case "$ctl" in
+		hdcdma)	builder="$create"; bimg=bootimg
+			cgeom=m40; slices="-s a 1 480 -s b 481" ;;
+		hdca)	builder="$here/hdca_create_vol"; bimg=hdcabootimg
+			cgeom=m26; slices="-s a 1 192 -s b 193" ;;
+		ide)	builder="$here/ide_create_vol"; bimg=idebootimg
+			cgeom=m40; slices="-s a 1 480 -s b 481" ;;
+		ncr)	builder="$here/ncr_create_vol"; bimg=ncrbootimg
+			cgeom=m40; slices="-s a 1 480 -s b 481" ;;
+		*)	echo "$sim: $image: no builder for $ctl/$geom, skipped" >&2
+			skipped=1
+			continue ;;
+		esac
+		if [ "$geom" != "$cgeom" ]; then
 			echo "$sim: $image: no builder for $ctl/$geom, skipped" >&2
 			skipped=1
 			continue
@@ -77,14 +99,15 @@ for sim in $sims; do
 
 		if [ "$unit" = 0 ]; then
 			#
-			# The bootable root: create_vol builds an m40 hdcdma
+			# The bootable root: the controller's builder makes the
 			# volume from filesystem/ and the built kernel, setdev'd
-			# to 3/0 with swap on 3/32.  It insists on a .vol name,
-			# so build beside the target and move it into place.
+			# to that controller's root and swap.  It insists on a
+			# .vol name, so build beside the target and move it into
+			# place.
 			#
 			bld="$here/.simimage.$$.vol"
 			rm -f "$bld" "$bld.lock"
-			if "$create" "$bld" >/dev/null; then
+			if "$builder" "$bld" >/dev/null; then
 				if mv "$bld" "$img"; then
 					echo "$sim: built $image (bootable root)"
 				else
@@ -92,7 +115,7 @@ for sim in $sims; do
 					failed=1
 				fi
 			else
-				echo "$sim: $image: create_vol failed" >&2
+				echo "$sim: $image: $builder failed" >&2
 				failed=1
 			fi
 			rm -f "$bld" "$bld.lock"
@@ -100,11 +123,12 @@ for sim in $sims; do
 			#
 			# The other volumes only have to exist with a filesystem
 			# on them; the root volume carries the system and its
-			# sources.  The slice table is create_vol's m40 one.
+			# sources.  The slice table is the one the controller's
+			# builder uses, and the boot is its controller's.
 			#
 			if "$mnix" initialize "$geom" "$img" &&
-			   "$mnix" label "$img" -s a 1 480 -s b 481 &&
-			   "$mnix" mkfs "$img" -i "$bootdir/bootimg" -f; then
+			   "$mnix" label "$img" $slices &&
+			   "$mnix" mkfs "$img" -i "$bootdir/$bimg" -f; then
 				echo "$sim: built $image (empty filesystem)"
 			else
 				echo "$sim: $image: mnix failed" >&2

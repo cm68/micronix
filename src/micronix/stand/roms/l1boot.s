@@ -314,7 +314,8 @@ mapram	equ	0600h		;the map ram, which is write only: this
 				; will put back, and the monitor's own
 				; "restore the maps" pairs the two
 map	equ	0200h		;the readable image of the map ram
-task	equ	0402h		;the task register: write to switch
+swreg	equ	0402h		;the switch register: read
+task	equ	0402h		;the task register: write
 gobuff	equ	01b0h		;ram stub for the task switch
 ctask	equ	0006h		;current task, read by the trap handler
 
@@ -348,14 +349,19 @@ dl_mod	equ	dl_off + 104	;d_model, sixteen bytes
 ;* halt trap is live, which is what makes a halt here reach the	*
 ;* monitor rather than run off into nothing.			*
 ;*								*
-;* Pass 1 finds every disk that answers with a label naming a	*
-;* boot and prints them; pass 2 boots the one chosen.		*
+;* Pass 1 walks the enabled rows in table order and stops at the	*
+;* first disk carrying a label naming a boot.  The floppy rows are	*
+;* first, so a bootable floppy overrides the hard disks; the rest	*
+;* are in policy order and the first that answers wins.  Pass 2	*
+;* boots that one.							*
 ;****************************************************************
 
 entry:
 	ld	hl,strset	;"level 1 boot"
 	call	uputs
-	call	enumer		;pass 1: fill cand[] and print it
+	ld	a,(swreg)	;the enable-boot bits, read once
+	ld	(sw),a
+	call	enumer		;pass 1: the first enabled disk
 	ld	a,(ncand)
 	or	a
 	jp	nz,bootit
@@ -366,10 +372,21 @@ hang:	halt
 
 ;****************************************************************
 ;* The controller table: one row per kind of disk the machine	*
-;* can boot from, in the order they are probed, six bytes a row	*
-;* - the name the menu prints, the routine that says whether a	*
-;* drive is there, and the routine that moves block 0 to	*
-;* (dest).  A row with a zero name ends the table.		*
+;* can boot from, in the order the policy probes them, six bytes	*
+;* a row - the name the menu prints, the routine that says whether	*
+;* a drive is there, and the routine that moves block 0 to	*
+;* (dest).  A row with a zero name ends the table.  ctbits runs	*
+;* beside it, one byte a row, and names the switch bit that	*
+;* enables that row:						*
+;*									*
+;*	008h  floppy (DJ/DMA, Disk 1)				*
+;*	010h  MFM hard (HD/DMA, Disk 3)				*
+;*	020h  IDE						*
+;*	040h  SCSI						*
+;*	080h  HDCA / Disk 2					*
+;*									*
+;* The floppy rows are first so a bootable floppy overrides the	*
+;* hard disks; the rest are mfm, ide, scsi, then the 080h pair.	*
 ;*								*
 ;* A probe answers with carry set if a drive is there and ready	*
 ;* to be read; a read answers with carry set if it delivered	*
@@ -378,15 +395,17 @@ hang:	halt
 ;****************************************************************
 
 ctable:
-	dw	chd0a, mwprobe, mwread
-	dw	chda, hdaprobe, hdaread
-	dw	cide, ideprobe, ideread
-	dw	cscsi, ncrprobe, ncrread
 	dw	cfla, djprobe, djread
 	dw	cd1a, d1probe, d1read
-	dw	cd2a, d2probe, d2read
+	dw	chd0a, mwprobe, mwread
 	dw	cd3a, d3probe, d3read
+	dw	cide, ideprobe, ideread
+	dw	cscsi, ncrprobe, ncrread
+	dw	cd2a, d2probe, d2read
+	dw	chda, hdaprobe, hdaread
 	dw	0
+ctbits:
+	db	008h, 008h, 010h, 010h, 020h, 040h, 080h, 080h
 
 ;****************************************************************
 ;* pass 1: walk the table and keep every disk carrying a label.	*
@@ -399,6 +418,8 @@ ctable:
 enumer:
 	ld	hl,ctable
 	ld	(cur),hl
+	ld	hl,ctbits
+	ld	(cbit),hl
 	xor	a
 	ld	(ncand),a
 	ld	hl,cand
@@ -411,6 +432,10 @@ enuml:	ld	hl,(cur)
 	ld	a,(cname+1)
 	or	a
 	ret	z
+	ld	hl,(cbit)
+	ld	a,(sw)
+	and	(hl)		;this row's enable bit
+	jr	z,enumnt	;disabled: try the next row
 	call	rowatch
 	jr	nc,enumnt
 	ld	hl,(chead)	;remember the row, not the disk:
@@ -439,10 +464,14 @@ enuml:	ld	hl,(cur)
 	call	uputs
 enumle:	ld	hl,strnl
 	call	uputs
+	ret			;the first candidate wins: boot it
 enumnt:	ld	hl,(cur)
 	ld	de,6		;one row further on
 	add	hl,de
 	ld	(cur),hl
+	ld	hl,(cbit)
+	inc	hl
+	ld	(cbit),hl
 	jr	enuml
 enumlg:	ld	hl,strlegac	;no label: the medium's own sector 0
 	call	uputs		; is the program, and is a legacy
@@ -2237,6 +2266,8 @@ numbuf:	ds	8		;a decimal number, at most five digits
 hs:	ds	2		;heads * sectors per track, on the way
 mulr:	ds	2		;the multiplier, shifting right
 cur:	ds	2		;the table cursor
+cbit:	ds	2		;the parallel mask-table cursor
+sw:	ds	1		;the switch register, read once
 chead:	ds	2		;where the next candidate goes
 ncand:	ds	1		;how many answered
 cand:	ds	2 * 8		;their table rows, in order

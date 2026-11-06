@@ -17,6 +17,17 @@
 ;* If top five switches are 'On', a hard disk is assumed to be	*
 ;* the disk device and Boothd is executed.			*
 ;*								*
+;*  Revised 11/06/26    -	MON 5.0 switch bits are software-	*
+;*				defined: 004h goes multiuser	*
+;*				after the single-user timeout,	*
+;*				and 008h..080h enable the	*
+;*				floppy, hdcdma/disk3, ide,	*
+;*				scsi and hdca/disk2 boots.	*
+;*				With none of 008h..080h set the	*
+;*				monitor runs; with any set the	*
+;*				level 1 rom probes the enabled	*
+;*				classes in policy order.	*
+;*								*
 ;*  Revised  9/24/26    -	MON 5.0.  The HDCA (Morrow HDC	*
 ;*				Winchester) boot driver is	*
 ;*				replaced by one for the		*
@@ -201,14 +212,22 @@ s1mbuf	equ	00ch		;ICW4: buffered master, same
 ;*	Switch equates						*
 ;*								*
 ;* The switch register is negated: a switch that is on reads as a	*
-;* clear bit.  Two of its eight bits are still meaningful.  Switch	*
-;* 6 says enter the monitor instead of booting; switch 5 says look	*
-;* for the System Support 1's serial port first.		*
+;* clear bit.  The monitor and the level 1 rom use these software-	*
+;* defined bits:							*
+;*									*
+;*	004h	multiuser after the single-user idle timeout (init)	*
+;*	008h	enable boot from floppy				*
+;*	010h	enable boot from hdcdma/disk3			*
+;*	020h	enable boot from ide				*
+;*	040h	enable boot from scsi				*
+;*	080h	enable boot from hdca/disk2			*
+;*									*
+;* Any boot bit set enters the level 1 rom; with none set the	*
+;* monitor runs.  The console order is fixed: Wunderbus, then SS1.	*
 ;*								*
 ;****************************************************************
 
-sw5	equ	008h		;switch 5 on: the System Support 1 first
-sw6	equ	004h		;switch 6 on: the monitor, not a boot
+swboot	equ	0F8h		;the five enable-boot bits
 
 ;****************************************************************
 ;*								*
@@ -351,10 +370,9 @@ rom0	equ	$			;Local ROM, visible only to task 0
 ;* set for halts or a stop. All other task maps are initialized *
 ;* starting at bank 2 to bank 15. (e.g. task 15 has bank 15).	*
 ;* If swithches are set with S1 through S7 off and S8 on, the   *
-;* power on jump address will be F800. If switch 6 is on, the	*
-;* program will jump to the monitor regardless of the state	*
-;* of the other switches.  If S1 - S5 are all 'ON' a hard disk	*
-;* is assumed and the IDE boot program is executed.		*
+;* power on jump address will be F800. The software-defined	*
+;* boot bits (see the switch equates) decide whether to enter	*
+;* the level 1 rom; if none is set the monitor runs.		*
 ;* If pin 13 of 12C is grounded, the diagnostic mode is entered.*
 ;*								*
 ;****************************************************************
@@ -443,20 +461,21 @@ badram: ld	hl,0badh
 	jp 	allerr			;if no ram force entry to monitor
 
 ;
-;	The switch is binary now.  Switch 6 on asks for the monitor and
-;	switch 6 off for a boot.  There is no jump address field left to
-;	read and no disk driver in this rom to read it for: a boot means
-;	the level 1 rom in its socket, and boot is the resident copy loop
-;	that brings it down into ram and enters it.
+;	Any of the enable-boot bits asks for the level 1 rom; none of
+;	them enters the monitor.  The multiuser bit is read by init,
+;	not here.  There is no jump address field and no disk driver
+;	in this rom: a boot means the level 1 rom in its socket, and
+;	boot is the resident copy loop that brings it down into ram
+;	and enters it.
 ;
-;	Switch 5 picked the console back at findcon.  Nothing else on the
-;	switch is read.
+;	The switch no longer picks the console; findcon tries the
+;	Wunderbus first and the SS1 after it.
 
 boot	equ	ramhome		;the resident copy loop
 
 tstsw:	ld	a,(switch)
-	and	sw6
-	jp	nz,boot			;switch 6 off reads set: the level 1 rom
+	and	swboot
+	jp	nz,boot			;a boot bit is enabled: the level 1 rom
 
 montor:	ld	a,1			;normal task number
 	ld	(ctask),a
@@ -721,10 +740,10 @@ rstmxx:	add	hl,de		;add offset to selected map
 ;*  HDCA stops at 53h and the HD-DMA at 55h.		*
 ;*							*
 ;*  Both are programmed here for 19200 baud, 8 data	*
-;*  bits, no parity and one stop bit.  The switch names	*
-;*  which to look for first and the other is looked for	*
-;*  after it, so a machine with one console is found	*
-;*  either way and a machine with both is steered.	*
+;*  bits, no parity and one stop bit.  The monitor looks	*
+;*  for the Wunderbus first and the SS1 after it, so a	*
+;*  machine with one console is found either way and a	*
+;*  machine with both ends up with the Wunderbus.	*
 ;*							*
 ;*  Neither driver can be a routine in the rom: the	*
 ;*  console is called from both halves of it, and a rom	*
@@ -753,16 +772,7 @@ credy	equ	6		;its entry for asking whether one waits
 ;*							*
 ;********************************************************
 
-findcon:ld	a,(switch)
-	and	sw5
-	jr	nz,fconw		;switch 5 off: Wunderbus first
-	call	findss1
-	jr	z,fconss
-	call	findwb
-	jr	z,fconwb
-	jr	nocon
-
-fconw:	call	findwb
+findcon: call	findwb
 	jr	z,fconwb
 	call	findss1
 	jr	z,fconss

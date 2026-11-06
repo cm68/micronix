@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# manifest - list what a boot diskette carries
+#
+#	./manifest <image>
+#
+# Every path on the image, in tree order, with its type and size, and
+# the blocks the filesystem has used and has free.  The file list comes
+# from mnix's own tar of the image; the device nodes come from its
+# devlist, because the tar format this tree writes carries a device
+# entry as an empty file.  The answer is what the image says, not what
+# the build intended to put on it.
+#
+# The free count is the free list's length: fsinfo's nfree is only the
+# last chunk of the list, not the whole of it.
+#
+
+here=`dirname "$0"`
+here=`cd "$here" && pwd` || exit 1
+root=`cd "$here/../.." && pwd`
+mnix="$root/src/tools/mnix"
+
+img="$1"
+if [ -z "$img" ] || [ ! -f "$img" ]; then
+	echo "usage: $0 <image>" >&2
+	exit 1
+fi
+
+tmp=`mktemp` || exit 1
+trap 'rm -f "$tmp"' 0
+
+"$mnix" -f "$img" tar c "$tmp" / >/dev/null 2>&1 || exit 1
+
+fssum=`"$mnix" -f "$img" fsinfo 2>/dev/null`
+fsize=`echo "$fssum" | sed -n 's/.*fsize: *\([0-9][0-9]*\).*/\1/p'`
+free=`echo "$fssum" | sed -n '/free list:/,$p' | tr ' ' '\n' |
+	grep -E '^[0-9]+$' | wc -l`
+
+echo "# $img"
+tar -tvf "$tmp" 2>/dev/null | awk '
+	$1 ~ /^d/ { printf "%-42s %8s  dir\n", $6, "-"; next }
+	$1 ~ /^l/ { printf "%-42s %8s  link\n", $6, "-"; next }
+	$6 ~ /^dev\// { next }
+		{ printf "%-42s %8s  file\n", $6, $3 }
+'
+"$mnix" -f "$img" devlist 2>/dev/null |
+awk 'NF == 4 {
+	printf "%-42s %8s  %s device\n", "dev/" $4, $2 "," $3,
+	    $1 == "b" ? "block" : "character"
+     }'
+echo
+echo "# $fsize blocks total, $free free, $((fsize - free)) used"
+
+# vim: tabstop=4 shiftwidth=4 noexpandtab:

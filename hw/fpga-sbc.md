@@ -606,17 +606,27 @@ S-100 bus is wait-stated; the CPU speed changes throughput, not the bus
 protocol.  Keep 4 MHz to preserve the monitor's disk timing.
 
 **Front panel.**  The switch register at `0x402` read is the board's
-DIP switches, negated: a switch on reads low.  The bits are:
+DIP switches, negated: a switch on reads low.  mon500 defines the
+software bits (register values; S1 is bit 7, S6 bit 2):
 
 | bits | meaning |
 |---|---|
-| `0x04` | no monitor: boot the level-1 loader |
-| `0xF8` | start-address mask |
-| `0x00` | boot the local hard disk (HDCA under mon447, IDE under mon500) |
-| `0x08` | boot HD-DMA |
-| `0x10` | boot DJ-DMA |
+| `0x04` | multiuser after the single-user idle timeout (init reads it) |
+| `0x08` | enable boot from floppy |
+| `0x10` | enable boot from hdcdma/disk3 |
+| `0x20` | enable boot from ide |
+| `0x40` | enable boot from scsi |
+| `0x80` | enable boot from hdca/disk2 |
 | `0x02` | INT PEND (status) |
 | `0x01` | TRAP RESET (status) |
+
+Any `0x08`..`0x80` bit boots; with none set the monitor runs.  The
+level 1 rom probes the enabled classes in policy order (floppy, mfm,
+ide, scsi, hdca/disk2) and boots the first with a label.  S7 and S8
+are not in the readable register; bits 1 and 0 are the two status
+bits, not switches.  The current RTL returns `~DIP[7:0]`, so the
+carrier's DIP[7:2] must be S1..S6 and DIP[1:0] (S7/S8) must be left
+out of the software field.
 
 `0x401` read is the keyboard/diagnostics connector.  With no front
 panel, tie it to `0xFF` (no diagnostics) or to a DIP bit.  `0x400`

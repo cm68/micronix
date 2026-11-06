@@ -61,7 +61,7 @@ module u1_sequencer (
     input  wire        flash_phys,
 
     // task nibble to the external map address mux
-    output wire [3:0]  task,
+    output wire [3:0]  task_o,
 
     // local/trap state to U2
     output wire        local_o,
@@ -173,7 +173,7 @@ module u1_sequencer (
     wire       super    = (eff_task == 4'd0);
     wire       user     = ~super;
 
-    assign task = eff_task;
+    assign task_o = eff_task;
 
     // ------------------------------------------------------------------
     // Mask and status

@@ -14,11 +14,13 @@
  * node it builds.  A disk without a label has no geometry to make a
  * filesystem from, and is refused.
  *
- * The boot is not this program's: it is the device blocks below the
- * filesystem, which the label's slice table already put in front of slice
- * 'a', so no filesystem block number reaches it and no file has to own it.
- * The -i flag is carried for the host's mnix, which writes the boot below
- * the filesystem; here it is accepted and ignored.
+ * The boot is the device blocks below the filesystem, which the label's
+ * slice table already put in front of slice 'a', so no filesystem block
+ * number reaches it and no file has to own it.  -i names the boot file
+ * (DEFBOOT is /bootmw.bin); the file's first half-block goes into block
+ * 0 in front of the label, and the rest from block 1 on, which is where
+ * the rom and the level 2 sector expect them.  A missing file is a
+ * filesystem with no boot, not an error: a data disk has no use for one.
  *
  * This is the command driver: it works out the device and the geometry,
  * opens the raw unix device, and hands the building over to mkfsfunc.c,
@@ -105,6 +107,79 @@ putboot(device)
         if (lseek(fd, 0L, 0) < 0 || write(fd, buf, BSIZE) != BSIZE)
             die("cannot write the label");
     }
+    close(fd);
+    unlink(path);
+}
+
+/*
+ * Write the boot below the filesystem, the other half of what putboot
+ * records.  Block 0's first half is the level 2 sector and its second
+ * half is the label, so the boot file supplies the first half and the
+ * label already in the block is kept.  Level 3 is the rest of the file,
+ * from block 1 on.
+ *
+ * The HDCA reads level 2's load address from the last two bytes of the
+ * sector - mkbootimg -a puts them there - and those bytes are outside
+ * the label.  Take them from the boot file, as mnix's hardboot does.
+ */
+static
+writeboot(device, bfile)
+    char *device;
+    char *bfile;
+{
+    static char path[] = "/tmp/mkfs.b";
+    struct stat sb;
+    char blk[BSIZE];
+    char la[2];
+    UINT major, minor;
+    int fd, bfd, got;
+    int n, i;
+
+    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
+        return;
+    major = sb.st_addr[0] >> 8;
+    minor = (sb.st_addr[0] & ~(7 << 5)) | (DL_WHOLE << 5);
+    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+        return;
+    if ((fd = open(path, 2)) < 0) {
+        unlink(path);
+        return;
+    }
+    if ((bfd = open(bfile, 0)) < 0) {
+        close(fd);
+        unlink(path);
+        return;
+    }
+    if (lseek(fd, 0L, 0) < 0 || read(fd, blk, BSIZE) != BSIZE)
+        goto out;
+    if (read(bfd, blk, DL_OFFSET) < 0)
+        goto out;
+    if (major == 1 && lseek(bfd, (long) BSIZE - 2, 0) >= 0) {
+        if (read(bfd, la, 2) == 2) {
+            blk[BSIZE - 2] = la[0];
+            blk[BSIZE - 1] = la[1];
+        }
+    }
+    if (lseek(fd, 0L, 0) < 0 || write(fd, blk, BSIZE) != BSIZE)
+        goto out;
+    /*
+     * Level 3 from block 1.  The boot file's own second half is not
+     * the medium's label - mkbootimg leaves it empty for the writer -
+     * so skip it to the block boundary and go on from there.
+     */
+    lseek(bfd, (long) BSIZE, 0);
+    for (n = 1; ; n++) {
+        got = read(bfd, blk, BSIZE);
+        if (got <= 0)
+            break;
+        for (i = got; i < BSIZE; i++)
+            blk[i] = 0;
+        if (lseek(fd, (long) n * BSIZE, 0) < 0 ||
+            write(fd, blk, BSIZE) != BSIZE)
+            break;
+    }
+out:
+    close(bfd);
     close(fd);
     unlink(path);
 }
@@ -277,6 +352,12 @@ main(argc, argv)
 
     domkfs(fsize, isize, dsize, f);
     putboot(device);
+    /*
+     * After domkfs, not before: opening the whole-disk node to write
+     * the boot sets the drive's mapping to the whole disk, and the
+     * filesystem writes must still be going through the slice's.
+     */
+    writeboot(device, bfile);
 
     close(dev);
     exit(0);

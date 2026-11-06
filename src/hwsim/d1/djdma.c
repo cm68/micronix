@@ -1459,6 +1459,14 @@ djdma_init()
 #endif
                 return 1;
             }
+            /*
+             * imd_load(..., 1) opens it read-only, so the card must
+             * say so in its drive status too.  Without this the
+             * kernel opens its root read-write, the driver sends a
+             * write, the read-only image refuses it, and the boot
+             * stops waiting for a completion that cannot come.
+             */
+            rodrv[i] = 1;
             media_bound(&djdma_media, i, drivenames[i]);
         }
     }
@@ -1472,6 +1480,7 @@ djdma_init()
 #endif
                 return 1;
             }
+            rodrv[FIVE + i] = 1;
             media_bound(&djdma_media, FIVE + i, fivenames[i]);
         }
     }

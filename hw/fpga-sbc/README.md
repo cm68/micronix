@@ -89,7 +89,11 @@ That needs a USB Blaster and the udev rule for `09fb`.
   S-100 VI lines free.  The 82C55/CF share `FPGA_BI_D` with the JEDEC
   ROM; the chip selects are exclusive.
 - The front-panel switch register reads the DIPs negated
-  (`~DIP`), matching the MPZ80's "switch on reads low" sense.  If the
+  (`~DIP`), matching the MPZ80's "switch on reads low" sense.  DIP[7:2]
+  are S1-S6; mon500's software bits are 0x04 (multiuser after the
+  single-user timeout), 0x08/0x10/0x20/0x40/0x80 (enable the floppy,
+  hdcdma/disk3, ide, scsi and hdca/disk2 boots).  DIP[1:0] are S7/S8,
+  outside the software field.  If the
   board's DIP wiring is active-high, remove the inversion in
   `mpz80_seq.v`.
 

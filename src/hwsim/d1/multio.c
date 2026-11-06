@@ -416,8 +416,15 @@ multio_intack()
     trace(trace_intack, "multio_intack: ivecstate=%d %s\n",
         ivecstate, ivs_name[ivecstate]);
 
-    // the vector is empty, so let's calculate it
-    if (ivecstate == IV_EMPTY) {
+    /*
+     * The vector is empty, or the previous ack found nothing to vector.
+     * The second is not "this ack is spurious": the IM0 CALL game
+     * pulses the 8259 once more than the vector has bytes, so the pulse
+     * after a real vector finds no request and leaves IV_INVALID.  A
+     * real request can be standing when the next ack arrives, and it
+     * must be vectored rather than answered with the invalid 0xff.
+     */
+    if (ivecstate == IV_EMPTY || ivecstate == IV_INVALID) {
         /*
          * Select the highest-priority pending request that is unmasked
          * and higher priority than the highest-priority in-service level,

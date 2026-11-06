@@ -38,12 +38,14 @@ static void iorw(INT16, UINT8);
  * hardware: the front panel, task and mask registers at 0x400, the
  * write-only map RAM at 0x600, and the FPU at 0xc00, above which the
  * page is unmapped.  Only the RAM and the EPROM are memory, so only
- * they are served here.  A write to the task or mask register would
- * switch tasks or stop the machine under the kernel's feet, and the
- * map registers are how the kernel places its windows.
+ * they are served here, with the switch-register exception below.  A
+ * write to the task or mask register would switch tasks or stop the
+ * machine under the kernel's feet, and the map registers are how the
+ * kernel places its windows.
  */
 
 #define LOWREG	0x400			/* front panel, task and mask */
+#define SWREG	0x402			/* switch register: the one readable byte */
 #define LOWROM	0x800			/* monitor EPROM */
 #define LOWTOP	0x1000			/* rest of the page is on board */
 
@@ -106,6 +108,11 @@ memwrite(dev)
  * report the whole count with no error.  The registers are not there
  * to be read or changed, and a program that walks memory should pass
  * through them rather than stop at them.
+ *
+ * The switch register at 0x402 is the exception: a one-byte read of
+ * it is served from the hardware.  It is read-only and the only
+ * hardware byte a user program has any business seeing; a write still
+ * takes the zero path, because writing 0x402 is the task register.
  */
 
 extern UINT8 zpage[];            /* exec.c: a 512-byte zero page */
@@ -122,7 +129,9 @@ krw(dev, rw)
     if ((UINT8) dev & 1) {      /* minor 1: kernel space, low bit */
         off = (UINT16) u.offset;
         n = off + u.count;      /* below off: the transfer wraps at 64K */
-        if (n < off || (off < LOWTOP && n > (off & LOWROM) + LOWREG)) {
+        if (n < off ||
+            ((off < LOWTOP && n > (off & LOWROM) + LOWREG) &&
+             !(rw == READ && off == SWREG && u.count == 1))) {
             if (rw == READ)
                 do
                     iomove(READ, zpage, u.count >= ZSIZE ? ZSIZE : u.count);

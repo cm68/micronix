@@ -113,10 +113,13 @@ left behind.  A drive worth keeping is kept the way hddma-0.blessed is,
 under a name that says what it is.  Nothing else here carries the
 suffix, which is what lets .gitignore tell the images from the scripts.
 
-The other scripts are the host-side path and REGEN.md is where they are:
-create_vol builds a bootable volume out of the tree, boot_vol boots one,
-check_vol runs the host checkers over one, and ncr_create_vol and
-ncr_boot_vol do the same pair for the NCR 5380.
+The other scripts are the host-side path and REGEN.md is where they are.
+hdinstall builds a bootable volume out of the tree on any of the four
+controllers - hdcdma, hdca, ide or ncr - and picks that controller's 4k
+level 2 boot; create_vol, hdca_create_vol, ide_create_vol and
+ncr_create_vol are its per-controller names.  boot_vol, hdca_boot_vol,
+ide_boot_vol and ncr_boot_vol boot the volume each one made, and
+check_vol runs the host checkers over one.
 
 Nothing is patched.  An earlier version of this directory had the swap
 device changed and that was a mistake - see above.
