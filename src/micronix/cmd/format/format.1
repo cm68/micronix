@@ -26,9 +26,9 @@ DESCRIPTION
 .in +5
 .br
 Format lays down the low-level shape of a disk and writes the label a
-fresh drive needs.  It is one program for every controller on the
-machine, and it reads which controller from the device node: the high
-byte of the node's device number is the major, sys/consts.c's
+fresh drive needs.  It is one program for the disk controllers this
+tree formats, and it reads which controller from the device node: the
+high byte of the node's device number is the major, sys/consts.c's
 biosw.  The drive and slice come from the low byte, as they do for
 read and write.  The device must be the drive's whole-disk slice,
 the
@@ -59,22 +59,27 @@ SCSI	The target does the work: FORMAT UNIT blanks the drive, and format
 writes the label and the prototype table.
 .sp
 .ti -10
-IDE	The IDE card has no format command.  Format writes the label and
-the prototype table, which is what label -w does for this card.
+IDE	The IDE card has no format command in this tree.  Format writes
+the label - a fresh or uncarved drive gets the prototype table, a
+carved one keeps its own - which is what label -w does for this card.
 .sp
 .ti -10
 DJ-DMA	The 8 inch floppy: 77 tracks, track 0 single density with 26
 sectors of 128 bytes and tracks 1 through 76 double density with 15
-sectors of 512 bytes.  There is no label; mkfs follows.
+sectors of 512 bytes.  It writes tracks only and no label, so a
+diskette has nothing for mkfs to read until a labeler or mkbootimg has
+put a label in block 0.
 .sp
 .in -10
-The geometry comes from a model name, or the disk's own label, or the
-flags, in that order; the flags override a model.  A model name is
-looked up in the table belonging to the controller the device names,
-so
+The geometry comes from the disk's own label, unless a model name or a
+flag says otherwise: a model overrides the label, and -c, -h and -s
+override the model.  A model name is looked up in the table belonging to the
+controller the device names, so
 .bd
 m10
-is the Seagate ST-412 on an HD-DMA and the Discus M10 on an HDCA.
+is the Seagate ST-412 on an HD-DMA and the Discus M10 on an HDCA.  With
+no model, no label and no flags there is no geometry, and format
+refuses to guess.
 .sp
 .in +10
 .ti -10
@@ -114,10 +119,12 @@ track, and prints its capacity.
 -t track	Format one cylinder (HD-DMA) or one track (DJ-DMA) instead
 of the whole drive.  This is a repair, not a statement about the
 drive's shape.  The HDCA, the 5380 and the IDE card have no partial
-format.
+format.  A bare track number after the device is the same as -t; that
+is djformat's old form.
 .sp
 .ti -10
--e head	Format one head of every cylinder (HD-DMA).
+-e head	Format one head of every cylinder (HD-DMA).  A partial HD-DMA
+walk rewrites the label only if it crossed cylinder 0 head 0.
 .sp
 .in -10
 A geometry from no model, no label and no flags is an error.  The label
@@ -127,8 +134,9 @@ An option a controller does not use is an error rather than ignored, so
 a mistaken drive is not formatted with a shape nobody asked for.
 .sp
 The label is written at byte 256 of block 0.  It carries the geometry,
-the first sector number the controller uses - one for the HDCA and zero
-for every other - the drive's timing on the HD-DMA, and the drive's
+the first sector number the controller uses - one for the HDCA, zero
+for the other fixed disks; a floppy's label, where it has one, is the
+medium's own - the drive's timing on the HD-DMA, and the drive's
 manufacturer and model.  A fresh or uncarved label gets the prototype
 table: cylinder 0 for the boot and the label,
 .bd
@@ -151,7 +159,11 @@ format -m m26 /dev/hdac
 .sp
 format -c 392 -h 16 -s 63 /dev/scsi0c
 .sp
+format -c 392 -h 16 -s 63 /dev/ide0c
+.sp
 format -p /dev/hdac
+.sp
+format /dev/fla
 .sp 2
 .in -5
 .bd
