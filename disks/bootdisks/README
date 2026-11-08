@@ -67,7 +67,7 @@ that can do that.  The five inch medium is the tight one:
 	/boot		the four controllers' level 2 + level 3 boots,
 			about 4k each - bootmw.bin, bootide.bin,
 			bootncr.bin and boothdca.bin - 32 blocks
-	/hdinit		the install script, 1619 bytes
+	/hdinit		the install script, 1970 bytes
 	/bin		the fourteen commands an install needs:
 			sh rm mkfs mount umount chmod cptree mknod
 			setdev ln sync echo format halt.  sh is the real
@@ -79,7 +79,7 @@ that can do that.  The five inch medium is the tight one:
 	/b /f /tmp	the mount points the install uses, and a scratch
 			directory
 
-The five inch image uses 589 of its 760 blocks and leaves 171 free.
+The five inch image uses 585 of its 760 blocks and leaves 175 free.
 The eight inch carries the same set in 626 of 2250 on the double sided
 medium, and in 599 of 1125 on the single sided one.  Run manifest for
 the live numbers: the binaries and the init change, and the free count

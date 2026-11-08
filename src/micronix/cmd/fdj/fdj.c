@@ -104,6 +104,7 @@ run(cmd, len, buf, count, flags, hole)
 {
     struct cdb r;
     int i;
+    r.addrbits = 0;
 
     if (len > sizeof(r.cmd) || count > CDBDATA)
         return -1;

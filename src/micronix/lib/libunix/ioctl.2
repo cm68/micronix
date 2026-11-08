@@ -40,68 +40,173 @@ cmd
 against the driver of the device named by
 .bd
 fd.
-A device is a block device or a character device, and the request
-means a different thing on each.
+A device is a block device or a character device, and the
+request means a different thing on each.  A device that
+does not have the request answers ENOTTY; there is no
+default request.
 .sp
-On a block device
 .bd
-arg
-is a
-.bd
-struct cdb
-and the only request is
+BLOCK DEVICES
+.sp
+A block device has one request,
 .bd
 CDBCMD,
-which hands the command block it describes to the driver
-and lets it run.
-The block is the bus's own - a SCSI command descriptor
-block, the seven task-file registers of an ATA command,
-or the HD-DMA board's block - and the kernel never looks
-inside it.  A driver with no command block answers ENOTTY.
-
+which runs the command block
 .bd
 arg
-points at a
+describes.  The command block is the bus's own - a SCSI
+command descriptor block, the seven task-file registers
+of an ATA command, or the HD-DMA board's twelve-byte
+block - and the kernel copies it, checks its length and
+moves its data, but never interprets it.  A block driver
+that has no command-block interface has no ioctl and
+answers ENOTTY.
+.sp
+On
 .bd
-struct cdb
-(see <sys/ioctl.h>), and the structure's
+CDBCMD
+.bd
+arg
+points at this structure.  UINT8 is an unsigned byte,
+INT16 a signed sixteen-bit integer and UINT32 an
+unsigned thirty-two-bit integer, as in the header.
+.nf
+.bd 9
+struct cdb {
+    UINT8 cmd[26];      /* the command block itself */
+    INT16 len;          /* how many bytes of cmd[] are the command */
+    INT16 count;        /* data phase in bytes; 0 if there is none */
+    INT16 flags;        /* CDB_IN, CDB_ASYNC; 0 for neither */
+    UINT8 *buf;         /* the caller's buffer for the data phase */
+    INT16 hole;         /* offset in cmd[] of the data address, or -1 */
+    UINT32 addrbits;    /* bit n marks cmd[n..n+2] as an address */
+};
+.fi
+.sp
+The requests and the two limits are:
+.nf
+.bd 5
+CDBCMD      0       run the command block in cmd[]
+CDB_IN      1       flags: the device fills buf, rather than reading it
+CDB_ASYNC   2       flags: do not wait for the answer (network card)
+CDBMAX      26      the largest len, the width of cmd[]
+CDBDATA     4096    the largest data phase, one page
+.fi
+.sp
 .bd
 cmd
-holds up to sixteen bytes of command, while
+holds up to
+.bd
+CDBMAX
+bytes.  The first byte is the bus's opcode where the bus
+has one, and what the remaining bytes mean is the
+command's own business; the driver is the only part of
+the system that knows which bus it is talking to.
 .bd
 len
-says how many of those bytes are the command.
+says how many of the bytes in
+.bd
+cmd
+are the command (the rest are status space or unused).
 .bd
 count
 is the number of bytes in the data phase, or zero if
-there is none.
+the command has none.
 .bd
 flags
-says which way the data goes: CDB_IN means the device
-fills the buffer, and without it the buffer is sent.
-CDB_ASYNC, for the network card only, says the caller
-will read the answer from the card's frame stream
-rather than have the call wait for it.
+is zero, plus
+.bd
+CDB_IN
+if the device fills
 .bd
 buf
-is the caller's buffer for the data, and
+rather than reading it, plus
+.bd
+CDB_ASYNC
+if the call is not to wait for the answer - the network
+card's frames then arrive on its frame stream instead.
+.sp
+.bd
+buf
+is the caller's buffer for the data phase; it is
+ignored when
+.bd
+count
+is zero.  A data phase of one disk block (512 bytes) or
+less is staged in one cache block by the kernel.  A
+larger one, up to
+.bd
+CDBDATA
+(one page), is moved by the driver itself, because a
+cache block is all the kernel can hold at once.
+.sp
+A bus that is a bus master needs the data's physical
+address, not the virtual address
+.bd
+buf
+names.  The kernel keeps the staged data in a 4096-byte
+segment, so its physical address is
+.sp
+.nf
+	(segment << 12) | (window address & 0xfff)
+.fi
+.sp
+and
 .bd
 hole
-is where in
+says where in
 .bd
 cmd
-the address of that buffer is to be written, for a bus
-whose command block carries one, or -1 for a bus that
-does not.
-
-A data phase of one disk block (512 bytes) or less is
-moved by the kernel, and the caller's buffer is filled
-from it or sent from it.  A larger one, up to CDBDATA
-(one page), is moved by the driver itself.  The command
-block is copied back to the caller when the driver
-returns, including anything the driver wrote into it,
-so a bus that answers a command inside its block leaves
-its answer there.
+that address belongs: at cmd[hole], cmd[hole+1] and
+cmd[hole+2], little endian, low byte first.  It is -1
+when the command has no data phase, or when the bus
+keeps the data address itself (the SCSI adapter does),
+so the driver has nothing to write.
+.sp
+.bd
+addrbits
+is needed when a command names memory of its own
+besides the data phase - a format lays down a
+sector-header table, or a list of sectors to skip.
+Which words of
+.bd
+cmd
+those addresses occupy is the command's business, not
+the driver's, so the caller marks them.  Bit n of
+.bd
+addrbits
+set means cmd[n], cmd[n+1] and cmd[n+2] are one
+address; the driver writes the swizzled address shown
+above at every marked word.  A word at n with n+2 past
+.bd
+len
+is ignored, and an address that is meant to be zero -
+a null sector table - leaves its bit clear.
+.bd
+hole
+is the same thing for the one data-phase address and
+the two may be used together.
+.sp
+The caller must initialize
+.bd
+addrbits.
+It is copied in with the rest of the structure, and an
+uninitialized word asks the driver to swizzle whatever
+bits happen to be set.  The callers in this tree zero
+the structure, or the field, before filling it in.
+.sp
+When the driver returns, the whole block is copied back
+to the caller, including any bytes the driver wrote into
+it.  A bus that answers a command inside the block - the
+DJ-DMA leaves a status byte in each command it runs -
+has no other way to be heard, so a caller that wants
+that answer finds it in
+.bd
+cmd
+after the call.
+.sp
+.bd
+CHARACTER DEVICES
 .sp
 On a character device
 .bd
@@ -110,18 +215,25 @@ is one of the device's own request codes and
 .bd
 arg
 is whatever that request wants.  A terminal has two:
-.bd
-TIOCGETA
-writes the six-byte
-.bd
-struct sgtty
-(see <sys/sgtty.h>) that
-.bd
-arg
-points at, and
-.bd
-TIOCSETA
-sets the terminal from it.  They are the requests behind
+.nf
+.bd 2
+TIOCGETA    0x7401    fill arg with the terminal's status
+TIOCSETA    0x7402    set the terminal's status from arg
+.fi
+.sp
+The status is this six-byte structure:
+.nf
+.bd 7
+struct sgtty {
+    UINT8 ispeed;       /* input speed */
+    UINT8 ospeed;       /* output speed */
+    UINT8 erase;        /* erase character */
+    UINT8 kill;         /* kill character */
+    UINT16 mode;        /* see <sys/sgtty.h> for the bits */
+};
+.fi
+.sp
+They are the requests behind
 .bd
 gtty
 (3) and
@@ -130,11 +242,11 @@ stty
 (3); those are the calls to make, and this is the call
 under them.  Both were system calls once, and a binary
 built before the library moved them here still reaches
-the same two requests through the old numbers
-(gtty = 32, stty = 31).  Any other character device has
-its own requests - the network card's are the NET*
-requests of <sys/net.h> - and a request its driver does
-not have answers ENOTTY.
+the same two requests through the old numbers (gtty =
+32, stty = 31).  Any other character device has its own
+request codes - the network card's are the NET* requests
+of <sys/net.h> - and a code its driver does not have
+answers ENOTTY.
 .sp 2
 .in -5
 .bd
@@ -150,8 +262,9 @@ ERRORS
 .br
 .bd
 EINVAL
-if cmd is not CDBCMD, or len is not between 1 and
-CDBMAX, or count is negative or greater than CDBDATA.
+if cmd is not CDBCMD, if len is less than 1 or greater
+than CDBMAX, or if count is negative or greater than
+CDBDATA.
 .br
 .bd
 EBADF

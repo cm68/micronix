@@ -366,7 +366,7 @@ setdma()
 static unsigned char
 setchannel()
 {
-    resetchannel = physread(channel + 1) + 
+    resetchannel = physread(channel + 1) +
         (physread(channel + 2) << 8) +
         (physread(channel + 3) << 16);
     tracec(trace_djdma, "%x", resetchannel);
@@ -1451,6 +1451,16 @@ djdma_init()
 
     if (drivenames) {
         for (i = 0; drivenames[i] && i < FIVE; i++) {
+            /*
+             * A diskette named on the command line is writable: a
+             * boot/install diskette's root carries mkfs's temp nodes
+             * in /tmp, and the kernel syncs its superblock.  IMD_DELTA
+             * keeps those writes in the sidecar overlay, so the base
+             * image is unchanged and can be booted again after the
+             * delta is cleared.  Distribution media are read-only, but
+             * they come through the media changer (load_drive's ro
+             * argument), not here.
+             */
             imdp[i] = imd_load(drivenames[i], i, 1);
             if (!imdp[i]) {
 #ifndef NODEBUG
@@ -1459,14 +1469,6 @@ djdma_init()
 #endif
                 return 1;
             }
-            /*
-             * imd_load(..., 1) opens it read-only, so the card must
-             * say so in its drive status too.  Without this the
-             * kernel opens its root read-write, the driver sends a
-             * write, the read-only image refuses it, and the boot
-             * stops waiting for a completion that cannot come.
-             */
-            rodrv[i] = 1;
             media_bound(&djdma_media, i, drivenames[i]);
         }
     }
@@ -1480,7 +1482,6 @@ djdma_init()
 #endif
                 return 1;
             }
-            rodrv[FIVE + i] = 1;
             media_bound(&djdma_media, FIVE + i, fivenames[i]);
         }
     }

@@ -499,6 +499,25 @@ bioctl(fd, cmd, arg)
 }
 
 /*
+ * Write a swizzled address into every field the caller's bit vector
+ * names.  A command block can hold more than the data phase's address -
+ * a format names a sector table too - and which words those are is the
+ * caller's knowledge, not the driver's.  On the field's first byte.
+ */
+void
+cdbaddr(UINT8 *block, INT16 len, UINT32 bits, UINT32 phys)
+{
+    register INT16 i;
+
+    for (i = 0; i + 2 < len; i++)
+        if ((bits >> i) & 1) {
+            block[i] = (UINT8) phys;
+            block[i + 1] = (UINT8) (phys >> 8);
+            block[i + 2] = (UINT8) (phys >> 16);
+        }
+}
+
+/*
  * Return the major device number.
  */
 UINT16

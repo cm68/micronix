@@ -34,6 +34,7 @@ extern void panic(UINT8 *);
 extern void wakeup(INT16);
 extern void sleep(INT16, UINT8);
 extern UINT8 dlslice(struct dlgeom *, struct slicemap *, UINT16, UINT16 *, UINT16 *, UINT16 *, UINT16 *);
+extern void cdbaddr(UINT8 *, INT16, UINT32, UINT32);
 extern UINT8 busgive(INT16 (*)());
 extern UINT8 busget(INT16 (*)());
 
@@ -547,8 +548,21 @@ newrw()
      * block number - which is what a large drive could not be counted in.
      */
     cmd.blk = mwbuf->blk;
-    cmd.dma = mwbuf->data;
-    cmd.xdma = mwbuf->xmem;
+    /*
+     * The command block carries a flat physical address: the window word
+     * is the low twelve bits and the segment is folded in as bits 12-23,
+     * not written in the third byte as its own byte.  The board is a bus
+     * master and sees physical memory; a window address beside a segment
+     * is the kernel's view, not the controller's.
+     */
+    {
+        UINT32 phys;
+
+        phys = ((UINT32) mwbuf->xmem << 12) |
+            ((UINT16) mwbuf->data & 0xfff);
+        cmd.dma = (UINT16) phys;
+        cmd.xdma = (UINT8) (phys >> 16);
+    }
     cmd.count = 512;
     cmd.op = (mwbuf->flags & BREAD) ? READS : WRITES;
     if (mwinfo->flags & RECAL)
@@ -983,17 +997,21 @@ mwioctl(dev, com, r, b)
 
     if (r->count) {
         /*
-         * The address, three bytes, written the way newrw() writes it for
-         * a read or a write: the low two are the window address the
-         * buffer is reachable at, the third is the segment it lives in.
-         * The board takes those two together as one address, which is why
-         * this is not computed as one - a 24-bit address does not fit a
-         * 16-bit unsigned, and the segment is the top eight bits.
+         * The address is swizzled into one flat 24-bit physical value -
+         * the segment folded in as the high bits, exactly as djioctl does
+         * for the floppy and as the board sees memory.  The window word
+         * alone is not an address: the third byte is not "the segment"
+         * beside it, it is bits 16-23 of the folded value.
          */
+        UINT32 phys;
+
         p = bhold(b);
-        ((UINT8 *) &cmd)[hole] = (UINT16) p;
-        ((UINT8 *) &cmd)[hole + 1] = (UINT8) ((UINT16) p >> 8);
-        ((UINT8 *) &cmd)[hole + 2] = b->xmem;
+        phys = ((UINT32) b->xmem << 12) | ((UINT16) p & 0xfff);
+        ((UINT8 *) &cmd)[hole] = (UINT8) phys;
+        ((UINT8 *) &cmd)[hole + 1] = (UINT8) (phys >> 8);
+        ((UINT8 *) &cmd)[hole + 2] = (UINT8) (phys >> 16);
+        if (r->addrbits)
+            cdbaddr((UINT8 *) &cmd, MWLEN, r->addrbits, phys);
     }
 
     mwwait();

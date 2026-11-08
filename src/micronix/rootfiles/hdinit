@@ -32,7 +32,10 @@ shift
 # carry a label; with options format lays the geometry down first.
 case "$#" in
 0)	;;
-*)	format "$@" $whole ;;
+*)	format "$@" $whole
+	# the label must reach the medium before mkfs's own whole-disk
+	# read looks for it; a dirty buffer in the cache is not there yet
+	sync ;;
 esac
 
 echo

@@ -116,14 +116,21 @@ BINS="sh rm mkfs mount umount chmod cptree mknod setdev ln sync echo
 
 #
 # What the install diskette carries is what the install needs and
-# nothing else, and it is the same set on both media.  The init scripts
-# drive mkfs, mount, cptree, mknod, setdev, rm, ln, chmod, sync, echo
-# and halt; format is there because a drive has to be laid down before
-# mkfs can read its label, and the operator runs it with the model or
-# geometry the drive is.  fsck is deliberately absent: an install makes
-# a new filesystem, and checking the one it just made is not a step that
-# can repair anything.  The operator commands, the diskette-to-diskette
-# loop and the repair tools are on the maintenance diskette instead.
+# nothing else.  The init scripts drive mkfs, mount, cptree, mknod,
+# setdev, rm, ln, chmod, sync, echo and halt; format is there because a
+# drive has to be laid down before mkfs can read its label, and the
+# operator runs it with the model or geometry the drive is.  fsck is not
+# on the five inch install diskette: that flow (hdinit) makes a new
+# filesystem and checking the one it just made is not a step that can
+# repair anything.
+#
+# The eight inch install diskette is the distribution install: its
+# script labels the drive after format, makes two filesystems, creates
+# the /usr/src mount point under /b, pulls each distribution diskette
+# through the media changer, and puts the build script on the new root.
+# That needs label, fsck, mkdir, chg and cp as well, and the medium has
+# the room.  The five inch medium does not, and its install has no
+# distribution to pull.
 #
 MAINTBINS="sh login ls cp mv rm cat mkdir mkfs fsck mount umount chmod
 	cptree mknod setdev ln sync echo format label chg fdj halt"
@@ -162,10 +169,16 @@ esac
 bootimg="$bootdir/$bootimg"
 
 # The maintenance diskette carries the repair set, not the install one.
+# An eight inch install diskette carries the distribution install's
+# tools as well, since it is the one that runs that install.
 if [ "$maint" = 1 ]; then
 	case "$medium" in
 	d5ds|d5soft)	BINS="$MAINT5" ;;
 	*)		BINS="$MAINTBINS" ;;
+	esac
+else
+	case "$medium" in
+	d8ss|d8ds)	BINS="$BINS label fsck mkdir cp chg" ;;
 	esac
 fi
 

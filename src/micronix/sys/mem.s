@@ -805,9 +805,12 @@ _memrw:
 	ld	a,b
 	or	c
 	jp	z,7f
-	call	_ei
+	; interrupts stay off across the copy, as in copyin, copyout,
+	; zerouser and segcopy: with MAP0[2]/MAP0[4] holding the user and
+	; outer-space pages, an interrupt taken mid-ldir runs its handler
+	; through the user's pages.  Here the djdma interrupt ran djint,
+	; djint called busget, and busget is page 1 - the user window.
 	ldir
-	call	_di
 7:
 	pop	bc		; restore caller's bc
 	pop	af

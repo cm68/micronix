@@ -563,6 +563,7 @@ inquire()
 	register struct dlabel *lp;
 	unsigned long cyls, heads, spt, nblk, bsize;
 	int i;
+	r.addrbits = 0;
 
 	if (fstat(devfd, (char *) &st) < 0)
 		die("cannot stat the device");

@@ -80,6 +80,18 @@ struct cdb {
     INT16 flags;                  /* CDB_IN if the data comes back */
     UINT8 *buf;                  /* the caller's buffer for that data */
     INT16 hole;                   /* where in cmd[] its address goes; -1 none */
+    /*
+     * The addresses inside the block, as a bit vector: bit n set means
+     * cmd[n], cmd[n+1], cmd[n+2] are one 24-bit address that the driver
+     * has to swizzle - a caller knows its buffer as a virtual address
+     * and the controller follows a physical one.  A format's block can
+     * name more than the data phase (a sector table, a skipped-sector
+     * list), and which words those are differs by command; the caller
+     * says so here instead of every driver learning every command.  The
+     * value written is the swizzled address of the staged buffer.  hole
+     * remains the one-address spelling and is applied the same way.
+     */
+    UINT32 addrbits;
 };
 
 #define CDBMAX  26              /* the widest command block there is */
@@ -92,13 +104,44 @@ struct cdb {
                                  * read it in order with everything else */
 
 /*
- * hole is the caller's, not the kernel's, and the kernel only carries it:
- * it says where in the command block the address of the data phase belongs,
- * three bytes little endian, and the driver writes them there.  buf is a
- * caller's virtual address and a bus wants a physical one, so the driver
- * is the only one that can supply it, and a bus whose block has no room
- * for an address - SCSI's, which the adapter holds itself - says so with
- * hole set to -1 and is not asked for one.
+ * Addresses in the block: hole and addrbits.
+ *
+ * A command block can name memory the controller must read or write - the
+ * data phase itself, a sector-header table a format lays down, a list of
+ * sectors to skip.  The caller knows those as virtual addresses; the bus
+ * follows physical ones, and only the kernel can swizzle them: the value
+ * is
+ *
+ *	(segment << 12) | (window address & 0xfff)
+ *
+ * of the buffer the kernel staged.  Which words of cmd[] are addresses is
+ * a property of the command, not of the bus, and the driver cannot know
+ * every command - a DJDMA format, a SCSI CDB and an IDE task-file block
+ * have nothing in common.  So the caller says so.
+ *
+ * hole is the single-address spelling: where in cmd[] the data phase's
+ * address belongs, three bytes little endian, or -1 if the command has
+ * no data phase or the bus keeps the address itself (SCSI's adapter
+ * does).  Both drivers have always applied it, and it is the right thing
+ * for a command whose only address is its data.
+ *
+ * addrbits is the general one: bit n set means cmd[n], cmd[n+1] and
+ * cmd[n+2] are one 24-bit address to be swizzled.  A word at n with
+ * n + 2 >= len is ignored.  The driver writes the swizzled address of
+ * the staged data buffer at every flagged word; a caller with several
+ * addresses in one block marks each of them, and a caller that wants a
+ * zero address in one of them leaves the bit clear (a null sector table
+ * is a real thing).  count must be non-zero and no more than CDBDATA for
+ * a buffer to be staged and an address to exist.
+ *
+ * A caller must initialize addrbits.  It is copied in with the rest of
+ * the structure and an uninitialized stack word is a request to swizzle
+ * whatever bits happen to be set; the command blocks in this tree zero
+ * the structure (memset) or the field before filling it in.  Use
+ * addrbits for addresses beyond the data phase; hole remains for the
+ * old spelling and the two may be used together.  A driver whose bus has
+ * no address in its block ignores both, and SCSI callers set hole to -1
+ * and leave addrbits zero.
  */
 
 /*

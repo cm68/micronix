@@ -86,6 +86,7 @@ run(op, head, track, sector, count, flags, buf)
 {
     struct cdb r;
     int st;
+    r.addrbits = 0;
 
     memset((char *) &r, 0, sizeof r);
     r.cmd[0] = op;

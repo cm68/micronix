@@ -29,8 +29,10 @@
 
 #include <types.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/fs.h>
 #include <sys/stat.h>
+#include <sys/dir.h>
 #include <sys/dlabel.h>
 
 #include "mkfs.h"
@@ -38,7 +40,6 @@
 #include <stdlib.h>
 
 
-extern int mknod(char *path, int mode, int dev);
 
 int dev = -1;
 
@@ -67,6 +68,76 @@ void wrblk(bn, buf)
 }
 
 /*
+ * The whole-disk node that belongs to a device node.
+ *
+ * The label and the boot live at device block 0, which a slice node
+ * cannot address: block 0 of slice a is a cylinder into the drive.  The
+ * old way to reach it was to mknod a 'c' node under /tmp, which needs a
+ * writable root; the boot diskette root is not writable.  The /dev the
+ * diskette or a running system already carries has a whole-disk node for
+ * every controller - dev/devlist names them - so this finds it by major
+ * and minor and opens that instead.
+ *
+ * A floppy has no whole-disk slice.  Its own node is the whole disk and
+ * its block 0 is the label, so that node is the answer.
+ *
+ * Answers the path in a static buffer, or 0 if there is no such node.
+ */
+static char wholename[32];
+
+static char *
+whole_node(device, majorp, minorp)
+    char *device;
+    UINT *majorp, *minorp;
+{
+    struct stat sb, ns;
+    struct dir de;
+    char nm[15];
+    char path[32];
+    UINT major, whole;
+    int dfd, n, i;
+
+    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK) {
+        printf("mkfs: %s is not a block device\n", device);
+        return (0);
+    }
+    major = sb.st_addr[0] >> 8;
+    whole = ((sb.st_addr[0] & 0377) & ~(7 << 5)) | (DL_WHOLE << 5);
+    *majorp = major;
+    *minorp = whole;
+    if (major == 2) {           /* a floppy: its own node is the whole */
+        strncpy(wholename, device, sizeof(wholename) - 1);
+        wholename[sizeof(wholename) - 1] = 0;
+        return (wholename);
+    }
+    dfd = open("/dev", 0);
+    if (dfd < 0) {
+        printf("mkfs: cannot open /dev\n");
+        return (0);
+    }
+    while ((n = read(dfd, (char *) &de, sizeof de)) == sizeof de) {
+        if (de.ino == 0 || de.name[0] == '.')
+            continue;
+        for (i = 0; i < 14 && de.name[i]; i++)
+            nm[i] = de.name[i];
+        nm[i] = 0;
+        strcpy(path, "/dev/");
+        strcat(path, nm);
+        if (stat(path, &ns) < 0 || (ns.st_mode & IFMT) != IFBLK)
+            continue;
+        if ((ns.st_addr[0] & 0377) != whole ||
+            (ns.st_addr[0] >> 8) != major)
+            continue;
+        close(dfd);
+        strcpy(wholename, path);
+        return (wholename);
+    }
+    close(dfd);
+    printf("mkfs: no whole-disk node for %u/%u\n", major, whole);
+    return (0);
+}
+
+/*
  * Write the label's boot extent back into block 0 of the whole disk.
  *
  * The boot lives in the blocks below slice 'a' - the label command put
@@ -86,29 +157,21 @@ static
 putboot(device)
     char *device;
 {
-    static char path[] = "/tmp/mkfs.b";
-    struct stat sb;
+    char *path;
     char buf[BSIZE];
     UINT major, minor;
     int fd;
 
-    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
+    if ((path = whole_node(device, &major, &minor)) == 0)
         return;
-    major = sb.st_addr[0] >> 8;
-    minor = (sb.st_addr[0] & ~(7 << 5)) | (DL_WHOLE << 5);
-    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+    if ((fd = open(path, 2)) < 0)
         return;
-    if ((fd = open(path, 2)) < 0) {
-        unlink(path);
-        return;
-    }
     if (lseek(fd, 0L, 0) >= 0 && read(fd, buf, BSIZE) == BSIZE) {
         putlabel(buf);
         if (lseek(fd, 0L, 0) < 0 || write(fd, buf, BSIZE) != BSIZE)
             die("cannot write the label");
     }
     close(fd);
-    unlink(path);
 }
 
 /*
@@ -127,27 +190,19 @@ writeboot(device, bfile)
     char *device;
     char *bfile;
 {
-    static char path[] = "/tmp/mkfs.b";
-    struct stat sb;
+    char *path;
     char blk[BSIZE];
     char la[2];
     UINT major, minor;
     int fd, bfd, got;
     int n, i;
 
-    if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
+    if ((path = whole_node(device, &major, &minor)) == 0)
         return;
-    major = sb.st_addr[0] >> 8;
-    minor = (sb.st_addr[0] & ~(7 << 5)) | (DL_WHOLE << 5);
-    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+    if ((fd = open(path, 2)) < 0)
         return;
-    if ((fd = open(path, 2)) < 0) {
-        unlink(path);
-        return;
-    }
     if ((bfd = open(bfile, 0)) < 0) {
         close(fd);
-        unlink(path);
         return;
     }
     if (lseek(fd, 0L, 0) < 0 || read(fd, blk, BSIZE) != BSIZE)
@@ -181,7 +236,6 @@ writeboot(device, bfile)
 out:
     close(bfd);
     close(fd);
-    unlink(path);
 }
 
 void usage()
@@ -207,7 +261,7 @@ labelgeom(device, tracksp, headsp, sptp, sizep)
     char *device;
     UINT *tracksp, *headsp, *sptp, *sizep;
 {
-    static char path[] = "/tmp/mkfs.c";
+    char *path;
     struct stat sb;
     struct dlabel *lp;
     UINT major, minor, sl, off, len;
@@ -216,27 +270,21 @@ labelgeom(device, tracksp, headsp, sptp, sizep)
 
     if (stat(device, &sb) < 0 || (sb.st_mode & IFMT) != IFBLK)
         return (0);
-    major = sb.st_addr[0] >> 8;
-    minor = sb.st_addr[0] & 0377;
-    sl = (minor >> 5) & 7;
-    minor = (minor & ~(7 << 5)) | (DL_WHOLE << 5);
-    if (mknod(path, 0160666, (major << 8) | minor) < 0)
+    sl = (sb.st_addr[0] >> 5) & 7;
+    if ((path = whole_node(device, &major, &minor)) == 0)
         return (0);
     if ((fd = open(path, 0)) < 0)
-        goto out;
+        return (0);
     if (lseek(fd, 0L, 0) < 0 || read(fd, buf, BSIZE) != BSIZE) {
         close(fd);
-        goto out;
+        return (0);
     }
     close(fd);
     lp = (struct dlabel *) &buf[DL_OFFSET];
     if (lp->d_magic[0] != DL_MAGIC[0] || lp->d_magic[1] != DL_MAGIC[1] ||
         lp->d_magic[2] != DL_MAGIC[2] || lp->d_magic[3] != DL_MAGIC[3] ||
-        lp->d_tracks == 0 || lp->d_heads == 0 || lp->d_spt == 0) {
-        unlink(path);
+        lp->d_tracks == 0 || lp->d_heads == 0 || lp->d_spt == 0)
         return (0);
-    }
-    unlink(path);
     *tracksp = lp->d_tracks;
     *headsp = lp->d_heads;
     *sptp = lp->d_spt;
@@ -253,9 +301,6 @@ labelgeom(device, tracksp, headsp, sptp, sizep)
         len = lp->d_tracks - off;
     *sizep = len * (UINT) lp->d_heads * lp->d_spt;
     return (1);
-out:
-    unlink(path);
-    return (0);
 }
 
 main(argc, argv)

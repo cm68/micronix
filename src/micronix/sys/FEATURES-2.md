@@ -49,8 +49,13 @@ The calls themselves:
   terminal one: `stty` and `gtty` still do that.  `ioctl` carries a
   command block (`struct cdb`, `CDBCMD`) to a block driver - a SCSI
   CDB, an ATA task file, whatever the bus wants - and the kernel moves
-  the data phase through one cache block when it fits.  A driver that
-  declares no ioctl entry answers `ENOTTY`.  It is what makes
+  the data phase through one cache block when it fits.  The block's
+  addresses are the caller's declaration (`cdb.hole`, or the `addrbits`
+  vector for commands that name more than the data phase), because only
+  the caller knows which words of the command are addresses and only
+  the driver can swizzle a window address to the physical one the bus
+  follows.  A driver that declares no ioctl entry answers `ENOTTY`.  It
+  is what makes
   `hdformat`, `mwformat`, `scsiformat` and the partition readers
   possible without a syscall per controller.
 - **reboot** (sys/sys1.c).  The graceful path drains the cache through

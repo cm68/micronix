@@ -34,6 +34,7 @@ extern void sleep(INT16, UINT8);
 static UINT8 getstat(INT16);
 extern UINT8 busgive(INT16 (*)());
 extern UINT8 busget(INT16 (*)());
+extern void cdbaddr(UINT8 *, INT16, UINT32, UINT32);
 
 /*
  * The static routines below, declared before anything calls them.
@@ -849,6 +850,8 @@ djioctl(dev, cmd, r, b)
 		D[hole + 1] = (UINT8) (phys >> 8);
 		D[hole + 2] = (UINT8) (phys >> 16);
 	}
+	if (r->addrbits)
+		cdbaddr(D, len, r->addrbits, phys);
 
 	busplease();
 

@@ -283,14 +283,18 @@ attention(portaddr p, byte v)
     drv = command.seldir & DRV_MASK;
 
     steps = command.step_low + (command.step_high << 8);
-    /* The boot loaders pass a flat 16-bit address (dma_high == 0); the
-     * kernel passes a 4K segment + 12-bit offset (dma_high == segment),
-     * matching the MMU (mpz80.c getpte): physical = seg<<12 | off. */
-    if (command.dma_high == 0)
-        dmaaddr = command.dma_low + (command.dma_mid << 8);
-    else
-        dmaaddr = (command.dma_high << 12) |
-            ((command.dma_low + (command.dma_mid << 8)) & 0xfff);
+    /*
+     * The command block's data address is one flat 24-bit physical
+     * address, low byte first, with the third byte its bits 16-23.  The
+     * kernel swizzles its window word and segment into that at the
+     * command block (sys/mw.c, sys/dj.c), so the board - and this - take
+     * the three bytes as one address, not as a word beside a segment.
+     * A boot loader's flat 16-bit address is the same thing with a zero
+     * top byte.
+     */
+    dmaaddr = command.dma_low + (command.dma_mid << 8) +
+        (command.dma_high << 16);
+
     link = command.link_low + (command.link_mid << 8) + (command.link_high << 16);
     /*
      * Four head select lines, not three.  The fourth is the high-current

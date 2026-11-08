@@ -62,6 +62,7 @@ fmtrack(fd, drive, cyl, secs)
 {
     struct cdb r;
     int st;
+    r.addrbits = 0;
 
     r.len = 17;
     r.cmd[0] = SETMP;           /* the density's media parameters */

@@ -194,6 +194,7 @@ run(nb, count, buf)
 {
     struct cdb r;
     int st;
+    r.addrbits = 0;
 
     memset((char *) &r, 0, sizeof r);
     memcpy((char *) &r.cmd[0], (char *) nb, sizeof (struct hddma_cmd));

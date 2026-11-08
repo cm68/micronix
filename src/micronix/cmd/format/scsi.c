@@ -36,6 +36,7 @@ static
 format_unit()
 {
     struct cdb r;
+    r.addrbits = 0;
 
     memset((char *) &r, 0, sizeof r);
     r.cmd[0] = CFORMAT;
