@@ -20,11 +20,13 @@
  * and the page is spent.  Nothing has been taken when init runs, so there
  * is nothing to give back.
  *
- * No tick - this controller answers when it is spoken to, and the one
- * asynchronous thing it has to say (the bus going free) is an interrupt.
- * No data either: the probe reads a register and computes nothing, and
- * what the driver keeps - boards[] and scs[] (sys/ncr.c) - is nobody
- * else's business, so there is no structure to point at.
+ * The tick is ncrcheck, the watchdog that turns a target which has
+ * stopped answering into an error instead of a hang: a command is
+ * expected to complete by interrupt, and an expectation with no
+ * timeout is a hang waiting for the hardware.  No data: the probe reads
+ * a register and computes nothing, and what the driver keeps -
+ * boards[] and scs[] (sys/ncr.c) - is nobody else's business, so there
+ * is no structure to point at.
  *
  * name is a character list rather than the string it reads as; sys/ovl.h
  * says why, and it is the same reason this file is one struct.
@@ -39,12 +41,12 @@
 
 extern INT16 ncropen();
 extern void ncrclose(), ncrstrat();
-extern INT16 ncrinit(), ncrprobe();
+extern INT16 ncrinit(), ncrprobe(), ncrcheck();
 extern void ncrint();
 extern struct biovec ncrbvec;
 
-struct ovlhdr ncrhdr = { 5, &ncrinit, 0, 0, &ncrbvec, 0, &ncrprobe, &ncrint,
-	{ 'n', 'c', 'r', '5', '3', '8', '0' } };
+struct ovlhdr ncrhdr = { 5, &ncrinit, &ncrcheck, 0, &ncrbvec, 0, &ncrprobe,
+	&ncrint, { 'n', 'c', 'r', '5', '3', '8', '0' } };
 
 /*
  * vim: tabstop=4 shiftwidth=4 expandtab:

@@ -458,8 +458,20 @@ disk1int()
         newrw();
         return;
     }
-    if (d1state != ACTIVE)
-        return;                 /* nothing in flight, or already failed */
+    if (d1state != ACTIVE) {
+        /*
+         * Nothing is in flight: the completion was failed by the
+         * watchdog, or the queue already moved on.  SENSE INTERRUPT
+         * STATUS is the chip's acknowledgement and the only thing that
+         * drops its interrupt pin; returning without it leaves the level
+         * asserted and the handler is entered again.
+         */
+        d1fault = 0;
+        d1putb(FDC_SENSEI);
+        (void) d1getb();
+        (void) d1getb();
+        return;
+    }
 
     d1fault = 0;
     st0 = d1getb();

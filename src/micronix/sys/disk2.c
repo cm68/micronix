@@ -559,8 +559,15 @@ disk2int()
     void (*f) ();
 
     f = d2intr;
-    if (f == 0)
+    if (f == 0) {
+        /*
+         * Nothing is armed: the completion the board is reporting was
+         * timed out or was never wanted.  Release the line anyway, or
+         * the level stays asserted and the handler is entered again.
+         */
+        out(D2_CTL, 0);
         return (0);
+    }
     d2intr = 0;
     (*f) ();
     return (0);
@@ -585,6 +592,14 @@ disk2check()
         return (0);
     di();
     d2intr = 0;
+    /*
+     * Dismiss the board as well.  The phase being dropped means the
+     * completion is no longer wanted; a latch left standing would be
+     * delivered after the next request armed its phase and would be
+     * taken for that one.  A control write with RUN clear releases the
+     * line (disk2probe does the same after its tickle).
+     */
+    out(D2_CTL, 0);
     ei();
     d2info->flags &= ~CALIB;    /* the head position is a guess now */
     d2buf->flags |= BERROR;

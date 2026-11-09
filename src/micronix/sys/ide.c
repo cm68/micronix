@@ -195,6 +195,9 @@ static INT16 idereset(struct ideif *, UINT8);
  */
 #define IDELEN  7
 
+/* ticks a command may sit in flight before the tick fails it */
+#define IDEDEADLINE 4
+
 /*
  * What goes in the drive/head register: LBA addressing, head 0.  The
  * register also carries a bit for choosing between the two drives one
@@ -486,6 +489,8 @@ static struct ideif boards[] = {
     {&myrd, &mywr, &myxfer, &myreset, &mysel, &myintr, 0, 0, 0},
 };
 
+static UINT8 idead;             /* ticks the request has been in flight */
+
 /*
  * Drive configuration.  Unlike mw.c's info there is nothing in here that
  * the label does not carry.  mw.c keeps a table of per-model numbers,
@@ -626,6 +631,29 @@ ideint()
 }
 
 /*
+ * The tick: a command that has sat in flight past IDEDEADLINE seconds is
+ * failed.  The status read is the drive's acknowledgement - it is what
+ * drops INTRQ - so the completion that never came is dismissed here and
+ * cannot be delivered later, after the next request has started, and
+ * taken for that request's.
+ */
+INT16
+idecheck()
+{
+    register struct ideif *ip;
+
+    ip = &boards[0];
+    if (!ip->busy)
+        return (0);
+    if (++idead <= IDEDEADLINE)
+        return (0);
+    ip->status = (*ip->rd) (STAT) | SERR;
+    ip->done = 1;
+    wakeup(&ip->done);
+    return (0);
+}
+
+/*
  * Wait for the handler to say the drive has answered.  The shape is the
  * kernel's canonical one - uio.c's block() and bwait() are the same three
  * lines - and it is not decoration: the test and the sleep are inside one
@@ -682,6 +710,7 @@ idestart(ip, unit, lba, read)
     }
     ip->busy = 1;
     ip->done = 0;
+    idead = 0;
     ei();
 
     (*ip->sel) (unit);
@@ -1097,6 +1126,7 @@ ideioctl(dev, cmd, r, b)
     }
     ip->busy = 1;
     ip->done = 0;
+    idead = 0;
     ei();
 
     (*ip->sel) (dev & 1);

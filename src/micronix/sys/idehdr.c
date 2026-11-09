@@ -12,10 +12,13 @@
  * driver's own rather than statics inside it (sys/ide.c) - an address a
  * header names has to be visible to the object holding the header.
  *
- * No tick - this controller answers when it is spoken to.  No init
- * either: the attach loop unmasks the line once the handler is in
- * place, and the drive's own reset belongs at open, where it is, so
- * there is nothing to switch on before this driver is reachable.
+ * The tick is idecheck, the watchdog that turns a drive which has
+ * stopped answering into an error instead of a hang: a command is
+ * expected to complete by interrupt, and an expectation with no
+ * timeout is a hang waiting for the hardware.  No init: the attach
+ * loop unmasks the line once the handler is in place, and the drive's
+ * own reset belongs at open, where it is, so there is nothing to
+ * switch on before this driver is reachable.
  * Nothing here reaches the driver's data, so there is no data
  * structure to point at yet.
  *
@@ -33,10 +36,10 @@
 extern INT16 ideopen();
 extern void ideclose(), idestrat();
 extern void ideint();
-extern INT16 ideprobe();
+extern INT16 ideprobe(), idecheck();
 extern struct biovec idebvec;
 
-struct ovlhdr idehdr = { 4, 0, 0, 0, &idebvec, 0, &ideprobe, &ideint,
+struct ovlhdr idehdr = { 4, 0, &idecheck, 0, &idebvec, 0, &ideprobe, &ideint,
 	{ 'i', 'd', 'e' } };
 
 /*

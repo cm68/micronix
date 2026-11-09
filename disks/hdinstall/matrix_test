@@ -535,6 +535,13 @@ run_controller() {
 	fi
 
 	# 2. the hard disk alone: make, install, clobber, make, verify.
+	#
+	# The level 1 rom's default switch mask is 0x7c - it deliberately
+	# leaves out the hdca/disk2 bit (0x80) - so on this leg the rom
+	# never probes the card and says "no boot device".  Add the bit,
+	# and leave the rest of the default probe alone.
+	bootflags=""
+	[ "$name" = hdca ] && bootflags="-c 0xfc"
 	boot_stage "build" "=== TEST-DONE" 21600 \
 		"$drive"0:"$rootvol" "$drive"1:"$usrvol"
 	rc=$?

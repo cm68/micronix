@@ -49,6 +49,8 @@ static void (*hdintr)(struct hd *);	/* the phase the op-done interrupt resumes *
 static struct hd *hdintarg;	/* its argument */
 static void (*hdseekintr)(struct hd *);	/* the phase the seek-done interrupt resumes */
 static struct hd *hdseekarg;	/* its argument */
+static void (*hdresume)(struct hd *);	/* the phase taken off the latch to run */
+static struct hd *hdresumearg;	/* its argument */
 static UINT8 hdunit;		/* the drive the FUNC register selects */
 static struct hd *hdactive;	/* the drive owning the controller */
 static UINT8 hddead;		/* seconds the request has been in flight */
@@ -319,6 +321,7 @@ release(hp)
 			q->h_buf = q->h_next;
 			q->h_next = 0;
 			q->h_flags &= ~HDWAIT;
+			wakeup(q);      /* a strategy waiting for the slot */
 			phase00(q);
 			return;
 		}
@@ -349,13 +352,19 @@ hdtick()
 		return (0);
 	/*
 	 * The armed continuations are dropped so a late interrupt - if the
-	 * controller ever does answer - finds nothing to resume.
+	 * controller ever does answer - finds nothing to resume.  The
+	 * card's own latches are dismissed in the same critical section:
+	 * a completion left standing here would be delivered after the
+	 * next request had armed its continuation, and would be taken for
+	 * that request's.  This is what makes the timeout final.
 	 */
 	di();
 	hdseekintr = 0;
 	hdseekarg = 0;
 	hdintr = 0;
 	hdintarg = 0;
+	out(HDCA_CMD, CMD_RAMDATA);	/* dismiss op-done */
+	(void)in(HDCA_INT);		/* dismiss seek-done */
 	ei();
 	if (hdactive)
 		phase11(hdactive, ENXIO);
@@ -373,8 +382,6 @@ hdstrat(b)
 	struct buf *b;
 {
 	struct hd *hp;
-	UINT16 cyl, head, sector;
-	UINT16 sl, off, roll, len, maxblk;
 
 	hp = getinfo(b->dev);
 	hp->h_drive = b->dev & 3;
@@ -394,36 +401,29 @@ hdstrat(b)
 	}
 
 	/*
-	 * The buffer's minor names its slice; dlslice resolves its offset,
-	 * roll, length and bound from the cached table ('c' is the whole
-	 * drive).
+	 * One request queued behind the one in flight.  Wait for the slot
+	 * rather than overwrite it: the queued buffer is this drive's whole
+	 * record of the request, and the geometry is resolved from it when
+	 * the request starts (phase00), so nothing here touches the fields
+	 * of the request already on the controller.
+	 *
+	 * The test and the sleep are inside one di(), so release() cannot
+	 * free the slot between them and lose its wakeup.  release() wakes
+	 * this channel when it takes the queue.
 	 */
-	sl = devslice(b->dev);
-	if (dlslice((struct dlgeom *)hp, hdslice[b->dev & 3], sl,
-		    &off, &roll, &len, &maxblk) || b->blk > maxblk) {
-		b->flags |= BERROR;
-		b->error = ENXIO;
-		iodone(b);
+	for (;;) {
+		di();
+		if (!hp->h_next)
+			break;
+		sleep(hp, PRIBIO);
+	}
+	hp->h_buf = b;
+	if (exclude(hp) < 0) {
+		ei();
 		return (0);
 	}
-	if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
-		dlreload(b, (struct dlgeom *)hp, hdslice[b->dev & 3], 0);
-	cyl = gettrk(b->blk, hp->h_spc, off, roll, len);
-	head = gethed(b->blk, hp);
-	sector = getsec(b->blk, hp);
-	hp->h_buf = b;
-	hp->h_cur = b;
-	hp->h_head = head;
-	hp->h_sector = sector;
-	hp->h_trackdelta = cyl - hp->h_cyl;
-	if (b->flags & BREAD)
-		hp->h_flags &= ~HDWRITE;
-	else
-		hp->h_flags |= HDWRITE;
-
-	if (exclude(hp) < 0)
-		return (0);
 	phase00(hp);
+	ei();
 	return (0);
 }
 
@@ -435,7 +435,41 @@ static void
 phase00(hp)
 	struct hd *hp;
 {
+	struct buf *b;
+	UINT16 sl, off, roll, len, maxblk, cyl;
+
+	b = hp->h_buf;
+	hp->h_cur = b;
 	hp->h_flags &= ~HDERROR;
+	/*
+	 * An ioctl named its own geometry; an ordinary request derives it
+	 * here, when it starts, and not in the strategy.  The request that
+	 * is queued behind this one must not be able to change the head,
+	 * track or sector this one is about to move.
+	 */
+	if (!hp->h_cmd) {
+		sl = devslice(b->dev);
+		if (dlslice((struct dlgeom *)hp, hdslice[b->dev & 3], sl,
+			    &off, &roll, &len, &maxblk) || b->blk > maxblk) {
+			b->flags |= BERROR;
+			b->error = ENXIO;
+			hp->h_cur = 0;
+			hp->h_buf = 0;
+			iodone(b);
+			release(hp);
+			return;
+		}
+		if (!(b->flags & BREAD) && b->blk == 0 && sl == DL_WHOLE)
+			dlreload(b, (struct dlgeom *)hp, hdslice[b->dev & 3], 0);
+		cyl = gettrk(b->blk, hp->h_spc, off, roll, len);
+		hp->h_head = gethed(b->blk, hp);
+		hp->h_sector = getsec(b->blk, hp);
+		hp->h_trackdelta = cyl - hp->h_cyl;
+		if (b->flags & BREAD)
+			hp->h_flags &= ~HDWRITE;
+		else
+			hp->h_flags |= HDWRITE;
+	}
 	hdactive = hp;
 	hddead = 0;
 	phase01(hp);
@@ -623,6 +657,7 @@ phase12(hp)
 	hp->h_buf = 0;
 	hp->h_cur = 0;
 	release(hp);
+	wakeup(hp);         /* a close waiting for the drive to drain */
 }
 
 /*
@@ -641,9 +676,21 @@ hdint()
 	if (psr & PSR_OPDONE) {
 		out(HDCA_CMD, CMD_RAMDATA);	/* acknowledge op-done */
 		if (hdintr) {
-			(*hdintr) (hdintarg);
+			/*
+			 * Take the phase off the latch before running it.
+			 * The phase finishes this request, releases the
+			 * controller and starts the next queued one, which
+			 * arms the next continuation.  Clearing after the
+			 * call threw that arming away, and the queued
+			 * request never saw its interrupt; it sat until the
+			 * watchdog failed it, leaving a stale buffer and a
+			 * filesystem busy at umount.
+			 */
+			hdresume = hdintr;
+			hdresumearg = hdintarg;
 			hdintr = 0;
 			hdintarg = 0;
+			(*hdresume) (hdresumearg);
 		}
 		return (0);
 	}
@@ -651,9 +698,11 @@ hdint()
 	if (ssr & SSR_SDONE) {
 		(void)in(HDCA_INT);	/* acknowledge seek-done */
 		if (hdseekintr) {
-			(*hdseekintr) (hdseekarg);
+			hdresume = hdseekintr;
+			hdresumearg = hdseekarg;
 			hdseekintr = 0;
 			hdseekarg = 0;
+			(*hdresume) (hdresumearg);
 		}
 	}
 	return (0);
@@ -721,9 +770,19 @@ hdclose(dev)
 	struct hd *hp;
 
 	hp = getinfo(dev);
-	while (hp->h_flags & HDWAIT)
+	/*
+	 * Wait for the drive to drain.  The test and the sleep are inside
+	 * one di(), and phase12() and release() wake this channel as the
+	 * queue moves, so a completion cannot slip between them.
+	 */
+	for (;;) {
+		di();
+		if (!hp->h_cur && !hp->h_buf && !hp->h_next)
+			break;
 		sleep(hp, PRIBIO);
+	}
 	hp->h_flags &= ~HDOPEN;
+	ei();
 	return (0);
 }
 
@@ -862,7 +921,6 @@ hdcioctl(dev, cmd, r, b)
 		return (-1);
 	}
 	hdmutex = 1;
-	ei();
 
 	hp->h_buf = b;
 	hp->h_cur = b;
@@ -876,11 +934,22 @@ hdcioctl(dev, cmd, r, b)
 		hp->h_flags &= ~HDWRITE;
 
 	phase00(hp);
+	ei();
 
-	while (hp->h_cmd)
+	/*
+	 * The canonical wait: the test and the sleep inside one di(), so
+	 * the op-done interrupt cannot clear h_cmd between them and lose
+	 * the wakeup.
+	 */
+	for (;;) {
+		di();
+		if (!hp->h_cmd)
+			break;
 		sleep(&hdioctl, PRIBIO);
+	}
 
 	r->cmd[HDLEN] = hp->h_stat;
+	ei();
 	return (0);
 }
 

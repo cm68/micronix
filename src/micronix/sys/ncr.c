@@ -359,6 +359,9 @@ static INT8 scsiselect(struct scsiif *, UINT8);
  * overlaid top end is not mapped, so everything a resident handler
  * touches has to be resident too.
  */
+/* ticks a command may sit in flight before the tick fails it */
+#define NCRDEADLINE 4
+
 struct scsiif
 {
     /* prototyped: the byte first parameters ride in A and the indirect
@@ -455,6 +458,8 @@ myintr(on)
 static struct scsiif boards[] = {
     {&myrd, &mywr, &myreset, &myintr, 0, 0, 0, 0, 0},
 };
+
+static UINT8 ncrdead;           /* ticks the request has been in flight */
 
 /*
  * Target configuration.  Unlike mw.c's info there is nothing in here that
@@ -729,6 +734,32 @@ ncrint()
 }
 
 /*
+ * The tick: a command that has sat in flight past NCRDEADLINE seconds is
+ * failed.  The basis-status read and the reset-parity-interrupt read are
+ * the chip's acknowledgement - the second is what clears its interrupt
+ * latches - so the completion that never came is dismissed here and
+ * cannot be delivered later, after the next request has started, and
+ * taken for that request's.
+ */
+INT16
+ncrcheck()
+{
+    register struct scsiif *ip;
+
+    ip = &boards[0];
+    if (!ip->busy)
+        return (0);
+    if (++ncrdead <= NCRDEADLINE)
+        return (0);
+    ip->status = (*ip->rd) (BASR);
+    (*ip->rd) (RPI);
+    ip->error = EIO;
+    ip->done = 1;
+    wakeup(&ip->done);
+    return (0);
+}
+
+/*
  * Take the card: wait for it to be free, then mark it busy and clear
  * the per-command flags.  The wait is the kernel's canonical shape -
  * uio.c's block() and bwait() are the same three lines - and the test
@@ -748,6 +779,7 @@ scsibegin(ip)
     ip->busy = 1;
     ip->done = 0;
     ip->error = 0;
+    ncrdead = 0;
     ei();
 }
 

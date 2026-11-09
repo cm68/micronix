@@ -37,6 +37,8 @@ struct nd ndinfo[NND];
 static INT16 ndmutex;		/* the card, 0 = free */
 static void (*ndintr)(struct nd *);	/* the phase the op-done interrupt resumes */
 static struct nd *ndintarg;
+static void (*ndresume)(struct nd *);	/* the phase taken off the latch to run */
+static struct nd *ndresumearg;	/* its argument */
 static UINT8 nddead;		/* seconds the request has been in flight */
 static UINT8 ndstat;		/* the status that raised the interrupt */
 
@@ -141,6 +143,7 @@ release(np)
 		np->n_buf = np->n_next;
 		np->n_next = 0;
 		np->n_flags &= ~NDWAIT;
+		wakeup(np);     /* a strategy waiting for the slot */
 		phase00(np);
 		return;
 	}
@@ -163,11 +166,27 @@ ndstrat(b)
 		return (0);
 	}
 	np = &ndinfo[0];		/* one drive */
+
+	/*
+	 * One request queued behind the one on the card.  Wait for the
+	 * slot rather than overwrite it, and do not touch the request in
+	 * flight: phase00() takes n_buf as n_cur when the request starts.
+	 * The test and the sleep are inside one di(); release() wakes
+	 * this channel when it takes the queue.
+	 */
+	for (;;) {
+		di();
+		if (!np->n_next)
+			break;
+		sleep(np, PRIBIO);
+	}
 	np->n_buf = b;
-	np->n_cur = b;
-	if (exclude(np) < 0)
+	if (exclude(np) < 0) {
+		ei();
 		return (0);
+	}
 	phase00(np);
+	ei();
 	return (0);
 }
 
@@ -179,9 +198,11 @@ static void
 phase00(np)
 	struct nd *np;
 {
-	struct buf *b = np->n_cur;
+	struct buf *b;
 	UINT8 *p;
 
+	np->n_cur = np->n_buf;
+	b = np->n_cur;
 	np->n_flags &= ~NDERROR;
 	nddead = 0;
 	ndblk(b->blk);
@@ -267,6 +288,7 @@ phase12(np)
 	np->n_buf = 0;
 	np->n_cur = 0;
 	release(np);
+	wakeup(np);         /* a close waiting for the drive to drain */
 }
 
 /*
@@ -288,6 +310,7 @@ ndtick()
 	di();
 	ndintr = 0;
 	ndintarg = 0;
+	out(ND_CMD, ND_ACK);        /* dismiss the card's latched cause */
 	ei();
 	np = &ndinfo[0];
 	if (np->n_cur)
@@ -310,9 +333,17 @@ ndint()
 		return (0);
 	out(ND_CMD, ND_ACK);
 	if (ndintr) {
-		(*ndintr) (ndintarg);
+		/*
+		 * Take the phase off the latch before running it, as
+		 * disk2int() does: the phase may start the next queued
+		 * request and arm its continuation, and clearing after
+		 * the call would throw that arming away.
+		 */
+		ndresume = ndintr;
+		ndresumearg = ndintarg;
 		ndintr = 0;
 		ndintarg = 0;
+		(*ndresume) (ndresumearg);
 	}
 	return (0);
 }
@@ -337,8 +368,18 @@ ndclose(dev)
 	struct nd *np;
 
 	np = &ndinfo[0];
-	while (np->n_flags & NDWAIT)
+	/*
+	 * Wait for the drive to drain.  The test and the sleep are inside
+	 * one di(), and phase12() and release() wake this channel as the
+	 * queue moves, so a completion cannot slip between them.
+	 */
+	for (;;) {
+		di();
+		if (!np->n_cur && !np->n_buf && !np->n_next)
+			break;
 		sleep(np, PRIBIO);
+	}
+	ei();
 	return (0);
 }
 
