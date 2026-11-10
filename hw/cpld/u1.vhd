@@ -59,8 +59,8 @@ entity u1_sequencer is
         wr_n   : in std_logic;
         halt_n : in std_logic;
 
-        -- map RAM B permission nibble: {unused, RI10, execute, read}
-        perm : in std_logic_vector(3 downto 0);
+        -- map RAM B attribute nibble: {unused, RI10, execute, read}
+        pte_attr : in std_logic_vector(3 downto 0);
 
         -- from U2
         bus_grant : in std_logic;
@@ -117,17 +117,17 @@ architecture rtl of u1_sequencer is
     signal wr   : std_logic;
 
     signal mem       : std_logic;
-    signal m1_read   : std_logic;
-    signal mem_read  : std_logic;
-    signal mem_write : std_logic;
-    signal io_read   : std_logic;
-    signal io_write  : std_logic;
+    signal m1_fetch   : std_logic;
+    signal memread  : std_logic;
+    signal memwrite : std_logic;
+    signal ioread   : std_logic;
+    signal iowrite  : std_logic;
 
     signal addr_lo : std_logic_vector(3 downto 0);
     signal page    : std_logic_vector(3 downto 0);
 
-    signal local_page : std_logic;
-    signal local      : std_logic;
+    signal local     : std_logic;
+    signal local_mem : std_logic;
     signal local_reg  : std_logic;
     signal local_ram  : std_logic;
     signal local_rom  : std_logic;
@@ -154,9 +154,9 @@ architecture rtl of u1_sequencer is
     -- Trap-window state (declared early: the decode and every control
     -- output below are qualified by it)
     ----------------------------------------------------------------------
-    signal trap_count  : unsigned(3 downto 0);
-    signal trap_active : std_logic;
-    signal trap_armed  : std_logic;
+    signal trapcount  : unsigned(3 downto 0);
+    signal trap_win : std_logic;
+    signal trap_arm  : std_logic;
     signal flash_half_r : std_logic;
 
     ----------------------------------------------------------------------
@@ -165,20 +165,51 @@ architecture rtl of u1_sequencer is
     -- Low nibble is the task/map-table selector.  The high nibble is
     -- latched context and is not an address field.
     ----------------------------------------------------------------------
-    signal task_cur   : unsigned(3 downto 0);
-    signal task_next  : unsigned(3 downto 0);
-    signal task_delay : unsigned(3 downto 0);
-    signal task_ctx   : unsigned(3 downto 0);
+    signal taskreg   : unsigned(3 downto 0);
+    signal next_taskreg  : unsigned(3 downto 0);
+    signal delay : unsigned(3 downto 0);
+    signal task_hi   : unsigned(3 downto 0);
 
-    signal eff_task : unsigned(3 downto 0);
-    signal is_super : std_logic;
-    signal is_user  : std_logic;
+    signal task_eff : unsigned(3 downto 0);
+    signal supervisor : std_logic;
+    signal user  : std_logic;
 
     ----------------------------------------------------------------------
     -- Mask and status
     ----------------------------------------------------------------------
-    signal mask_reg   : std_logic_vector(7 downto 0);
-    signal status_reg : std_logic_vector(7 downto 0);
+    signal maskreg   : std_logic_vector(7 downto 0);
+    signal trapstat : std_logic_vector(7 downto 0);
+
+    -- Common MPZ80 contract definitions.  The same names and values
+    -- are in the Verilog twin and the FPGA sequencer; change one,
+    -- change all.  Manual Tables 1-1, 4-9 and 4-10.
+    constant ATTR_READ   : integer := 0;
+    constant ATTR_EXEC   : integer := 1;
+    constant ATTR_RI10   : integer := 2;
+    constant ATTR_UNUSED : integer := 3;
+
+    constant MASK_STOP : integer := 0;
+    constant MASK_AUX  : integer := 1;
+    constant MASK_TINT : integer := 2;
+    constant MASK_HALT : integer := 4;
+    constant MASK_SINT : integer := 5;
+    constant MASK_IO   : integer := 6;
+    constant MASK_ZIO  : integer := 7;
+
+    constant TS_RESET    : std_logic_vector(7 downto 0) := x"BF";
+    constant TS_HALT     : std_logic_vector(7 downto 0) := x"BB";
+    constant TS_INT      : std_logic_vector(7 downto 0) := x"B7";
+    constant TS_IN       : std_logic_vector(7 downto 0) := x"3C";
+    constant TS_OUT      : std_logic_vector(7 downto 0) := x"BC";
+    constant TS_FAULT    : std_logic_vector(7 downto 0) := x"F7";
+    constant TS_FAULT_RD : std_logic_vector(7 downto 0) := x"3E";
+    constant TS_FAULT_WR : std_logic_vector(7 downto 0) := x"BE";
+    constant TS_GROW_RD  : std_logic_vector(7 downto 0) := x"7E";
+    constant TS_GROW_WR  : std_logic_vector(7 downto 0) := x"FE";
+    constant TS_STOP_RD  : std_logic_vector(7 downto 0) := x"2F";
+    constant TS_STOP_WR  : std_logic_vector(7 downto 0) := x"AF";
+    constant TS_AUX_RD   : std_logic_vector(7 downto 0) := x"1F";
+    constant TS_AUX_WR   : std_logic_vector(7 downto 0) := x"9F";
 
     constant ST_VOID : std_logic_vector(7 downto 0) := x"01";
     constant ST_IORQ : std_logic_vector(7 downto 0) := x"02";
@@ -189,9 +220,7 @@ architecture rtl of u1_sequencer is
     constant ST_RI10 : std_logic_vector(7 downto 0) := x"40";
     constant ST_READ : std_logic_vector(7 downto 0) := x"80";
 
-    constant ST_RESET : std_logic_vector(7 downto 0) :=
-        ST_VOID or ST_IORQ or ST_HALT or ST_INT or
-        ST_STOP or ST_AUX or ST_READ;
+    constant ST_RESET : std_logic_vector(7 downto 0) := TS_RESET;
 
     signal mask_stop_dis : std_logic;
     signal mask_aux_en   : std_logic;
@@ -215,28 +244,27 @@ architecture rtl of u1_sequencer is
     ----------------------------------------------------------------------
     -- Permission check and deferred memory fault
     ----------------------------------------------------------------------
-    signal perm_read_ok  : std_logic;
-    signal perm_exec_ok  : std_logic;
-    signal perm_write_ok : std_logic;
+    signal perm_read  : std_logic;
+    signal perm_exec  : std_logic;
+    signal perm_write : std_logic;
+    signal perm_ok    : std_logic;
+    signal attr_grow  : std_logic;
+    signal perm_fault : std_logic;
+    signal grow       : std_logic;
+    signal mem_fault  : std_logic;
 
-    signal access_ok     : std_logic;
-    signal ri10          : std_logic;
-    signal prot_fault    : std_logic;
-    signal grow_fault    : std_logic;
-    signal mem_fault_now : std_logic;
-
-    signal mem_fault_pending : std_logic;
-    signal fault_is_write    : std_logic;
-    signal fault_ri10        : std_logic;
-    signal fault_page        : std_logic_vector(7 downto 0);
+    signal fault_pending  : std_logic;
+    signal fault_is_write : std_logic;
+    signal fault_grow     : std_logic;
+    signal fault_trapreg  : std_logic_vector(7 downto 0);
 
     signal fault_event : std_logic;
 
     ----------------------------------------------------------------------
     -- Trap address shift register: {current page, previous page}
     ----------------------------------------------------------------------
-    signal trap_addr_reg   : std_logic_vector(7 downto 0);
-    signal trap_addr_latch : std_logic_vector(7 downto 0);
+    signal trapreg   : std_logic_vector(7 downto 0);
+    signal trapreg_hold : std_logic_vector(7 downto 0);
 
     signal trap_shift : std_logic;
 
@@ -246,7 +274,7 @@ architecture rtl of u1_sequencer is
     signal trap_read       : std_logic;
     signal trap_start_read : std_logic;
     signal trap_event      : std_logic;
-    signal trap_status     : std_logic_vector(7 downto 0);
+    signal trapstat_next     : std_logic_vector(7 downto 0);
 
     ----------------------------------------------------------------------
     -- Data bus
@@ -266,11 +294,11 @@ begin
     wr   <= not wr_n;
 
     mem       <= mreq and (not iorq);
-    m1_read   <= m1 and mem and rd;
-    mem_read  <= mem and rd;
-    mem_write <= mem and wr;
-    io_read   <= iorq and rd;
-    io_write  <= iorq and wr;
+    m1_fetch   <= m1 and mem and rd;
+    memread  <= mem and rd;
+    memwrite <= mem and wr;
+    ioread   <= iorq and rd;
+    iowrite  <= iorq and wr;
 
     addr_lo <= a3 & a2 & a1 & a0;
     page    <= a15 & a14 & a13 & a12;
@@ -281,10 +309,10 @@ begin
     -- The external 74AHCT138 must be enabled only for memory cycles; the
     -- mem term here is the second line of defence against an I/O address
     -- accidentally matching the local page.
-    local_page <= mem and
+    local <= mem and
                   (not (sel_ram_n and sel_regs_n and sel_map_n and
                         sel_rom_n and sel_fpu_n));
-    local      <= local_page or (flash_phys and mem);
+    local_mem  <= local or (flash_phys and mem);
 
     local_reg <= mem and (not sel_regs_n);
     local_ram <= mem and (not sel_ram_n);
@@ -296,8 +324,8 @@ begin
     reg_402 <= '1' when (local_reg = '1' and addr_lo = "0010") else '0';
     reg_403 <= '1' when (local_reg = '1' and addr_lo = "0011") else '0';
 
-    rd_reg <= local_reg and rd and (not trap_active);
-    wr_reg <= local_reg and wr and (not trap_active);
+    rd_reg <= local_reg and rd and (not trap_win);
+    wr_reg <= local_reg and wr and (not trap_win);
 
     task_write     <= wr_reg and reg_402;
     mask_write     <= wr_reg and reg_403;
@@ -305,11 +333,11 @@ begin
     keyb_read      <= rd_reg and reg_401;
     status_read    <= rd_reg and reg_403;
 
-    map_write <= mem and (not sel_map_n) and wr and (not trap_active);
+    map_write <= mem and (not sel_map_n) and wr and (not trap_win);
 
     -- A normal S-100 memory cycle: not local, not the flash region, not
     -- inside the forced trap window.
-    mapped <= mem and (not local) and (not trap_active);
+    mapped <= mem and (not local_mem) and (not trap_win);
 
     ----------------------------------------------------------------------
     -- Task register and 8-M1 switch delay
@@ -318,25 +346,25 @@ begin
     -- permission check, exactly as mpz80.c applies set_taskreg() before
     -- decoding the address.
     ----------------------------------------------------------------------
-    eff_task <= task_next when (m1_read = '1' and task_delay = 1)
-                else task_cur;
+    task_eff <= next_taskreg when (m1_fetch = '1' and delay = 1)
+                else taskreg;
 
-    is_super <= '1' when eff_task = 0 else '0';
-    is_user  <= not is_super;
+    supervisor <= '1' when task_eff = 0 else '0';
+    user  <= not supervisor;
 
-    task_o <= std_logic_vector(eff_task);
+    task_o <= std_logic_vector(task_eff);
 
     ----------------------------------------------------------------------
     -- Mask and status
     ----------------------------------------------------------------------
     -- SINT follows the emulator/kernel: mask bit 5 high blocks supervisor
     -- interrupts; low allows them.  (The manual's wording is the reverse.)
-    mask_stop_dis <= mask_reg(0);
-    mask_aux_en   <= mask_reg(1);
-    mask_tint_dis <= mask_reg(2);
-    mask_halt_dis <= mask_reg(4);
-    mask_sint_dis <= mask_reg(5);
-    mask_io_dis   <= mask_reg(6);
+    mask_stop_dis <= maskreg(MASK_STOP);
+    mask_aux_en   <= maskreg(MASK_AUX);
+    mask_tint_dis <= maskreg(MASK_TINT);
+    mask_halt_dis <= maskreg(MASK_HALT);
+    mask_sint_dis <= maskreg(MASK_SINT);
+    mask_io_dis   <= maskreg(MASK_IO);
 
     ----------------------------------------------------------------------
     -- Prefix tracking, halt substitution and trap sources
@@ -345,67 +373,71 @@ begin
                           (d = x"ED") or (d = x"FD")
                  else '0';
 
-    halt_event <= '1' when (m1_read = '1' and prefix = '0' and d = x"76" and
-                            mask_halt_dis = '1' and trap_active = '0' and
-                            trap_armed = '0')
+    halt_event <= '1' when (m1_fetch = '1' and prefix = '0' and d = x"76" and
+                            mask_halt_dis = '1' and trap_win = '0' and
+                            trap_arm = '0')
                   else '0';
 
-    io_event <= '1' when (iorq = '1' and m1 = '0' and is_user = '1' and
-                          mask_io_dis = '1' and trap_active = '0' and
-                          trap_armed = '0')
+    io_event <= '1' when (iorq = '1' and m1 = '0' and user = '1' and
+                          mask_io_dis = '1' and trap_win = '0' and
+                          trap_arm = '0')
                 else '0';
 
-    int_event <= '1' when (int_req = '1' and is_user = '1' and
-                           mask_tint_dis = '1' and trap_active = '0' and
-                           trap_armed = '0')
+    int_event <= '1' when (int_req = '1' and user = '1' and
+                           mask_tint_dis = '1' and trap_win = '0' and
+                           trap_arm = '0')
                  else '0';
 
     stop_event <= '1' when (stop_i = '1' and mask_stop_dis = '0' and
-                            trap_active = '0' and trap_armed = '0')
+                            trap_win = '0' and trap_arm = '0')
                   else '0';
 
     aux_event <= '1' when (aux_i = '1' and mask_aux_en = '1' and
-                           trap_active = '0' and trap_armed = '0')
+                           trap_win = '0' and trap_arm = '0')
                  else '0';
 
     ----------------------------------------------------------------------
     -- Permission check and deferred memory fault
     ----------------------------------------------------------------------
-    perm_read_ok  <= perm(0);
-    perm_exec_ok  <= perm(0) or perm(1);   -- manual: r/o is executable
-    perm_write_ok <= perm(0) and perm(1);
+    -- Manual Table 1-1 and Tables 4-9/4-10: Read-Only (01) may
+    -- execute and read, Execute-Only (10) may execute, Full (11) may
+    -- do everything.  So execute is any nonzero attribute, read is
+    -- bit 0 and write needs both bits.
+    perm_read  <= pte_attr(ATTR_READ);
+    perm_exec  <= pte_attr(ATTR_READ) or pte_attr(ATTR_EXEC);
+    perm_write <= pte_attr(ATTR_READ) and pte_attr(ATTR_EXEC);
 
-    access_ok <= perm_exec_ok when m1_read = '1' else
-                 perm_write_ok when mem_write = '1' else
-                 perm_read_ok;
+    perm_ok <= perm_exec when m1_fetch = '1' else
+               perm_write when memwrite = '1' else
+               perm_read;
 
-    ri10 <= perm(2);
+    attr_grow <= pte_attr(ATTR_RI10);
 
-    prot_fault <= mapped and is_user and (not access_ok);
-    grow_fault <= mapped and is_user and access_ok and ri10;
+    perm_fault <= mapped and user and (not perm_ok);
+    grow       <= mapped and user and perm_ok and attr_grow;
 
-    mem_fault_now <= prot_fault or grow_fault;
+    mem_fault <= perm_fault or grow;
 
-    fault_event <= '1' when (mem_fault_pending = '1' and m1_read = '1' and
-                             trap_active = '0' and trap_armed = '0')
+    fault_event <= '1' when (fault_pending = '1' and m1_fetch = '1' and
+                             trap_win = '0' and trap_arm = '0')
                    else '0';
 
     ----------------------------------------------------------------------
     -- Trap address shift register: {current page, previous page}
     ----------------------------------------------------------------------
-    trap_shift <= mapped and (mem_read or mem_write) and
-                  (not trap_active);
+    trap_shift <= mapped and (memread or memwrite) and
+                  (not trap_win);
 
     ----------------------------------------------------------------------
     -- Trap window, flash counter and data buffer
     ----------------------------------------------------------------------
-    trap_read <= mem_read;          -- opcode and operand fetches count
+    trap_read <= memread;          -- opcode and operand fetches count
 
     -- The faulting M1 is the first forced read; int/stop/aux/reset arm the
     -- window for the next read; the halt's own M1 is substituted with 0x00
     -- and the window starts after it.
     trap_start_read <= trap_read and
-                       (fault_event or (trap_armed and (not halt_event)));
+                       (fault_event or (trap_arm and (not halt_event)));
 
     trap_event <= halt_event or io_event or int_event or stop_event or
                   aux_event or fault_event;
@@ -414,46 +446,46 @@ begin
     -- Status encoding, highest-priority source first
     ----------------------------------------------------------------------
     status_encode : process (stop_event, aux_event, int_event, halt_event,
-                             io_event, fault_event, rd, io_read,
-                             fault_is_write, fault_ri10)
+                             io_event, fault_event, rd, ioread,
+                             fault_is_write, fault_grow)
     begin
-        trap_status <= ST_RESET;
+        trapstat_next <= ST_RESET;
         if stop_event = '1' then
             if rd = '1' then
-                trap_status <= x"2F";
+                trapstat_next <= TS_STOP_RD;
             else
-                trap_status <= x"AF";
+                trapstat_next <= TS_STOP_WR;
             end if;
         elsif aux_event = '1' then
             if rd = '1' then
-                trap_status <= x"1F";
+                trapstat_next <= TS_AUX_RD;
             else
-                trap_status <= x"9F";
+                trapstat_next <= TS_AUX_WR;
             end if;
         elsif int_event = '1' then
-            trap_status <= x"B7";
+            trapstat_next <= TS_INT;
         elsif halt_event = '1' then
-            trap_status <= x"BB";
+            trapstat_next <= TS_HALT;
         elsif io_event = '1' then
-            if io_read = '1' then
-                trap_status <= x"3C";
+            if ioread = '1' then
+                trapstat_next <= TS_IN;
             else
-                trap_status <= x"BC";
+                trapstat_next <= TS_OUT;
             end if;
         elsif fault_event = '1' then
             if EMU_FAULT_STATUS then
-                trap_status <= x"F7";
+                trapstat_next <= TS_FAULT;
             elsif fault_is_write = '1' then
-                if fault_ri10 = '1' then
-                    trap_status <= x"FE";
+                if fault_grow = '1' then
+                    trapstat_next <= TS_GROW_WR;
                 else
-                    trap_status <= x"BE";
+                    trapstat_next <= TS_FAULT_WR;
                 end if;
             else
-                if fault_ri10 = '1' then
-                    trap_status <= x"7E";
+                if fault_grow = '1' then
+                    trapstat_next <= TS_GROW_RD;
                 else
-                    trap_status <= x"3E";
+                    trapstat_next <= TS_FAULT_RD;
                 end if;
             end if;
         end if;
@@ -462,27 +494,27 @@ begin
     ----------------------------------------------------------------------
     -- Interrupt gating (U2 supplies the raw S-100 request)
     ----------------------------------------------------------------------
-    int_to_cpu <= int_req and (not trap_active) and (not trap_armed) and
-                  ((is_user and (not mask_tint_dis)) or
-                   (is_super and (not mask_sint_dis)));
+    int_to_cpu <= int_req and (not trap_win) and (not trap_arm) and
+                  ((user and (not mask_tint_dis)) or
+                   (supervisor and (not mask_sint_dis)));
 
     ----------------------------------------------------------------------
     -- Data bus
     ----------------------------------------------------------------------
     data_bus : process (trap_addr_read, keyb_read, status_read,
-                        trap_addr_latch, status_reg)
+                        trapreg_hold, trapstat)
     begin
         d_oe  <= '0';
         d_out <= x"FF";
         if trap_addr_read = '1' then
             d_oe  <= '1';
-            d_out <= trap_addr_latch;
+            d_out <= trapreg_hold;
         elsif keyb_read = '1' then
             d_oe  <= '1';
             d_out <= x"FF";
         elsif status_read = '1' then
             d_oe  <= '1';
-            d_out <= status_reg;
+            d_out <= trapstat;
         end if;
     end process data_bus;
 
@@ -494,98 +526,98 @@ begin
     sequencer : process (clk, reset_n)
     begin
         if reset_n = '0' then
-            task_cur          <= (others => '0');
-            task_next         <= (others => '0');
-            task_delay        <= (others => '0');
-            task_ctx          <= (others => '0');
-            mask_reg          <= (others => '0');
-            status_reg        <= ST_RESET;
+            taskreg          <= (others => '0');
+            next_taskreg         <= (others => '0');
+            delay        <= (others => '0');
+            task_hi          <= (others => '0');
+            maskreg          <= (others => '0');
+            trapstat        <= ST_RESET;
             prefix            <= '0';
-            trap_addr_reg     <= (others => '0');
-            trap_addr_latch   <= (others => '0');
-            trap_count        <= (others => '0');
-            trap_active       <= '0';
-            trap_armed        <= '1';   -- reset window starts at first read
+            trapreg     <= (others => '0');
+            trapreg_hold   <= (others => '0');
+            trapcount        <= (others => '0');
+            trap_win       <= '0';
+            trap_arm        <= '1';   -- reset window starts at first read
             flash_half_r      <= '0';   -- lower 1K reset half
-            mem_fault_pending <= '0';
+            fault_pending <= '0';
             fault_is_write    <= '0';
-            fault_ri10        <= '0';
-            fault_page        <= (others => '0');
+            fault_grow        <= '0';
+            fault_trapreg        <= (others => '0');
         elsif rising_edge(clk) then
 
             -- Prefix: one prefix byte, then the next M1 is the opcode.
-            if m1_read = '1' then
+            if m1_fetch = '1' then
                 prefix <= is_prefix;
-            elsif mem_read = '1' then
+            elsif memread = '1' then
                 prefix <= '0';
             end if;
 
             -- Task switch delay.  The new task is selected on the final
-            -- M1, and eff_task already reflects that for this fetch.
-            if m1_read = '1' and task_delay /= 0 then
-                if task_delay = 1 then
-                    task_cur   <= task_next;
-                    task_delay <= (others => '0');
+            -- M1, and task_eff already reflects that for this fetch.
+            if m1_fetch = '1' and delay /= 0 then
+                if delay = 1 then
+                    taskreg   <= next_taskreg;
+                    delay <= (others => '0');
                 else
-                    task_delay <= task_delay - 1;
+                    delay <= delay - 1;
                 end if;
             end if;
 
             -- Trap address shift, and latch on a faulting reference.
             if trap_shift = '1' then
-                trap_addr_reg <= page & trap_addr_reg(7 downto 4);
+                trapreg <= page & trapreg(7 downto 4);
             end if;
 
-            if mem_fault_now = '1' then
-                mem_fault_pending <= '1';
-                fault_is_write    <= mem_write;
-                fault_ri10        <= ri10;
-                fault_page        <= page & trap_addr_reg(7 downto 4);
+            if mem_fault = '1' then
+                fault_pending <= '1';
+                fault_is_write    <= memwrite;
+                fault_grow        <= attr_grow;
+                fault_trapreg        <= page & trapreg(7 downto 4);
             end if;
 
             if trap_event = '1' then
-                status_reg <= trap_status;
-                task_cur   <= (others => '0');
-                task_next  <= (others => '0');
-                task_delay <= (others => '0');
-                trap_armed <= '1';
+                trapstat <= trapstat_next;
+                taskreg   <= (others => '0');
+                next_taskreg  <= (others => '0');
+                delay <= (others => '0');
+                trap_arm <= '1';
             end if;
 
             if fault_event = '1' then
-                trap_addr_latch   <= fault_page;
-                mem_fault_pending <= '0';
+                trapreg_hold   <= fault_trapreg;
+                fault_pending <= '0';
             elsif trap_event = '1' then
                 if trap_shift = '1' then
-                    trap_addr_latch <= page & trap_addr_reg(7 downto 4);
+                    trapreg_hold <= page & trapreg(7 downto 4);
                 else
-                    trap_addr_latch <= trap_addr_reg;
+                    trapreg_hold <= trapreg;
                 end if;
             end if;
 
             -- Window counter and first-read start.
-            if trap_active = '1' then
+            if trap_win = '1' then
                 if trap_read = '1' then
-                    trap_count <= trap_count - 1;
-                    if trap_count = 1 then
-                        trap_active <= '0';
+                    trapcount <= trapcount - 1;
+                    if trapcount = 1 then
+                        trap_win <= '0';
                     end if;
                 end if;
             elsif trap_start_read = '1' then
-                trap_active <= '1';
-                trap_count  <= to_unsigned(15, 4);
-                trap_armed  <= '0';
+                trap_win <= '1';
+                trapcount  <= to_unsigned(15, 4);
+                trap_arm  <= '0';
             end if;
 
             -- Register writes.
             if task_write = '1' then
-                task_next    <= unsigned(d(3 downto 0));
-                task_ctx     <= unsigned(d(7 downto 4));
-                task_delay   <= to_unsigned(8, 4);
+                next_taskreg    <= unsigned(d(3 downto 0));
+                task_hi     <= unsigned(d(7 downto 4));
+                delay   <= to_unsigned(8, 4);
                 flash_half_r <= '1';   -- upper monitor half
             end if;
 
             if mask_write = '1' then
-                mask_reg <= d;
+                maskreg <= d;
             end if;
 
             -- Any non-reset trap selects the upper monitor half.
@@ -598,10 +630,10 @@ begin
     ----------------------------------------------------------------------
     -- Output control
     ----------------------------------------------------------------------
-    local_o <= local_page or (flash_phys and mem);
+    local_o <= local or (flash_phys and mem);
 
-    trap_o <= trap_active or halt_event or mem_fault_now or
-              mem_fault_pending or trap_armed;
+    trap_o <= trap_win or halt_event or mem_fault or
+              fault_pending or trap_arm;
 
     mapram_oe_n <= "00" when mapped = '1' else "11";
 
@@ -611,20 +643,20 @@ begin
 
     flash_cnt_load_n <= not trap_start_read;
     flash_cnt_clr_n  <= reset_n;
-    flash_cnt_clk    <= trap_read and trap_active;
+    flash_cnt_clk    <= trap_read and trap_win;
 
     flash_half <= flash_half_r;
-    flash_mux  <= trap_active or trap_start_read;
+    flash_mux  <= trap_win or trap_start_read;
 
-    flash_ce_n <= not (local_rom or flash_phys or trap_active or
+    flash_ce_n <= not (local_rom or flash_phys or trap_win or
                        trap_start_read or halt_event);
-    flash_oe_n <= not ((local_rom or flash_phys or trap_active or
-                        trap_start_read or halt_event) and mem_read);
+    flash_oe_n <= not ((local_rom or flash_phys or trap_win or
+                        trap_start_read or halt_event) and memread);
 
-    sram_oe_n <= not (local_ram and mem_read);
-    sram_we_n <= not (local_ram and mem_write);
+    sram_oe_n <= not (local_ram and memread);
+    sram_we_n <= not (local_ram and memwrite);
 
-    trapbuf_oe_n <= not (trap_active or trap_start_read or halt_event);
-    trapdata_sel <= trap_active or trap_start_read;
+    trapbuf_oe_n <= not (trap_win or trap_start_read or halt_event);
+    trapdata_sel <= trap_win or trap_start_read;
 
 end architecture rtl;

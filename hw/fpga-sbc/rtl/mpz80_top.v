@@ -106,7 +106,11 @@ module mpz80_top (
 );
 
     // ---------------------------------------------------------------
-    // clocks: 50 MHz -> 4.000 MHz CPU, 2.000 MHz S-100 PHI
+    // clocks: 50 MHz -> 4.000 MHz CPU, 2.000 MHz S-100 CLOCK
+    //   S-100 pin 24 (PHI) is the master timing signal for the bus: it
+    //   is the CPU clock and must track the CPU.
+    //   S-100 pin 49 (CLOCK) is a fixed 2 MHz timebase with no
+    //   relationship to any other bus signal (IEEE-696 2.2.9.3).
     // ---------------------------------------------------------------
     wire clk4, clk2, c2, c3;
     PLL01_50 pll (
@@ -463,7 +467,9 @@ module mpz80_top (
 
     assign FPGA_OUT_pHLDA      = !busak_n;
 
-    assign FPGA_OUT_PHI        = clk2;
+    // S-100 pin 24: master timing signal, tracks the CPU clock.
+    assign FPGA_OUT_PHI        = clk4;
+    // S-100 pin 49: constant 2 MHz, no relationship to the CPU clock.
     assign FPGA_OUT_2mHz_CLOCK = clk2;
     assign FPGA_OUT_CPU_CLK    = clk4;
 

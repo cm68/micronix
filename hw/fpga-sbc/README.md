@@ -50,7 +50,7 @@ That needs a USB Blaster and the udev rule for `09fb`.
 | `lat0-12.hex` | 4 KB 8x12 font ROM initializer |
 | `text_ram.mif` | power-up contents of the text page (spaces) |
 | `rtl/uart.v` | vendor USB UART backend (FT231x) |
-| `rtl/pll_4m.v` | 50 MHz -> 4.000 MHz CPU, 2.000 MHz PHI |
+| `rtl/pll_4m.v` | 50 MHz -> 4.000 MHz CPU (S-100 PHI) and fixed 2.000 MHz S-100 CLOCK |
 | `tools/bin2mif.py` | unused; the monitor goes in the JEDEC part |
 
 ## Board assumptions
@@ -97,12 +97,36 @@ That needs a USB Blaster and the udev rule for `09fb`.
   board's DIP wiring is active-high, remove the inversion in
   `mpz80_seq.v`.
 
+## MPZ80 contract choices
+
+- The permission bits follow the manual (Table 1-1, Tables 4-9/4-10):
+  execute is any nonzero attribute, read bit 0, write both.  The RTL
+  and the hwsim now agree; the old hwsim `attr & 0x2` test made
+  Read-Only non-executable and contradicted the manual.
+- `mpz80_seq.v` implements the PTE-bank extension and enables it by
+  default (`EXT_PTE_BANK = 1`), matching the Z180 board: A20-A23 come
+  from the map entry's odd-byte high nibble.  The manual ignores that
+  nibble, so the extension is upward compatible, but the monitor must
+  initialize the bank nibbles and use a direct PTE map for the selector
+  boot (fpga-sbc.md section 5.1).  Build with
+  `EXT_PTE_BANK = 0` for an exact-MPZ80 task-register bank.
+- The two S-100 clock lines are distinct.  PHI (pin 24) is the master
+  timing signal and carries the CPU clock, so it varies with the CPU;
+  CLOCK (pin 49) is a fixed 2.000 MHz timebase with no relationship to
+  any other bus signal (IEEE-696 2.2.9.3).  `FPGA_OUT_PHI` = `clk4`;
+  `FPGA_OUT_2mHz_CLOCK` = the fixed 2 MHz PLL output.
+- The attribute and register names (`pte_attr`, `ATTR_*`, `maskreg`,
+  `trapstat`, `trap_win`, `trap_arm`, `taskreg`, `next_taskreg`,
+  `delay`, `trapreg`, `fault_trapreg`) are the common vocabulary used
+  by the Z180 CPLD; see hw/cpld/u1.v.
+
 ## Status
 
 First-cut bitstream, not hardware-verified.  The 8259 pair, two 8250
 front ends, the uPD1990/DS1305 clock, the VGA/PS/2 console and the
-on-board MYIDE are integrated; the Wunderbus/MultIO image is complete
-at 8,813 LEs (85%), 4,209 registers and 118 pins, with 1,507 LEs free.
+on-board MYIDE are integrated; the Wunderbus/MultIO image, with the
+PTE-bank extension, fits at 9,543 of 10,320 LEs (92%), 5,225
+registers and 118 pins, leaving 777 LEs free.
 `rtl/im0_call.v` supplies the 8259's three-byte 8080-mode CALL to the
 T80's IM0 entry (operand bytes and the corrected return address); its
 phase logic was checked against the T80 in GHDL.  The

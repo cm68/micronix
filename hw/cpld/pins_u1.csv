@@ -28,10 +28,10 @@ iorq_n,I,z180,IO request
 rd_n,I,z180,read strobe
 wr_n,I,z180,write strobe
 halt_n,I,z180,unused in RTL; halt fail-safe reserved
-perm0,I,map,map RAM B bit 0 read enable
-perm1,I,map,map RAM B bit 1 execute enable
-perm2,I,map,map RAM B bit 2 RI10
-perm3,I,map,map RAM B bit 3 unused
+pte_attr0,I,map,attribute byte bit 0: ATTR_READ
+pte_attr1,I,map,attribute byte bit 1: ATTR_EXEC
+pte_attr2,I,map,attribute byte bit 2: ATTR_RI10
+pte_attr3,I,map,attribute byte bit 3: ATTR_UNUSED
 bus_grant,I,from-u2,DMA grant; tri-state A12-A23 driver
 stop_i,I,from-u2,front-panel stop
 aux_i,I,from-u2,front-panel aux

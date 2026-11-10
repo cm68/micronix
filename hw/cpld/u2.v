@@ -4,9 +4,9 @@
 // All S-100 outputs are buffer inputs; the 74ABT/74F parts drive the edge.
 //
 // The U2 owns the S-100 cycle, wait states, buffer enables, interrupt
-// request/acknowledge, DMA acknowledgment, the S-100 clock divider and
-// the switch-register status bits.  The trap engine and permission check
-// live in U1.
+// request/acknowledge, DMA acknowledgment, the S-100 clocks (PHI on
+// pin 24, the divided 2 MHz CLOCK on pin 49) and the switch-register
+// status bits.  The trap engine and permission check live in U1.
 
 `default_nettype none
 
@@ -66,9 +66,9 @@ module u2_bus (
     output wire        di_oe_n,
     output wire        ctrl_oe_n,
 
-    // S-100 clock buffer
-    output wire        s100_clk1,
-    output wire        s100_clk2,
+    // S-100 clocks
+    output wire        s100_phi,     // pin 24: master timing = CPU clock
+    output wire        s100_clk,     // pin 49: constant 2 MHz
 
     // S-100 hold acknowledge buffer input
     output wire        phlda,
@@ -232,11 +232,17 @@ module u2_bus (
     assign bus_grant     = ~busak_n;
 
     // ------------------------------------------------------------------
-    // S-100 clock divider: 10 MHz /5 -> 2 MHz with the default strap.
-    // The two outputs feed the clock buffer; clk2 is the complement.
+    // S-100 clocks.
+    //   pin 24 (PHI): the master timing signal for the bus.  It is the
+    //   CPU oscillator buffered, so it varies with the CPU.
+    //   pin 49 (CLOCK): a constant 2 MHz timebase with no relationship
+    //   to any other bus signal (IEEE-696 2.2.9.3), from the divider.
+    //   The default 10 MHz can /5 gives 2.000 MHz.
     // ------------------------------------------------------------------
+    assign s100_phi = clk;
+
     reg [3:0] div_cnt;
-    reg       s100_clk;
+    reg       clk_div;
 
     wire [3:0] div_n = (clkdiv == 2'b00) ? 4'd4 :
                        (clkdiv == 2'b01) ? 4'd5 :
@@ -245,19 +251,18 @@ module u2_bus (
     always @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             div_cnt  <= 4'd0;
-            s100_clk <= 1'b0;
+            clk_div  <= 1'b0;
         end else begin
             if (div_cnt >= (div_n - 4'd1))
                 div_cnt <= 4'd0;
             else
                 div_cnt <= div_cnt + 4'd1;
 
-            s100_clk <= (div_cnt < (div_n >> 1));
+            clk_div <= (div_cnt < (div_n >> 1));
         end
     end
 
-    assign s100_clk1 = s100_clk;
-    assign s100_clk2 = ~s100_clk;
+    assign s100_clk = clk_div;
 
 endmodule
 

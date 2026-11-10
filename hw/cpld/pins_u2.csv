@@ -40,8 +40,8 @@ a0_11_oe_n,O,buffer-enable,A0-A11 buffer output enable
 do_oe_n,O,buffer-enable,DO buffer output enable
 di_oe_n,O,buffer-enable,DI buffer output enable
 ctrl_oe_n,O,buffer-enable,S-100 control buffer output enable
-s100_clk1,O,s100-clock,S-100 clock buffer input
-s100_clk2,O,s100-clock,S-100 clock buffer input, complement
+s100_phi,O,s100-clock,S-100 pin 24 PHI buffer input; = CPU oscillator
+s100_clk,O,s100-clock,S-100 pin 49 CLOCK buffer input; constant 2 MHz
 phlda,O,buffer,pHLDA buffer input
 z180_wait_n,O,z180,Z180 /WAIT
 z180_nmi_n,O,z180,Z180 /NMI from S-100

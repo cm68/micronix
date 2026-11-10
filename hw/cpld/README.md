@@ -14,7 +14,7 @@ intended to be behaviourally identical; when one changes, change both.
 | file | device | contents |
 |---|---|---|
 | `u1.v`, `u1.vhd` | U1 | sequencer + translation: task register and 8-M1 delay, trap window, trap-address shift, mask/status, register/local decode, permission check, map RAM and flash control |
-| `u2.v`, `u2.vhd` | U2 | S-100 bus cycle, wait states, buffer enables, interrupts, DMA grant, S-100 clock divider, switch status |
+| `u2.v`, `u2.vhd` | U2 | S-100 bus cycle, wait states, buffer enables, interrupts, DMA grant, S-100 clocks, switch status |
 | `pins_u1.csv` | U1 | 60 logical user-I/O assignments |
 | `pins_u2.csv` | U2 | 51 logical user-I/O assignments |
 | `Makefile` | - | optional ghdl/iverilog syntax checks |
@@ -68,7 +68,7 @@ U1:
   not decoded (reserved context);
 - 15-read trap window with the external flash address counter;
 - trap-address shift register and latched page pair;
-- permission check from map RAM B, RI10/grow, deferred memory fault;
+- attribute/permission check from map RAM B (manual Tables 1-1/4-9: execute is any nonzero attribute, read bit 0, write both), RI10/grow, deferred memory fault;
 - local page/flash-region select, map RAM and A12-A23 driver control;
 - user-halt opcode substitution and 0x00 trap-data mux;
 - interrupt request gating with the mask.
@@ -80,7 +80,9 @@ U2:
 - pRDY timeout, pWAIT and Z180 /WAIT;
 - S-100 control/status outputs, interrupt acknowledge;
 - pHOLD/pHLDA to Z180 /BUSRQ//BUSAK;
-- 4-pin can divider, /4 /5 /6 /8 strap, two clock-buffer outputs;
+- can fed to the clock buffer for S-100 pin 24 (PHI, the master timing
+  signal, tracks the CPU); divider to S-100 pin 49 (CLOCK), /4 /5 /6
+  /8 strap;
 - INT PEND / TRAP RESET switch bits.
 
 ## Known gaps / bring-up items
@@ -105,6 +107,10 @@ U2:
   forms.
 - The ATF1508AS fit, macrocell usage and timing are unverified.  U1 is
   the tight device at 60 pins and much of the trap logic.
+- U2 forwards the can oscillator to the pin-24 buffer (`s100_phi`).
+  The ATF1508AS datasheet allows a dedicated clock input to be used as
+  macrocell data; confirm the fitter routes `clk` to that output.  If
+  it will not, feed the pin-24 buffer directly from the can.
 
 ## External parts referenced by the RTL
 

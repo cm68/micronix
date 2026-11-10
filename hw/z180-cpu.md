@@ -12,9 +12,10 @@ address outputs are not connected.
 This is a design document, not a built board.  It follows the
 contract-first style of `esp32-nic.md`: the software-visible interface
 is fixed first, then the logic, memory and bus that implement it.  The
-executable specifications are `src/hwsim/d1/mpz80.c` and
-`src/hwsim/d1/mmu_test.c`; the kernel's view is
-`src/micronix/sys/ARCHITECTURE.md`.
+MPZ80 technical manual (`publicdocs/Morrow-MPZ80-CPU-Technical-Manual-
+Rev1-Apr82.pdf`) is the authority; `src/hwsim/d1/mpz80.c` and
+`src/hwsim/d1/mmu_test.c` are the executable checks that must agree
+with it; the kernel's view is `src/micronix/sys/ARCHITECTURE.md`.
 
 ## 1. The contract
 
@@ -158,20 +159,29 @@ page 0; the low A11–A0 decode then picks the device.
 
 ### 2.4 Permissions and RI10
 
-The manual's permission matrix is the default:
+The manual is definitive: Table 1-1 defines Read-Only as "the user is
+allowed to both execute and read", and Tables 4-9/4-10 give the byte
+values.  The rule is therefore
 
-| PTE[9:8] | read | write | execute |
+- execute: any nonzero attribute (`ATTR_READ | ATTR_EXEC`);
+- read: `ATTR_READ` (bit 0);
+- write: both bits set (Full, `11` only).
+
+| attr[1:0] | read | write | execute |
 |---|---|---|---|
 | 00 | no | no | no |
-| 01 | yes | no | yes (read-only is executable) |
-| 10 | no | no | yes |
-| 11 | yes | yes | yes |
+| 01 | yes | no | yes (Read-Only is executable) |
+| 10 | no | no | yes (Execute-Only) |
+| 11 | yes | yes | yes (Full) |
 
 The kernel only uses `NONE 0`, `FULL 3` and `GROW 7`; the 01/10 rows
-matter to the monitor and to CP/M-era software.  The emulator's
-`mpz80.c` checks execute as `attr & 0x2`, which makes 01 non-executable;
-the board defaults to the manual's matrix and provides a CPLD build
-option for the emulator matrix if a regression ever requires it.
+matter to the monitor and to CP/M-era software.  The hwsim used to test
+execute as `attr & 0x2`, which made Read-Only non-executable and
+contradicted Table 1-1; it now tests `attr & 0x3`, and this board, the
+FPGA board and `src/hwsim/d1/mpz80.c` all implement the same rule.  The
+RTL names the bits `ATTR_READ`, `ATTR_EXEC` and `ATTR_RI10` in the
+attribute byte (`pte_attr`); the same names and values are in
+`hw/fpga-sbc/rtl/mpz80_seq.v`.
 
 RI10 (PTE[10]) means "grow on reference":
 
@@ -197,7 +207,10 @@ execute, read}`.
 The map is two 8-bit RAMs.  RAM A holds the even byte and drives the
 S-100 A12–A19 line drivers directly.  RAM B holds the odd byte; its high
 nibble drives the A20–A23 line drivers directly, and its low nibble
-(the permissions) is the only part that enters U1.  The address bits do
+(the permissions) is the only part that enters U1.  In the common
+vocabulary RAM A is `map_seg` / `pte_seg` and RAM B is
+`map_attr` / `pte_attr` (the FPGA sequencer stores the same two bytes
+in `map_seg` and `map_attr`).  The address bits do
 not pass through any CPLD.
 
 CPU writes to `0x600–0x7ff` in task 0's local page drive both RAM data
@@ -551,11 +564,16 @@ by swapping the can.  The default is 10.000 MHz; 8, 12 and 16 MHz cans
 are drop-in.
 
 The Z8S180's internal clock multiplier and refresh are not used.  The
-can output clocks the Z180 and both CPLDs.  U2 divides it for the S-100
-bus clock; a 2-bit `CLKDIV` strap selects /4, /5, /6 or /8 so an
-8/10/12/16 MHz can still yields a nominal 2 MHz S-100 clock.  The S-100
-bus is asynchronous and wait-stated, so CPU tuning does not change the
-bus protocol; it only changes how often the CPU reaches the bus.
+can output clocks the Z180 and both CPLDs, and U2 feeds it to the
+S-100 clock buffer for pin 24 (**PHI**, the master timing signal for
+the bus), so that line tracks the CPU.  U2 also divides the can for
+S-100 pin 49 (**CLOCK**), the constant 2 MHz timebase that IEEE-696
+2.2.9.3 requires to have no relationship to any other bus signal; a
+2-bit `CLKDIV` strap selects
+/4, /5, /6 or /8, so an 8/10/12/16 MHz can all give 2.000 MHz.  The
+S-100 bus is asynchronous and wait-stated, so CPU tuning does not
+change the bus protocol; it only changes how often the CPU reaches the
+bus and the PHI rate.
 
 ### 5.2 Internal MMU transparent
 
@@ -825,7 +843,7 @@ externally from MAP_WE and CPU A0.  U1 has four spare pins.
 | S-100 control buffer inputs (pSYNC, pSTVAL, pDBIN, pWR, sMEMR, sMEMW, sINP, sOUT, sM1, sINTA, pWAIT) | 11 |
 | buffer enables: A0–A11 /OE, DO /OE, DI /OE, control /OE | 4 |
 | BUS_GRANT to U1 | 1 |
-| S-100 clock outputs | 2 |
+| S-100 clock outputs (PHI 24, CLOCK 49) | 2 |
 | pHLDA buffer input | 1 |
 | Z180 /WAIT, /NMI, /INT0, /RESET | 4 |
 | INT PEND, TRAP RESET to switch buffer | 2 |
@@ -1001,8 +1019,10 @@ U2 owns these bus-side functions:
 - NMI passes to `/NMI`.
 - `pHOLD` -> Z180 `/BUSRQ`; `/BUSAK` -> `pHLDA`; U2 disables all S-100
   buffer enables while the bus is granted.
-- socketed 4-pin can input; `CLKDIV` strap selects /4, /5, /6 or /8
-  for a nominal 2 MHz S-100 clock.
+- socketed 4-pin can input; fed to the clock buffer for S-100 pin 24
+  (PHI, the master timing signal, so it tracks the CPU), and divided to
+  pin 49 (CLOCK) with the `CLKDIV` /4, /5, /6 or /8 strap for a
+  constant 2 MHz.
 - `pRESET`/`pPOC` and the reset button drive the Z180 `/RESET` and the
   CPLD reset; reset clears the task register, mask, trap window, and
   ROM-half latch.
@@ -1018,18 +1038,20 @@ the CPU in reset until the CPLDs are configured.
 Pseudo-Verilog for the translation device:
 
 ```verilog
-wire [15:0] pte = {sram_hi, sram_lo};
-wire [23:0] paddr = {pte[15:12], pte[7:0], a[11:0]};
+// Common names: pte_seg is map RAM A, pte_attr is map RAM B.
+wire [7:0] pte_seg  = sram_lo;
+wire [7:0] pte_attr = sram_hi;
+wire [23:0] paddr = {pte_attr[7:4], pte_seg, a[11:0]};
 
-wire exec = m1;
-wire read = !wr;
+wire exec = m1_fetch;
+wire read = !memwrite;
 wire perm_ok =
-    exec ? (pte[9] | pte[8]) :
-    read ? pte[8] :
-           (pte[8] & pte[9]);
+    exec ? (pte_attr[ATTR_READ] | pte_attr[ATTR_EXEC]) :
+    read ? pte_attr[ATTR_READ] :
+           (pte_attr[ATTR_READ] & pte_attr[ATTR_EXEC]);
 
-wire fault = !super && !local && !perm_ok;
-wire ri10  = !super && !local && pte[10];
+wire perm_fault = !supervisor && !local_mem && !perm_ok;
+wire grow       = !supervisor && !local_mem && pte_attr[ATTR_RI10];
 ```
 
 U1 owns the trap-address shift register:
@@ -1106,6 +1128,13 @@ schematic must be the final check:
 Pin numbers for this group must be taken from the IEEE-696 connector
 table and verified against the MPZ80 schematic before layout.
 
+The two clock outputs are IEEE-696 pin-numbered:
+
+| signal | pin | direction | use |
+|---|---|---|---|
+| PHI | 24 | out | master timing signal for the bus; the CPU oscillator buffered, so it varies with the CPU |
+| CLOCK | 49 | out | constant 2 MHz timebase with no relationship to any other bus signal (IEEE-696 2.2.9.3) |
+
 ### 7.2 Drive requirement, buffers and data paths
 
 The ATF1508AS cannot drive the S-100 edge: its I/O does not meet the
@@ -1128,7 +1157,7 @@ through 74AHCT244 receivers.
   For a local access U2 and U1 disable the S-100 address and data
   buffers; only the on-board devices see the cycle.  This includes the
   F00000–FFFFFF flash region; its data never reaches the S-100 bus.
-- Clocks: U2 -> 74ABT541/clock buffer -> S-100.
+- Clocks: U2 -> clock buffer -> S-100 PHI (pin 24) and CLOCK (pin 49).
 
 The 74ABT/74F parts are the current-drive elements.  The CPLD pins that
 appear in section 6.5 are buffer inputs and enables, not bus pins.
@@ -1173,11 +1202,13 @@ not contain the PIC.  The mask and trap behavior are in section 3.8.
 
 ### 7.8 Clock and reset
 
-U2 divides the socketed can oscillator and drives the bus clock
-buffer.  The `CLKDIV` strap selects /4, /5, /6 or /8; an 8, 10, 12 or
-16 MHz can therefore yields a nominal 2 MHz S-100 clock.  Reset comes from S-100 pRESET/pPOC and
-the on-board button; it clears the CPLDs and holds the Z180 in reset
-until the CPLDs are configured.
+U2 drives the socketed can oscillator to the clock buffer for S-100
+pin 24 (**PHI**, the master timing signal), so the bus timing reference
+tracks the CPU.  It also divides the can for S-100 pin 49 (**CLOCK**);
+the `CLKDIV` strap selects /4, /5, /6 or /8, so an 8, 10, 12 or 16 MHz
+can gives a constant 2.000 MHz.  Reset comes from S-100 pRESET/pPOC
+and the on-board button; it clears the CPLDs and holds the Z180 in
+reset until the CPLDs are configured.
 
 ### 7.9 Pin verification
 
@@ -1376,7 +1407,7 @@ bulk near the regulator.  Keep the map SRAM and CPLDs on a ground plane.
 | 2 | CY7C199-15PC (15 ns), 32K×8, 5 V | map RAM A/B |
 | 1 | AS6C6264-55 or CY7C199-15PC | local SRAM |
 | 1 | SST39SF080 (1M×8, 5 V) or equivalent | monitor flash |
-| 1 | 4-pin can oscillator socket + 10.000 MHz 5 V can | CPU/bus clock, tunable |
+| 1 | 4-pin can oscillator socket + 10.000 MHz 5 V can | CPU clock (S-100 PHI), tunable |
 | 2 | MAX232A (5 V, 0.1 µF) | ASCI0/1 RS-232 level shifters |
 | 2 | 2×5 0.1-inch header | ASCI0/1 serial ports |
 | 1 | 5 V regulator | +8 V -> +5 V |

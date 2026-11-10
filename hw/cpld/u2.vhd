@@ -5,9 +5,9 @@
 -- the 74ABT/74F parts drive the edge.
 --
 -- U2 owns the S-100 cycle, wait states, buffer enables, interrupt
--- request/acknowledge, DMA acknowledgment, the S-100 clock divider and
--- the switch-register status bits.  The trap engine and permission check
--- live in U1.
+-- request/acknowledge, DMA acknowledgment, the S-100 clocks (PHI on
+-- pin 24, the divided 2 MHz CLOCK on pin 49) and the switch-register
+-- status bits.  The trap engine and permission check live in U1.
 --
 -- The board contract is ../z180-cpu.md.
 
@@ -77,9 +77,9 @@ entity u2_bus is
         di_oe_n    : out std_logic;
         ctrl_oe_n  : out std_logic;
 
-        -- S-100 clock buffer
-        s100_clk1 : out std_logic;
-        s100_clk2 : out std_logic;
+        -- S-100 clocks
+        s100_phi : out std_logic;    -- pin 24: master timing = CPU clock
+        s100_clk : out std_logic;    -- pin 49: constant 2 MHz
 
         -- S-100 hold acknowledge buffer input
         phlda : out std_logic;
@@ -134,11 +134,11 @@ architecture rtl of u2_bus is
     signal write_cycle : std_logic;
 
     ----------------------------------------------------------------------
-    -- S-100 clock divider
+    -- S-100 clocks
     ----------------------------------------------------------------------
-    signal div_cnt  : unsigned(3 downto 0);
-    signal div_n    : unsigned(3 downto 0);
-    signal s100_clk : std_logic;
+    signal div_cnt : unsigned(3 downto 0);
+    signal div_n   : unsigned(3 downto 0);
+    signal clk_div : std_logic;
 
     -- Output ports cannot be read in VHDL-93; these carry the values
     -- that int_pend and trap_reset also need.
@@ -287,9 +287,15 @@ begin
     bus_grant     <= not busak_n;
 
     ----------------------------------------------------------------------
-    -- S-100 clock divider: 10 MHz /5 -> 2 MHz with the default strap.
-    -- The two outputs feed the clock buffer; clk2 is the complement.
+    -- S-100 clocks.
+    --   pin 24 (PHI): the master timing signal for the bus; the CPU
+    --   oscillator buffered, so it varies with the CPU.
+    --   pin 49 (CLOCK): a constant 2 MHz timebase with no relationship
+    --   to any other bus signal (IEEE-696 2.2.9.3), from the divider.
+    --   The default 10 MHz can /5 gives 2.000 MHz.
     ----------------------------------------------------------------------
+    s100_phi <= clk;
+
     div_strap : process (clkdiv)
     begin
         case clkdiv is
@@ -303,8 +309,8 @@ begin
     clock_div : process (clk, reset_n)
     begin
         if reset_n = '0' then
-            div_cnt  <= (others => '0');
-            s100_clk <= '0';
+            div_cnt <= (others => '0');
+            clk_div <= '0';
         elsif rising_edge(clk) then
             if div_cnt >= (div_n - 1) then
                 div_cnt <= (others => '0');
@@ -313,14 +319,13 @@ begin
             end if;
 
             if div_cnt < shift_right(div_n, 1) then
-                s100_clk <= '1';
+                clk_div <= '1';
             else
-                s100_clk <= '0';
+                clk_div <= '0';
             end if;
         end if;
     end process clock_div;
 
-    s100_clk1 <= s100_clk;
-    s100_clk2 <= not s100_clk;
+    s100_clk <= clk_div;
 
 end architecture rtl;

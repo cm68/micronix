@@ -39,8 +39,8 @@ The MPZ80 CPU board, not the rest of the machine:
 - the front-panel switch register, trap-address register and keyboard
   input;
 - the S-100 bus master: 24-bit address, data in/out, control strobes,
-  wait states, interrupt acknowledge, DMA, reset and the 2 MHz bus
-  clock.
+  wait states, interrupt acknowledge, DMA, reset, the master timing
+  signal (PHI, pin 24) and the fixed 2 MHz utility clock (pin 49).
 
 The S-100 cards are not emulated.  The bus carries the memory cards
 and up to four VI interrupt sources; more than four needs additional
@@ -88,7 +88,7 @@ rather than the manual.
 | level shifting | 74LVC245 to the 5 V S-100 edge; 74ABT/74F drivers where required |
 | interrupts | on-board 74148/74373/74244 controller; **JP10 bypasses it** |
 | power | +8 V S-100 or 8–10 V on P30/P31; 5 V and 3.3 V regulators |
-| bus clock | FPGA output PHI; existing design 2 MHz |
+| bus clock | pin 24 PHI = CPU clock; pin 49 CLOCK = fixed 2 MHz |
 
 The stock design occupies **3,891 / 10,320 LEs (38%)**, **196,608 /
 423,936 RAM bits (46%)** and **155 / 180 pins (86%)**.  The translator
@@ -126,13 +126,22 @@ decode; it does not change the CPU core.
 
 ### 2.3 Clock
 
-The MPZ80's Z80 runs at **4.000 MHz** and drives a **2.000 MHz** S-100
-PHI.  The stock board runs the core at 2 or 25 MHz from a 50 MHz PLL.
-For this build configure the PLL for 4.000 MHz (50 × 2/25) for the
-T80, and divide by two for PHI.  The S-100 bus is asynchronous and
-wait-stated; the 4 MHz CPU clock is the original, so the monitor's
-timing loops (disk step rates, the 8259 initialization delay, the
-console) behave as they did.
+The MPZ80's Z80 runs at **4.000 MHz**.  The S-100 bus has two clock
+lines, and they are not the same signal:
+
+- **PHI, pin 24** is the master timing signal for the bus.  It is the
+  CPU clock, so it varies with the CPU.
+- **CLOCK, pin 49** is a constant **2 MHz** timebase with no
+  relationship to any other bus signal (IEEE-696 2.2.9.3); cards use
+  it for counters, timers and baud-rate generators.
+
+The stock board runs the core at 2 or 25 MHz from a 50 MHz PLL.  For
+this build configure the PLL for 4.000 MHz (50 × 2/25) for the T80 and
+drive PHI from that CPU clock.  The 2 MHz CLOCK is a separate fixed PLL
+output, so it stays 2.000 MHz whatever the CPU runs at.  The S-100 bus
+is asynchronous and wait-stated; the 4 MHz CPU clock is the original,
+so the monitor's timing loops (disk step rates, the 8259
+initialization delay, the console) behave as they did.
 
 Do not run the core at 25 MHz in a chassis.  The MPZ80's disk
 drivers and the monitor's delay loops are calibrated for 4 MHz; a
@@ -188,12 +197,16 @@ Entry address:
 | byte | bits | meaning |
 |---|---|---|
 | even | 7–0 | segment, A19–A12 |
-| odd | 7–4 | unused on the exact MPZ80; the extension's bank (section 5) |
+| odd | 7–4 | bank, A23–A20, in the PTE-bank extension (manual: ignored) |
 | odd | 2 | RI10 / grow |
 | odd | 1 | execute enable |
 | odd | 0 | read enable |
 
-The permission matrix is the manual's Table 1-1:
+The byte is `pte_attr`, with `ATTR_READ` = 0, `ATTR_EXEC` = 1,
+`ATTR_RI10` = 2 and `ATTR_UNUSED` = 3 — the same names and values as
+the Z180 CPLD.
+
+The manual is definitive (Table 1-1, Tables 4-9/4-10):
 
 | attr[1:0] | read | write | execute |
 |---|---|---|---|
@@ -202,11 +215,13 @@ The permission matrix is the manual's Table 1-1:
 | `10` | no | no | yes |
 | `11` | yes | yes | yes |
 
-The emulator tests execute as `attr & 0x2` and a read as `attr & 0x1`;
-a write requires `(attr & 0x3) == 3`.  So `01` is read-only but
-executable, and `10` is execute-only.  The kernel uses `NONE 0`,
-`FULL 3` and `GROW 7`; the other rows matter to the monitor and to
-CP/M-era software.
+Execute is therefore any nonzero attribute (`attr[0] | attr[1]` —
+Read-Only is executable), a read requires `attr[0]`, and a write
+requires both bits.  `rtl/mpz80_seq.v` implements exactly that, and
+the hwsim (`src/hwsim/d1/mpz80.c`) now agrees; its old `attr & 0x2`
+test denied execute on Read-Only pages, contradicting Table 1-1.  The
+kernel uses `NONE 0`, `FULL 3` and `GROW 7`; the other rows matter to
+the monitor and to CP/M-era software.
 
 Writes to the map are ordinary local writes to `0x600–0x7FF`; the
 low nine address bits are the offset into the 512-byte map.  The
@@ -219,9 +234,15 @@ port A read for translation, port B write for the CPU.
 `0x402` write:
 
 ```
-bits 7-4   bank, A23-A20 for every page of the task
+bits 7-4   bank, A23-A20 for every page of the task (exact MPZ80)
 bits 3-0   task number, 0-15
 ```
+
+With the PTE-bank extension enabled (`EXT_PTE_BANK`, the build
+default), the bank comes from the map entry's odd byte instead, so
+each 4K page can reach any bank; the task register's high nibble is
+then latched context only.  The map must be initialized with the bank
+nibbles (section 5.1).
 
 `0x402` read is the **switch register**, not the task register.
 
@@ -522,7 +543,7 @@ the 8080-style dual port address: `IN A,(n)` puts `n` on both halves,
 
 A user mapped access checks the page's permission bits:
 
-- execute (M1): require bit 1;
+- execute (M1): require bit 0 or bit 1 (any nonzero attribute);
 - read: require bit 0;
 - write: require bits 0 and 1.
 
@@ -601,9 +622,11 @@ The emulator instead starts the window at address 1 and skips a
 zero local-RAM byte.  The board follows the hardware counter; the
 register state is the same.
 
-**Clock.**  4.000 MHz CPU, 2.000 MHz PHI, from the 50 MHz PLL.  The
-S-100 bus is wait-stated; the CPU speed changes throughput, not the bus
-protocol.  Keep 4 MHz to preserve the monitor's disk timing.
+**Clock.**  4.000 MHz CPU; S-100 PHI (pin 24) is that CPU clock; S-100
+CLOCK (pin 49) is a fixed 2.000 MHz from the PLL, independent of the
+CPU.  The S-100 bus is wait-stated; the CPU speed changes throughput,
+not the bus protocol.  Keep 4 MHz to preserve the monitor's disk
+timing.
 
 **Front panel.**  The switch register at `0x402` read is the board's
 DIP switches, negated: a switch on reads low.  mon500 defines the
@@ -678,10 +701,11 @@ virtual  = { T80.a[15:12], T80.a[11:0] }
 task     = taskreg[3:0]
 page_idx = virtual[15:12]
 pte_addr = (task << 5) | (page_idx << 1)
-segment  = map[pte_addr]
-attr     = map[pte_addr + 1]
+segment  = map_seg[pte_addr]
+attr     = map_attr[pte_addr + 1]
 local    = (taskreg[3:0] == 0) && (virtual < 0x1000)
-physical = { taskreg[7:4], segment, virtual[11:0] }   // exact MPZ80
+bank     = EXT_PTE_BANK ? attr[7:4] : taskreg[7:4]
+physical = { bank, segment, virtual[11:0] }
 ```
 
 `physical` drives the S-100 A0–A23 when the cycle is not local and
@@ -791,15 +815,19 @@ the DI buffer stays enabled so the vector reaches the T80.
 ### 4.6 Clock and reset
 
 The 50 MHz input feeds a PLL with a 4.000 MHz output.  The T80 runs on
-that; a divide-by-two produces the 2.000 MHz PHI.  Reset is the wired
-OR of S-100 pRESET/pPOC and the board button; the FPGA holds the T80
-in reset for a few clocks after configuration.
+that, and so does S-100 **PHI** (pin 24), the master timing signal: PHI
+is the CPU clock and tracks the CPU.  A second, fixed PLL output is
+2.000 MHz and drives S-100 **CLOCK** (pin 49); IEEE-696 2.2.9.3
+requires that line to have no relationship to any other bus signal, so
+it stays 2 MHz whatever the CPU clock is.  Reset is the wired OR of
+S-100 pRESET/pPOC and the board button; the FPGA holds the T80 in
+reset for a few clocks after configuration.
 
 The stock board's `FPGA_OUT_CPU_CLK`, `FPGA_OUT_PHI` and
-`FPGA_OUT_2mHz_CLOCK` pins are reused: CPU_CLK = 4 MHz, PHI = 2 MHz,
-2mHz_CLOCK = PHI (or the second clock buffer the backplane wants).
-Verify the polarity and the 74LVC245 direction against the V1.6
-schematic before layout.
+`FPGA_OUT_2mHz_CLOCK` pins are reused: CPU_CLK = 4 MHz, PHI = the CPU
+clock (pin 24), 2mHz_CLOCK = the fixed 2 MHz CLOCK (pin 49).  Verify
+the polarity and the 74LVC245 direction against the V1.6 schematic
+before layout.
 
 ### 4.7 Pin budget
 
@@ -863,15 +891,22 @@ Move A20–A23 from the task register's high nibble into the map entry's
 odd-byte high nibble:
 
 ```
-A[23:12] = {PTE[15:12], PTE[7:0]}
+bank      = EXT_PTE_BANK ? pte_attr[7:4] : taskreg[7:4]
+A[23:12]  = {bank, pte_seg}
 ```
 
-This is the Z180 board's 16-bit PTE (`hw/z180-cpu.md`, section 2.2).
-The task register's high nibble becomes latched context, not an
-address.  The selector boot must then use a direct PTE map instead of
-the task-register bank, exactly as `hw/z180-cpu.md` section 4.4 and
-8.5 describe.  With the option off, the odd byte's high nibble is
-stored but unused.
+This is the Z180 board's 16-bit PTE (`hw/z180-cpu.md`, section 2.2),
+and it is implemented in `rtl/mpz80_seq.v`.  The FPGA build enables it
+by default (`parameter EXT_PTE_BANK = 1`), so the two boards share one
+address model.  The manual says the odd byte's high nibble is ignored,
+which is what makes the extension upward compatible: a map written by
+exact-MPZ80 software (high nibble zero) still addresses the same
+memory, provided the bank nibbles are initialized before the extension
+is relied on.  The task register's high nibble becomes latched
+context, not an address.  The selector boot must then use a direct PTE
+map instead of the task-register bank, exactly as
+`hw/z180-cpu.md` section 4.4 and 8.5 describe.  With the option off,
+the odd byte's high nibble is stored but unused.
 
 The option changes the monitor, not the kernel: the kernel's PTE high
 nibbles are zero and it stays below 1 MB.
@@ -1061,7 +1096,8 @@ are the host-side checks; the board bring-up adds:
 ## 8. Bring-up
 
 1. Power: 5 V and 3.3 V, no hot parts.
-2. Clock and reset: 4 MHz CPU, 2 MHz PHI, T80 reset released.
+2. Clock and reset: 4 MHz CPU on PHI (pin 24), 2 MHz CLOCK (pin 49),
+   T80 reset released.
 3. JTAG: the Cyclone IV is configured; the T80 runs.
 4. Local page: RAM, registers, map RAM.
 5. Translation: a PTE, a known S-100 address, A12–A23 at the edge.
@@ -1077,7 +1113,7 @@ are the host-side checks; the board bring-up adds:
 |---|---|---|
 | task register high nibble | A20–A23 bank | same (exact); the extension moves it to the PTE |
 | local page select | task 0, address < 0x1000 | same |
-| map entry odd byte high nibble | unused | stored, unused (extension uses it) |
+| map entry odd byte high nibble | unused | bank in the PTE-bank extension (`EXT_PTE_BANK=1`) |
 | task-switch delay | 7 instruction fetches | 8 M1 cycles (emulator/kernel) |
 | halt substitution | M1 fetch of 0x76 | same, with ED/DD/FD/CB prefix suppression |
 | memory fault status | manual 0x3E/0x7E/0xBE/0xFE | emulator-compatible 0xF7 by default |
@@ -1088,7 +1124,7 @@ are the host-side checks; the board bring-up adds:
 | FPU | 9511/9512 at 0xC00 | open bus; optional second 1 KB RAM |
 | JEDEC socket | n/a | monitor/boot-selector ROM; the 512K SRAM is not fitted |
 | VGA/PS2/USB/IDE/RTC | n/a | VGA console, PS/2 keyboard, USB serial, IDE/CF and DS1305 used; SD and printer unused |
-| DPLL/clock | 4 MHz CPU, 2 MHz PHI | same |
+| DPLL/clock | 4 MHz CPU on PHI, 2 MHz CLOCK | same |
 | board revision | n/a | **V1.6** for EXT_A20–A23; V1.1 needs a four-wire rework |
 
 Open items before layout:

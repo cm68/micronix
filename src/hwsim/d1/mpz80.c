@@ -1177,7 +1177,14 @@ get_byte(vaddr addr)
         seg = "mapped:";
         if (!super_flag) {
             int exec = m1;
-            int ok = exec ? (attr & 0x2) : (attr & 0x1);
+            /*
+             * MPZ80 manual Table 1-1 and Table 4-9: Read-Only (01)
+             * permits execute as well as read, Execute-Only (02)
+             * permits execute, and Full (03) everything - so execute
+             * is any nonzero attribute.  Testing attr & 0x2 denied it
+             * for the Read-Only row, which the manual allows.
+             */
+            int ok = exec ? (attr & 0x3) : (attr & 0x1);
 
             if (!ok) {
                 fault_trapreg = trapreg;

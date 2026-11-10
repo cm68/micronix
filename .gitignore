@@ -614,3 +614,6 @@ hw/fpga-sbc/fit/incremental_db/
 hw/fpga-sbc/fit/output_files/
 hw/fpga-sbc/mon500.mif
 hw/fpga-sbc/*.qws
+
+# GHDL default library file, if ghdl is run outside hw/cpld.
+work-obj93.cf
