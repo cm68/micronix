@@ -595,6 +595,16 @@ tri-states the address, data and control buffers.  The disk
 controllers' DMA is the only user; the CPU board is a slave during
 that time.
 
+**Why the on-board RAM is not main memory.**  The 512 KB SRAM socket,
+if fitted, hangs on the FPGA's private RAM bus (section 4.4).  A
+temporary master drives the bus address, DO and strobes, but the FPGA
+receives only DI, RDY/XRDY, pHOLD, reset and the interrupts: there are
+no receivers for A0–A23, DO0–DO7 or `pSYNC`/`pSTVAL`/`pDBIN`/`pWR`, and
+no path to drive DI.  The board can grant the bus but cannot capture a DMA
+cycle into its own RAM.  A disk controller's DMA would have to be
+bounced through the CPU, so main memory stays on the S-100 cards where
+the controller writes it directly.
+
 **Reset.**  S-100 `pRESET`/`pPOC` and the board reset button drive the
 T80 reset and clear the translator.  Reset state:
 
@@ -779,6 +789,12 @@ disabled for a local ROM or selector read, so the shared low address
 is private to the fetch.  `FPGA_OUT_RAM_WR_n` is held high in this
 build; the part is programmed externally.  A future in-system flash
 loader can drive the same write pin.
+
+The 512 KB SRAM socket (not fitted) sits on this same private RAM bus,
+so it is not usable as main memory: an S-100 temporary master cannot
+reach it, and every disk DMA transfer would need CPU intervention to
+copy the data (section 3.15).  Main memory stays on the S-100 cards;
+the on-board RAM is only for the private local page, map and ROM.
 
 ### 4.5 The S-100 bus master
 

@@ -60,10 +60,14 @@ That needs a USB Blaster and the udev rule for `09fb`.
 - `JP10` fitted to bypass the on-board interrupt controller; the raw
   S-100 `pINT` goes to `FPGA_IN_INT-`.
 - The JEDEC socket is the monitor/boot-selector ROM; the 512 KB SRAM
-  is not fitted.  The board is the MPZ80 + two cascaded MultIOs: the
-  8259 pair, the UARTs, the uPD1990 clock and the on-board 82C55/CF
-  IDE are on the FPGA.  The S-100 bus carries memory and four VI
-  sources; more than four needs additional VI wiring.  VGA/PS-2 is
+  is not fitted.  The SRAM socket is on the FPGA's private RAM bus, so
+  it is not usable as main memory: the card has no S-100 address, DO
+  or control receivers, and DMA into it would need CPU intervention
+  (`../fpga-sbc.md` section 3.15).  The board is the MPZ80 + two
+  cascaded MultIOs: the 8259 pair, the UARTs, the uPD1990 clock and
+  the on-board 82C55/CF IDE are on the FPGA.  The S-100 bus carries
+  memory and four VI sources; more than four needs additional VI
+  wiring.  VGA/PS-2 is
   the console backend (R/G/B = T6/T7/T8, HSync = T9, VSync = T10,
   PS/2 data/clock = B12/B13), and SD is unused.
 - The two 8259s are on the FPGA and CAS-cascaded.  The four S-100 VI

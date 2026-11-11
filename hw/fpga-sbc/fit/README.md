@@ -92,10 +92,12 @@ line — it is the cascade between the two cards — and VI5 is not routed:
 
 The SBC's parallel interface is unused.  The JEDEC socket is the
 monitor/boot-selector ROM; the 512K SRAM is not fitted.  The JEDEC
-part is private to the FPGA and not visible to an S-100 temporary
-master, so incoming DMA cannot reach it, but it is the ROM, not main
-memory.  The local page and map are block RAM; main memory remains the
-S-100 cards.
+part and the SRAM socket are on the FPGA's private RAM bus and are not
+visible to an S-100 temporary master: the card has no address, DO or
+control receivers, so incoming DMA cannot reach either.  That is why
+the on-board memory is not main memory — disk-controller DMA would
+have to be bounced through the CPU.  The local page and map are block
+RAM; main memory remains the S-100 cards.
 
 ## Profiles
 
